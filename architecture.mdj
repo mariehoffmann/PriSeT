@@ -747,40 +747,6 @@
 									"subViews": [
 										{
 											"_type": "UMLOperationView",
-											"_id": "AAAAAAFk68tObhXO8aQ=",
-											"_parent": {
-												"$ref": "AAAAAAFk230FE0TIa+E="
-											},
-											"model": {
-												"$ref": "AAAAAAFk68tOVxXL6dM="
-											},
-											"font": "Arial;13;0",
-											"left": 1113,
-											"top": 254,
-											"width": 316.11328125,
-											"height": 13,
-											"text": "-collect_taxids()",
-											"horizontalAlignment": 0
-										},
-										{
-											"_type": "UMLOperationView",
-											"_id": "AAAAAAFk6+2NFzeT8w4=",
-											"_parent": {
-												"$ref": "AAAAAAFk230FE0TIa+E="
-											},
-											"model": {
-												"$ref": "AAAAAAFk6+2M+DeQME0="
-											},
-											"font": "Arial;13;0",
-											"left": 1113,
-											"top": 269,
-											"width": 316.11328125,
-											"height": 13,
-											"text": "-collect_accessions(taxid)",
-											"horizontalAlignment": 0
-										},
-										{
-											"_type": "UMLOperationView",
 											"_id": "AAAAAAFk7Dqu58GIdgQ=",
 											"_parent": {
 												"$ref": "AAAAAAFk230FE0TIa+E="
@@ -790,10 +756,10 @@
 											},
 											"font": "Arial;13;0",
 											"left": 1113,
-											"top": 284,
+											"top": 254,
 											"width": 316.11328125,
 											"height": 13,
-											"text": "+get_taxid2accs_map(): &Map",
+											"text": "+get_tax2accs_map(): &Map",
 											"horizontalAlignment": 0
 										},
 										{
@@ -807,10 +773,27 @@
 											},
 											"font": "Arial;13;0",
 											"left": 1113,
-											"top": 299,
+											"top": 269,
 											"width": 316.11328125,
 											"height": 13,
 											"text": "+AccessionCollector(&TaxDBConfig)",
+											"horizontalAlignment": 0
+										},
+										{
+											"_type": "UMLOperationView",
+											"_id": "AAAAAAFk/73Y75HHI1k=",
+											"_parent": {
+												"$ref": "AAAAAAFk230FE0TIa+E="
+											},
+											"model": {
+												"$ref": "AAAAAAFk/73Yz5HEIyY="
+											},
+											"font": "Arial;13;0",
+											"left": 1113,
+											"top": 284,
+											"width": 316.11328125,
+											"height": 13,
+											"text": "+run(): Bool",
 											"horizontalAlignment": 0
 										}
 									],
@@ -818,7 +801,7 @@
 									"left": 1108,
 									"top": 249,
 									"width": 326.11328125,
-									"height": 68
+									"height": 53
 								},
 								{
 									"_type": "UMLReceptionCompartmentView",
@@ -858,7 +841,7 @@
 							"left": 1088,
 							"top": 224,
 							"width": 346.11328125,
-							"height": 129,
+							"height": 97,
 							"nameCompartment": {
 								"$ref": "AAAAAAFk230FEkTCZQ0="
 							},
@@ -1192,7 +1175,7 @@
 							"left": 1056,
 							"top": 8,
 							"width": 409,
-							"height": 385,
+							"height": 345,
 							"nameLabel": {
 								"$ref": "AAAAAAFk27R3N0mM8qI="
 							},
@@ -5848,8 +5831,8 @@
 										"$ref": "AAAAAAFk7EyXGtrnpl0="
 									},
 									"font": "Arial;13;0",
-									"left": 1041.7392578125,
-									"top": 369.5,
+									"left": 1056.7392578125,
+									"top": 329.5,
 									"width": 308.521484375,
 									"height": 13,
 									"alpha": 0.8884793954496755,
@@ -5867,8 +5850,8 @@
 									},
 									"visible": false,
 									"font": "Arial;13;0",
-									"left": 1158,
-									"top": 360.5,
+									"left": 1173,
+									"top": 320.5,
 									"height": 13,
 									"alpha": 2.356194490192345,
 									"distance": 35
@@ -5884,8 +5867,8 @@
 									},
 									"visible": false,
 									"font": "Arial;13;0",
-									"left": 1168,
-									"top": 399.5,
+									"left": 1183,
+									"top": 359.5,
 									"height": 13,
 									"alpha": -2.356194490192345,
 									"distance": 20
@@ -5895,8 +5878,8 @@
 								"$ref": "AAAAAAFk27R3N0mLk6M="
 							},
 							"font": "Arial;13;0",
-							"left": 1176,
-							"top": 385,
+							"left": 1191,
+							"top": 345,
 							"width": 15,
 							"height": 15,
 							"nameLabel": {
@@ -6194,8 +6177,8 @@
 									},
 									"visible": false,
 									"font": "Arial;13;0",
-									"left": 1193,
-									"top": 423,
+									"left": 1201,
+									"top": 404,
 									"height": 13,
 									"alpha": 1.5707963267948966,
 									"distance": 15,
@@ -6215,8 +6198,8 @@
 									},
 									"visible": null,
 									"font": "Arial;13;0",
-									"left": 1208,
-									"top": 424,
+									"left": 1216,
+									"top": 407,
 									"height": 13,
 									"alpha": 1.5707963267948966,
 									"distance": 30,
@@ -6236,8 +6219,8 @@
 									},
 									"visible": false,
 									"font": "Arial;13;0",
-									"left": 1164,
-									"top": 420,
+									"left": 1172,
+									"top": 399,
 									"height": 13,
 									"alpha": -1.5707963267948966,
 									"distance": 15,
@@ -6255,7 +6238,7 @@
 								"$ref": "AAAAAAFk7EyXGtrpRBM="
 							},
 							"lineStyle": 1,
-							"points": "1182:400;1176.75:456",
+							"points": "1197:360;1178.5833333333333:456",
 							"showVisibility": true,
 							"nameLabel": {
 								"$ref": "AAAAAAFk7E6EQuGp7sU="
@@ -11943,9 +11926,9 @@
 											"font": "Arial;13;1",
 											"left": 953,
 											"top": 831,
-											"width": 189.4267578125,
+											"width": 237.376953125,
 											"height": 13,
-											"text": "Structures"
+											"text": "TaxTree"
 										},
 										{
 											"_type": "LabelView",
@@ -11978,7 +11961,7 @@
 									"font": "Arial;13;0",
 									"left": 948,
 									"top": 824,
-									"width": 199.4267578125,
+									"width": 247.376953125,
 									"height": 25,
 									"stereotypeLabel": {
 										"$ref": "AAAAAAFk9VxD3Yo8PPM="
@@ -12069,9 +12052,9 @@
 											"font": "Arial;13;0",
 											"left": 953,
 											"top": 854,
-											"width": 189.4267578125,
+											"width": 237.376953125,
 											"height": 13,
-											"text": "+build_taxtree(Int, &Tree): Bool",
+											"text": "+build_taxtree(Int, &TaxDBConfig): Bool",
 											"horizontalAlignment": 0
 										},
 										{
@@ -12086,16 +12069,16 @@
 											"font": "Arial;13;0",
 											"left": 953,
 											"top": 869,
-											"width": 189.4267578125,
+											"width": 237.376953125,
 											"height": 13,
-											"text": "+Tree()",
+											"text": "+TaxTree()",
 											"horizontalAlignment": 0
 										}
 									],
 									"font": "Arial;13;0",
 									"left": 948,
 									"top": 849,
-									"width": 199.4267578125,
+									"width": 247.376953125,
 									"height": 38
 								},
 								{
@@ -12143,7 +12126,7 @@
 							"containerChangeable": true,
 							"left": 928,
 							"top": 824,
-							"width": 219.4267578125,
+							"width": 267.376953125,
 							"height": 101,
 							"nameCompartment": {
 								"$ref": "AAAAAAFk9VxD3Yo7y4E="
@@ -14757,40 +14740,11 @@
 					"operations": [
 						{
 							"_type": "UMLOperation",
-							"_id": "AAAAAAFk68tOVxXL6dM=",
-							"_parent": {
-								"$ref": "AAAAAAFk230FEkS/sDQ="
-							},
-							"name": "collect_taxids",
-							"visibility": "private"
-						},
-						{
-							"_type": "UMLOperation",
-							"_id": "AAAAAAFk6+2M+DeQME0=",
-							"_parent": {
-								"$ref": "AAAAAAFk230FEkS/sDQ="
-							},
-							"name": "collect_accessions",
-							"visibility": "private",
-							"parameters": [
-								{
-									"_type": "UMLParameter",
-									"_id": "AAAAAAFk6+3eqTgPHLI=",
-									"_parent": {
-										"$ref": "AAAAAAFk6+2M+DeQME0="
-									},
-									"name": "taxid",
-									"type": ""
-								}
-							]
-						},
-						{
-							"_type": "UMLOperation",
 							"_id": "AAAAAAFk7Dqu0MGFVRE=",
 							"_parent": {
 								"$ref": "AAAAAAFk230FEkS/sDQ="
 							},
-							"name": "get_taxid2accs_map",
+							"name": "get_tax2accs_map",
 							"parameters": [
 								{
 									"_type": "UMLParameter",
@@ -14821,6 +14775,26 @@
 									"type": ""
 								}
 							]
+						},
+						{
+							"_type": "UMLOperation",
+							"_id": "AAAAAAFk/73Yz5HEIyY=",
+							"_parent": {
+								"$ref": "AAAAAAFk230FEkS/sDQ="
+							},
+							"name": "run",
+							"parameters": [
+								{
+									"_type": "UMLParameter",
+									"_id": "AAAAAAFk/75eOZHLjaQ=",
+									"_parent": {
+										"$ref": "AAAAAAFk/73Yz5HEIyY="
+									},
+									"type": "Bool",
+									"direction": "return"
+								}
+							],
+							"concurrency": "concurrent"
 						}
 					]
 				},
@@ -15213,7 +15187,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk9X5I/Y7Zd0I="
 									},
-									"name": "&BlockPair"
+									"name": "&BlockPair",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16061,7 +16036,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk7JsPh3NFMO8="
 									},
-									"name": "&ConfigFile"
+									"name": "&ConfigFile",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16069,7 +16045,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk7JsPh3NFMO8="
 									},
-									"name": "&primerConfig"
+									"name": "&primerConfig",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16077,7 +16054,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk7JsPh3NFMO8="
 									},
-									"name": "&refDBConfig"
+									"name": "&refDBConfig",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16085,7 +16063,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk7JsPh3NFMO8="
 									},
-									"name": "&taxDBConfig"
+									"name": "&taxDBConfig",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16113,7 +16092,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk7Mc2Uck8fX4="
 									},
-									"name": "&TaxDBConfig"
+									"name": "&TaxDBConfig",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16141,7 +16121,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk7M5+p8uIeVw="
 									},
-									"name": "&accCollector"
+									"name": "&accCollector",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16168,7 +16149,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk9TpLgoO7Dpw="
 									},
-									"name": "&ReferenceSet"
+									"name": "&ReferenceSet",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16195,7 +16177,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk9T7s7oR4M4o="
 									},
-									"name": "&BlockSet"
+									"name": "&BlockSet",
+									"type": ""
 								},
 								{
 									"_type": "UMLParameter",
@@ -16928,7 +16911,7 @@
 					"_parent": {
 						"$ref": "AAAAAAFk23AfVkPA1SQ="
 					},
-					"name": "Structures",
+					"name": "TaxTree",
 					"attributes": [
 						{
 							"_type": "UMLPort",
@@ -16987,7 +16970,7 @@
 									"_parent": {
 										"$ref": "AAAAAAFk9VxuH4p0rhI="
 									},
-									"name": "&Tree"
+									"name": "&TaxDBConfig"
 								},
 								{
 									"_type": "UMLParameter",
@@ -17006,7 +16989,7 @@
 							"_parent": {
 								"$ref": "AAAAAAFk9VxD3Yo4Wyk="
 							},
-							"name": "Tree"
+							"name": "TaxTree"
 						}
 					]
 				},
@@ -17064,7 +17047,8 @@
 									"_parent": {
 										"$ref": "AAAAAAFk9XrBdI6e4Qg="
 									},
-									"name": "&BlockSet"
+									"name": "&BlockSet",
+									"type": ""
 								}
 							]
 						},
