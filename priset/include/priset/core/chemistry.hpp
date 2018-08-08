@@ -12,9 +12,14 @@
 #include <algorithm>
 #include <cmath>
 
+#include <priset/core/PrimerConfig>
+
 // satisfies the primer_config_concept.
-namespace priset
+namespace priset::chemistry
 {
+//!\brief Enums for computational methods for primer melting temperature.
+enum method {wallace, salt_adjusted};
+
 //!\brief Wallace rule to compute the melting temperature of a primer sequence.
 template<typename sequence_type, typename float_type>
 // todo: require base type of string compatible with char via requires concept
@@ -30,7 +35,8 @@ float_type primer_melt_wallace(sequence_type primer)
 template<typename sequence_type, typename float_type>
 float_type primer_melt_salt(sequence_type primer, float_type Na)
 {
-    float_type cnt_CG = std::count_if(primer.begin(), primer.end(), [](char c) {return c == 'C' || c == 'G';});
+    float_type cnt_CG = std::count_if(primer.begin(), primer.end(), \
+        [](char c) {return c == 'C' || c == 'G';});
     return 100.5 + 41.0*cnt_CG/primer.size() - 820.0/primer.size() + 16.6*std::log10(Na);
 }
 
@@ -44,7 +50,6 @@ float_type primer_melt_salt(sequence_type primer, float_type Na)
 */
 
 //!\brief Compress a window of aligned sequences to 1-letter encode.
-// codes: '|'
 template<typename sequence_type>
 // todo: use aligned sequence type
 // block needs to be gap-free, N is ignored due to its ambiguity, all sequences are padded to the same length
@@ -68,7 +73,7 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
                 case 'C': column_mask |= mask_C; break;
                 case 'G': column_mask |= mask_G; break;
                 case 'T': column_mask |= mask_T; break;
-                default: std::cout << "Warning: block_variety scans block with unknown symbol '" <<
+                default: std::cout << "Warning: block_compress scans block with unknown symbol '" <<
                     aligned_sequences[i][j] << "'" << std::endl;
             }
         }
@@ -88,15 +93,34 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
     return as_cx
 }
 
-/*
-# check if all target sequences satisfy melting temperature range and do not differ too much
-def filter_melt(aligned_sequences, pos, offset, cfg):
-    melt = [primer_melt_wallace(aseq.seq[pos:pos+offset]) for aseq in aligned_sequences]
-    max_melt, min_melt = max(melt), min(melt)
-    if min_melt >= cfg.var['min_melt_temp'] and max_melt <= cfg.var['max_melt_temp'] and max_melt - min_melt <= cfg.var['max_melt_diff']:
-        return True, min_melt, max_melt
-    return False, min_melt, max_melt
+//!\brief Computer melting temperature of primer sequence.
+template<typename sequence_type, typename float_type>
+float_type get_Tm(sequence_type const primer, PrimerConfig & const primer_cfg) noexcept
+{
+    switch(method primer_cfg.get_primer_melt_method())
+    {
+        case wallace: return primer_melt_wallace(primer);
+        default: return primer_melt_salt(primer, primer_cfg.get_Na());
+    }
+}
 
+//!\brief Check if all target sequences satisfy melting temperature range and do not differ too much
+template<typename sequence_type, typename float_type>
+bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const primer)
+{
+    return filter_Tm(primer_cfg, primer, 0, primer.size());
+}
+
+template<typename sequence_type, typename float_type>
+bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const primer, size_type const pos, size_type const primer_len)
+{
+    float_type Tm = get_Tm(primer, pos, primer_len);
+    if (Tm >= primer_cfg.get_min_Tm && Tm <= primer_cfg.get_max_Tm)
+        return true;
+    return false;
+}
+
+/*
 # GC content in the primer should be between 40-60%, returns True if seqs pass the filter
 def filter_GC_content(aligned_sequences, pos, offset, cfg):
     GC_min, GC_max = int(cfg.var['gc_content'][0]*offset), int(cfg.var['gc_content'][1]*offset)
@@ -153,13 +177,9 @@ def filter_crossdimer(s, t, cfg):
     if min(cnv) < cfg.var['delta_G_cross']:
         return False
     return True, min(cnv)
+*/
 
-# translate into complementary string without reversing
-def complement(dna_sequence):
-    m = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'}
-    return ''.join([m[nt] for nt in dna_sequence])
-
-
+/*
 # one-letter encoding for set of aligned sequences, no gaps
 def compress_helper(aligned_sequences, pos, length, bin_codes):
     seq_x = ''
@@ -175,4 +195,4 @@ def complement_compress(aligned_sequences, pos, length):
     return compress_helper(aligned_sequences, pos, length, {'A': 8, 'C': 4, 'G': 2, 'T': 1})[::-1]
 */
 
-} // namespace priset
+} // namespace priset::chemistry

@@ -19,6 +19,13 @@
 namespace priset
 {
 
+template<typename value_type>
+struct Range
+{
+    value_type min;
+    value_type max;
+};
+
 struct PrimerConfig
 {
     //!\publicsection
@@ -37,12 +44,18 @@ struct PrimerConfig
     */
     //!\brief Default constructor.
     constexpr PrimerConfig() :
-        _coverage_rate{0.8},
-        _transcript_range{std::make_pair<size_type, size_type>(30, 700)},
+        _root_taxid{1},
+        _coverage_rate{.8},
         _mismatch_number{3},
-        _primer_length_range{std::make_pair<size_type, size_type>(18, 24)},
-        _root_taxid{1}
+        _transcript_range{Range<size_type>{30, 700}},
+        _primer_length_range{Range<size_type>{18, 24}},
+        _primer_melt_range{Range<float_type>{50.0, 60.0}},
+        _primer_melt_diff{10.0},
+        _primer_melt_method{chemistry::wallace},
+        _Na{.0},
         {};
+
+
 
     //!\brief Default copy constructor.
     constexpr PrimerConfig(PrimerConfig const &) = default;
@@ -109,6 +122,55 @@ struct PrimerConfig
         return _mismatch_number;
     }
 
+    //!\brief Set melting temperature range.
+    bool set_Tm_range(float_type min_Tm, float_type max_Tm)
+    {
+        _primer_melt_range = Range<float_type>{min_Tm, max_Tm};
+    }
+
+    //!\brief Set melting temperature range.
+    std::pair<float_type, float_type> get_Tm_range()
+    {
+        return std::make_pair<float_type, float_type>{_primer_melt_range.min, _primer_melt_range.max};
+    }
+
+    //!\brief Get minimal melting temperature.
+    constexpr float_type get_min_Tm() const noexcept
+    {
+        return _primer_melt_range.min;
+    }
+
+    //!\brief Get maximal melting temperature.
+    constexpr float_type get_min_Tm() const noexcept
+    {
+        return _primer_melt_range.max;
+    }
+
+    //!\brief Set molar Natrium concentration if salt adjusted method for primer Tm.
+    bool set_Na(float_type Na)
+    {
+        _Na = Na;
+        return true;
+    }
+
+    //!\brief Set molar Natrium concentration if salt adjusted method for primer Tm.
+    float_type get_Na()
+    {
+        return Na;
+    }
+
+    //!\brief Set method for computing primer melting temperature.
+    void set_primer_melt_method(chemistry::method method)
+    {
+        _primer_melt_method = method;
+    }
+
+    //!\brief Get method for computing primer melting temperature.
+    chemistry::method get_primer_melt_method()
+    {
+        return _primer_melt_method;
+    }
+
     //!\brief Set distance_range.
     constexpr bool set_transcript_range(std::pair<size_type, size_type> transcript_range)
     {
@@ -133,8 +195,8 @@ private:
     std::pair<size_type> _transcript_range;
     // root taxonomic identifier
     taxid_type _root_taxid;
-
-
+    // Natrium concentration
+    float_type Na;
 };
 
 } // namespace priset
