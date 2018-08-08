@@ -18,6 +18,28 @@
 namespace priset
 {
 //!\cond
+template <typename PrimerConfig>
+concept bool primer_config_concept = requires (PrimerConfig p)
+{
+    typename PrimerConfig::float_type;
+    typename PrimerConfig::sequence_type;
+    typename PrimerConfig::size_type;
+    typename PrimerConfig::taxid_type;
+
+    { p.check_primer_constraints(PrimerConfig::sequence_type) } -> bool;
+    { p.check_primerpair_constraints(PrimerConfig::sequence_type, PrimerConfig::sequence_type) } -> bool;
+    { p.set_root_taxid(PrimerConfig::taxid_type) } -> bool;
+    { p.get_root_taxid() } -> PrimerConfig::taxid_type;
+    { p.set_coverage_rate(PrimerConfig::float_type) } -> bool;
+    { p.get_coverage_rate() } -> PrimerConfig::float_type;
+    { p.set_mismatch_number(PrimerConfig::size_type) } -> bool;
+    { p.get_mismatch_number() } -> PrimerConfig::size_type;
+    { p.set_distance_range(std::pair<PrimerConfig::size_type, PrimerConfig::size_type>)} -> bool;
+    { p.get_distance_range()} -> std::pair<PrimerConfig::size_type, PrimerConfig::size_type>;
+};
+//!\endcond
+
+//!\cond
 template <typename SequenceCollector>
 concept bool sequence_collector_concept = requires (SequenceCollector s)
 {

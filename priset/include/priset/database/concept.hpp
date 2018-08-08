@@ -56,8 +56,8 @@ template <typename AccessionCollector>
 concept bool accession_collector_concept = requires (AccessionCollector a)
 {
     typename AccessionCollector::taxmap_type;
-    { v.get_tax2accs_map() } -> &AccessionCollector::taxmap_type;
-    { v.run() } -> bool;
+    { a.get_tax2accs_map() } -> &AccessionCollector::taxmap_type;
+    { a.run() } -> bool;
 };
 //!\endcond
 //\}
