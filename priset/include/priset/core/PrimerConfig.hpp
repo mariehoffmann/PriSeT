@@ -3,28 +3,21 @@
 // ============================================================================
 
 /*!\file
- * \brief Primer Settings.
- * \author Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
- */
+* \brief Primer Settings.
+* \author Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+*/
 
- #pragma once
+#pragma once
 
- #include <unordered_map>
+#include <unordered_map>
 
- #include <priset/core/chemistry.hpp>
- #include <priset/types/dna.hpp>
-
+#include <priset/core/chemistry.hpp>
+#include <priset/types/dna.hpp>
+#include <priset/types/Range.hpp>
 
 // satisfies the primer_config_concept.
 namespace priset
 {
-
-template<typename value_type>
-struct Range
-{
-    value_type min;
-    value_type max;
-};
 
 struct PrimerConfig
 {
