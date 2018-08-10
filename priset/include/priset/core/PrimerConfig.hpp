@@ -33,8 +33,9 @@ struct PrimerConfig
     * \{
     */
     using float_type = float;
+    // todo: require member typename sequence_type::size_type
     using sequence_type = std::String; // seqan dna string
-    using size_type = unsigned short int;
+    using size_type = sequence_type::size_type;
     using taxid_type = unsigned integer;
     //!\}
 
@@ -51,11 +52,10 @@ struct PrimerConfig
         _primer_length_range{Range<size_type>{18, 24}},
         _primer_melt_range{Range<float_type>{50.0, 60.0}},
         _primer_melt_diff{10.0},
-        _primer_melt_method{chemistry::wallace},
+        _primer_melt_method{chemistry::method::wallace},
         _Na{.0},
+        _CG_content{Range<float_type>{.4, .6}};
         {};
-
-
 
     //!\brief Default copy constructor.
     constexpr PrimerConfig(PrimerConfig const &) = default;
@@ -184,19 +184,50 @@ struct PrimerConfig
         return _transcript_range;
     }
 
+    //!\brief Get lower bound for CG content.
+    constexpr float_type get_CG_min_CG_content() const noexcept
+    {
+        return _CG_content.min;
+    }
+
+    //!\brief Get upper bound for CG content.
+    constexpr float_type get_CG_max_CG_content() const noexcept
+    {
+        return _CG_content.max;
+    }
+
 private:
-    // lower bound for coverage rate of primer to template match
-    float_type _coverage_rate;
-    // distance range between forward ending and reverse beginning
-    std::pair<size_type, size_type> _distance_range;
-    // upper bound for number of mismatches between primer and template
-    size_type _mismatch_number;
-    //!\brief Constraints for primer length range.
-    std::pair<size_type> _transcript_range;
-    // root taxonomic identifier
+
+    //!\brief Root taxonomic identifier below which references are sampled.
     taxid_type _root_taxid;
-    // Natrium concentration
-    float_type Na;
+
+    //!\brief Lower bound for coverage rate of primer to template alignment.
+    float_type _coverage_rate;
+
+    //!\brief Upper bound for number of mismatches between primer and template.
+    size_type _mismatch_number;
+
+    //!\brief Primer length range.
+    Range<size_type> _primer_length_range;
+
+    //!\brief Transcript length range.
+    Range<size_type> _transcript_range;
+
+    //!\brief Range of melting temperatures of candidate primer sequences.
+    Range<float_type> _primer_melt_range;
+
+    //!\brief Maximal permitted temperature difference [Kelvin] of primers.
+    float_type _primer_melt_diff;
+
+    //!\brief Method for computing melting temperature of primer.
+    method _primer_melt_method;
+
+    //!\brief Molar Natrium concentration for salt-adjusted primer_melt_method.
+    float_type _Na;
+
+    //!\brief CG content range of primer.
+    // It is recommended that the relative content of nts C and G is in the range of 40%-60%.
+    Range<float_type> _CG_content;
 };
 
 } // namespace priset

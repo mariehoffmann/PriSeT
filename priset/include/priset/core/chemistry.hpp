@@ -23,21 +23,24 @@ enum method {wallace, salt_adjusted};
 //!\brief Wallace rule to compute the melting temperature of a primer sequence.
 template<typename sequence_type, typename float_type>
 // todo: require base type of string compatible with char via requires concept
-float_type primer_melt_wallace(sequence_type primer)
+//sequence_type::value_type == dna
+float_type primer_melt_wallace(sequence_type primer, sequence_type::iterator it1, sequence_type::iterator it2)
 {
-    size_t cnt_AT = std::count_if(primer.begin(), primer.end(), [](char c) {return c == 'A' || c == 'T';});
-    size_t cnt_CG = std::count_if(primer.begin(), primer.end(), [](char c) {return c == 'C' || c == 'G';});
+    assert((std::is_same<sequence_type::value_type, dna>));
+    size_t cnt_AT = std::count_if(it1, it2, [](dna b) {return b == dna::A || c == dna::T;});
+    size_t cnt_CG = std::count_if(it1, it2, [](dna b) {return c == dna::C || c == dna::G;});
     return 2*cnt_AT + 4*cnt_CG;
 }
 
-//!\brief Salt-adjusted method to compute the melting temperature of a primer sequence.
+//!\brief Salt-adjusted method to compute melting temperature of primer sequence.
 // input primer:string sequence, Na:float molar Natrium ion concentration
 template<typename sequence_type, typename float_type>
-float_type primer_melt_salt(sequence_type primer, float_type Na)
+float_type primer_melt_salt(sequence_type primer, float_type Na, sequence_type::iterator it1, sequence_type::iterator it2)
 {
-    float_type cnt_CG = std::count_if(primer.begin(), primer.end(), \
+    float_type cnt_CG = std::count_if(it1, it2, \
         [](char c) {return c == 'C' || c == 'G';});
-    return 100.5 + 41.0*cnt_CG/primer.size() - 820.0/primer.size() + 16.6*std::log10(Na);
+    sequence_type::size_type primer_len = static_cast<sequence_type::size_type>(it2-it1);
+    return 100.5 + 41.0*cnt_CG/primer_len - 820.0/primer_len + 16.6*std::log10(Na);
 }
 
 //!\brief  variation measure for a block of aligned sequences in terms of number of columns
@@ -62,7 +65,7 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
     std::vector<dna> as_cx(offset);
     //codes = {1: '|', 2: '2', 3: '3', 4: '4'}
     unsigned short int mask_A = 1, mask_C = 2, mask_G = 4, mask_T = 8;
-    for (unsigned int i = 0; i < offset; ++i)
+    for (unsigned int i = offset; i < offset + size; ++i)
     {
         for (unsigned int j = 0; j < aligned_sequences.size(); ++j)
         {
@@ -88,14 +91,14 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
         if (column_mask & mask_T == mask_T)
             dna_str.append('T');
 
-        as_cx[i] = str2dna[dna_str];
+        as_cx[i-offset] = str2dna[dna_str];
     }
     return as_cx
 }
 
 //!\brief Computer melting temperature of primer sequence.
 template<typename sequence_type, typename float_type>
-float_type get_Tm(sequence_type const primer, PrimerConfig & const primer_cfg) noexcept
+float_type get_Tm(sequence_type const primer, PrimerConfig& const primer_cfg) noexcept
 {
     switch(method primer_cfg.get_primer_melt_method())
     {
@@ -104,34 +107,51 @@ float_type get_Tm(sequence_type const primer, PrimerConfig & const primer_cfg) n
     }
 }
 
-//!\brief Check if all target sequences satisfy melting temperature range and do not differ too much
+//!\brief Check for all target sequences the melting temperature range.
 template<typename sequence_type, typename float_type>
-bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const primer)
+bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const sequence)
 {
-    return filter_Tm(primer_cfg, primer, 0, primer.size());
+    return filter_Tm(primer_cfg, sequence, 0, sequence.size());
 }
 
+//!\brief Check melting temperature for subsequence.
 template<typename sequence_type, typename float_type>
-bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const primer, size_type const pos, size_type const primer_len)
+bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const sequence,
+    sequence_type::size_type const offset, sequence_type::size_type const size)
 {
-    float_type Tm = get_Tm(primer, pos, primer_len);
-    if (Tm >= primer_cfg.get_min_Tm && Tm <= primer_cfg.get_max_Tm)
+    float_type Tm = get_Tm(primer, primer_cfg, offset, size);
+    if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
         return true;
     return false;
 }
 
-/*
-# GC content in the primer should be between 40-60%, returns True if seqs pass the filter
-def filter_GC_content(aligned_sequences, pos, offset, cfg):
+//!\brief Compute relative GC content.
+template<typename sequence_type, typename float_type>
+float_type get_GC_content(sequence_type sequence, PrimerConfig & cfg,
+    sequence_type::size_type offset, sequence_type::size_type size) noexcept
+{
     GC_min, GC_max = int(cfg.var['gc_content'][0]*offset), int(cfg.var['gc_content'][1]*offset)
     logging.debug('GC_min, max = [{}, {}]'.format(GC_min, GC_max))
-    GC_cnts = [len([1 for nt in aseq.seq[pos:pos+offset] if nt.upper() in ['C', 'G']]) for aseq in aligned_sequences]
+    GC_cnts = [len([1 for nt in aseq.seq[offset:offset+size] if nt.upper() in ['C', 'G']]) for aseq in aligned_sequences]
     GC_cnts.sort()
     logging.debug('GC_ctns = ' + str(GC_cnts))
     if GC_cnts[0] < GC_min or GC_cnts[-1] > GC_max:
         return False, GC_cnts[0], GC_cnts[-1]
     return True, GC_cnts[0], GC_cnts[-1]
+}
 
+//!\brief Check if GC content is in the recommended range.
+template<typename sequence_type, typename float_type>
+bool filter_GC_content(sequence_type sequence, PrimerConfig & cfg,
+    sequence_type::size_type offset, sequence_type::size_type size) noexcept
+{
+    float_type CG_content = get_CG_content(sequence, cfg, offset, size);
+    if (CG_content < cfg.get_min_CG_content() || CG_content > cfg.get_max_CG_content())
+        return false;
+    return true;
+}
+
+/*
 # check for GC at 3' end, DNA sense/'+': 5' to 3', antisense/'-': 3' to 5', should be <= 3 in last 5 bps
 def filter_GC_clamp(sequence, sense='+'):
     if sense == '+':
