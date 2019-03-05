@@ -122,9 +122,9 @@ struct PrimerConfig
     }
 
     //!\brief Set melting temperature range.
-    std::pair<float_type, float_type> get_Tm_range()
+    Range<float_type> get_Tm_range()
     {
-        return std::make_pair<float_type, float_type>{_primer_melt_range.min, _primer_melt_range.max};
+        return _primer_melt_range.min;
     }
 
     //!\brief Get minimal melting temperature.

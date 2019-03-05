@@ -7,6 +7,7 @@
  * \author Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
  */
 
+// TODO: use seqan3 dna types, keep conversion table for ambiguous 1-letter encodings 
 #pragma once
 
 #include <cassert>

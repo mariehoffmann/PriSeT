@@ -13,6 +13,7 @@
 #include <cmath>
 
 #include <priset/core/PrimerConfig>
+#include <priset/types/dna.hpp>
 
 // satisfies the primer_config_concept.
 namespace priset::chemistry
@@ -126,18 +127,13 @@ bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const sequence,
 }
 
 //!\brief Compute relative GC content.
+// TODO: require sequence_concept (includes sequence has iterator)
 template<typename sequence_type, typename float_type>
 float_type get_GC_content(sequence_type sequence, PrimerConfig & cfg,
-    sequence_type::size_type offset, sequence_type::size_type size) noexcept
+    sequence_type::iterator_type it1, sequence_type::iterator_type it2) noexcept
 {
-    GC_min, GC_max = int(cfg.var['gc_content'][0]*offset), int(cfg.var['gc_content'][1]*offset)
-    logging.debug('GC_min, max = [{}, {}]'.format(GC_min, GC_max))
-    GC_cnts = [len([1 for nt in aseq.seq[offset:offset+size] if nt.upper() in ['C', 'G']]) for aseq in aligned_sequences]
-    GC_cnts.sort()
-    logging.debug('GC_ctns = ' + str(GC_cnts))
-    if GC_cnts[0] < GC_min or GC_cnts[-1] > GC_max:
-        return False, GC_cnts[0], GC_cnts[-1]
-    return True, GC_cnts[0], GC_cnts[-1]
+    size_t cnt_GC = std::count_if(it1, it2, [](dna b) {return b == dna::C || b == dna::G;});
+    return static_cast<float_type>(cnt_GC)/static_cast<float_type>(it2-it1);
 }
 
 //!\brief Check if GC content is in the recommended range.
