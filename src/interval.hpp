@@ -3,7 +3,7 @@
 // ============================================================================
 
 /*!\file
-* \brief Range type for storing upper and lower bounds.
+* \brief Interval type for storing upper and lower bounds.
 * \author Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
 */
 
@@ -12,8 +12,13 @@
 namespace priset
 {
 template<typename value_type>
-struct Range
+struct interval
 {
+    bool in(value_type const value) const
+    {
+        assert(min <= max && "max set to a value less than min!");
+        return min <= value && value <= max;
+    }
     value_type min;
     value_type max;
 };

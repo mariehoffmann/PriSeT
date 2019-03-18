@@ -10,10 +10,12 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
+#include <vector>
 
-#include <priset/core/PrimerConfig>
-#include <priset/types/dna.hpp>
+#include "primer_config.hpp"
+#include "dna.hpp"
 
 // satisfies the primer_config_concept.
 namespace priset::chemistry
@@ -23,24 +25,24 @@ enum method {wallace, salt_adjusted};
 
 //!\brief Wallace rule to compute the melting temperature of a primer sequence.
 template<typename sequence_type, typename float_type>
-// todo: require base type of string compatible with char via requires concept
+// todo: require sequence_type comparable with dna aka char and provides iterator
 //sequence_type::value_type == dna
-float_type primer_melt_wallace(sequence_type primer, sequence_type::iterator it1, sequence_type::iterator it2)
+float_type primer_melt_wallace(sequence_type primer, typename sequence_type::iterator it1, typename sequence_type::iterator it2)
 {
-    assert((std::is_same<sequence_type::value_type, dna>));
-    size_t cnt_AT = std::count_if(it1, it2, [](dna b) {return b == dna::A || c == dna::T;});
-    size_t cnt_CG = std::count_if(it1, it2, [](dna b) {return c == dna::C || c == dna::G;});
+    assert((std::is_same<typename sequence_type::value_type, dna>::value));
+    size_t cnt_AT = std::count_if(it1, it2, [](dna n) {return n == dna::A || n == dna::T;});
+    size_t cnt_CG = std::count_if(it1, it2, [](dna n) {return n == dna::C || n == dna::G;});
     return 2*cnt_AT + 4*cnt_CG;
 }
 
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
 // input primer:string sequence, Na:float molar Natrium ion concentration
 template<typename sequence_type, typename float_type>
-float_type primer_melt_salt(sequence_type primer, float_type Na, sequence_type::iterator it1, sequence_type::iterator it2)
+float_type primer_melt_salt(sequence_type primer, float_type Na, typename sequence_type::iterator it1, typename sequence_type::iterator it2)
 {
     float_type cnt_CG = std::count_if(it1, it2, \
         [](char c) {return c == 'C' || c == 'G';});
-    sequence_type::size_type primer_len = static_cast<sequence_type::size_type>(it2-it1);
+    typename sequence_type::size_type primer_len = static_cast<typename sequence_type::size_type>(it2-it1);
     return 100.5 + 41.0*cnt_CG/primer_len - 820.0/primer_len + 16.6*std::log10(Na);
 }
 
@@ -66,11 +68,12 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
     std::vector<dna> as_cx(offset);
     //codes = {1: '|', 2: '2', 3: '3', 4: '4'}
     unsigned short int mask_A = 1, mask_C = 2, mask_G = 4, mask_T = 8;
-    for (unsigned int i = offset; i < offset + size; ++i)
+    unsigned short int column_mask = 0;
+    for (unsigned int i = pos; i < pos + offset; ++i)  //  pos, pos + offset?
     {
         for (unsigned int j = 0; j < aligned_sequences.size(); ++j)
         {
-            unsigned short int column_mask = 0;
+            column_mask = 0;
             switch(aligned_sequences[i][j])
             {
                 case 'A': column_mask |= mask_A; break;
@@ -83,25 +86,27 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
         }
         // build dna string conform to key set of priset::str2dna map
         std::string dna_str = "";
-        if (column_mask & mask_A == mask_A)
-            dna_str.append('A');
-        if (column_mask & mask_C == mask_C)
-            dna_str.append('C');
-        if (column_mask & mask_G == mask_G)
-            dna_str.append('G');
-        if (column_mask & mask_T == mask_T)
-            dna_str.append('T');
+        if ((column_mask & mask_A) == mask_A)
+            dna_str.append("A");
+        if ((column_mask & mask_C) == mask_C)
+            dna_str.append("C");
+        if ((column_mask & mask_G) == mask_G)
+            dna_str.append("G");
+        if ((column_mask & mask_T) == mask_T)
+            dna_str.append("T");
 
         as_cx[i-offset] = str2dna[dna_str];
     }
-    return as_cx
+    return as_cx;
 }
 
 //!\brief Computer melting temperature of primer sequence.
-template<typename sequence_type, typename float_type>
-float_type get_Tm(sequence_type const primer, PrimerConfig& const primer_cfg) noexcept
+// make primer_config_type a const reference?
+template<typename primer_config_type, typename float_type>
+float_type get_Tm(typename primer_config_type::sequence_type const primer, primer_config_type & primer_cfg) noexcept
 {
-    switch(method primer_cfg.get_primer_melt_method())
+    // enum method {wallace, salt_adjusted};
+    switch(primer_cfg.get_primer_melt_method())
     {
         case wallace: return primer_melt_wallace(primer);
         default: return primer_melt_salt(primer, primer_cfg.get_Na());
@@ -109,16 +114,17 @@ float_type get_Tm(sequence_type const primer, PrimerConfig& const primer_cfg) no
 }
 
 //!\brief Check for all target sequences the melting temperature range.
-template<typename sequence_type, typename float_type>
-bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const sequence)
+template<typename primer_config_type, typename float_type>
+bool filter_Tm(primer_config_type & primer_cfg, typename primer_config_type::sequence_type & sequence)
 {
-    return filter_Tm(primer_cfg, sequence, 0, sequence.size());
+    return filter_Tm<primer_config_type::sequence_type, float_type>(primer_cfg, sequence, 0, sequence.size());
 }
 
+/*
 //!\brief Check melting temperature for subsequence.
-template<typename sequence_type, typename float_type>
-bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const sequence,
-    sequence_type::size_type const offset, sequence_type::size_type const size)
+template<typename primer_config_type, typename float_type>
+bool filter_Tm(primer_config_type& const primer_cfg, primer_config_type::sequence_type& const sequence,
+    typename sequence_type::size_type const offset, typename sequence_type::size_type const size)
 {
     float_type Tm = get_Tm(primer, primer_cfg, offset, size);
     if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
@@ -129,7 +135,7 @@ bool filter_Tm(PrimerConfig& const primer_cfg, sequence_type& const sequence,
 //!\brief Compute relative GC content.
 // TODO: require sequence_concept (includes sequence has iterator)
 template<typename sequence_type, typename float_type>
-float_type get_GC_content(sequence_type sequence, PrimerConfig & cfg,
+float_type get_GC_content(sequence_type sequence, primer_config & cfg,
     sequence_type::iterator_type it1, sequence_type::iterator_type it2) noexcept
 {
     size_t cnt_GC = std::count_if(it1, it2, [](dna b) {return b == dna::C || b == dna::G;});
@@ -138,15 +144,15 @@ float_type get_GC_content(sequence_type sequence, PrimerConfig & cfg,
 
 //!\brief Check if GC content is in the recommended range.
 template<typename sequence_type, typename float_type>
-bool filter_GC_content(sequence_type sequence, PrimerConfig & cfg,
-    sequence_type::size_type offset, sequence_type::size_type size) noexcept
+bool filter_GC_content(sequence_type sequence, primer_config & cfg,
+    typename sequence_type::size_type offset, typename sequence_type::size_type size) noexcept
 {
     float_type CG_content = get_CG_content(sequence, cfg, offset, size);
     if (CG_content < cfg.get_min_CG_content() || CG_content > cfg.get_max_CG_content())
         return false;
     return true;
 }
-
+*/
 /*
 # check for GC at 3' end, DNA sense/'+': 5' to 3', antisense/'-': 3' to 5', should be <= 3 in last 5 bps
 def filter_GC_clamp(sequence, sense='+'):
@@ -211,4 +217,4 @@ def complement_compress(aligned_sequences, pos, length):
     return compress_helper(aligned_sequences, pos, length, {'A': 8, 'C': 4, 'G': 2, 'T': 1})[::-1]
 */
 
-} // namespace priset::chemistry
+} // namespace chemistry
