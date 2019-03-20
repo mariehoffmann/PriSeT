@@ -1,22 +1,21 @@
 # PriSeT
-Tool for assisting the search of primer sequences for metabarcoding experiments. Given a set of higher order taxonomies, a reference database, and a region to search in, PriSeT tries to identify conserved sections suitable for PCR primers such that taxonomic coverage and separation are optimal.
+Tool for assisting the search of primer sequences for metabarcoding experiments. Given a taxonomic identifier, a reference database, and a genetic target region, PriSeT identifies conserved sections suitable for PCR primers such that taxonomic coverage and separation are optimal.
 
 ## Requirements
   * OS: Linux, MacOS
-  * Postgresql
+  * genmap 
 
 ## Setup
 In the background PriSet uses database queries for walking in the taxonomy tree and collecting relevant sequences. Therefore you first need to setup the NCBI Taxonomy database. NCBI provides all data files necessary to build locally a database according to the scheme below.
 
-### Compiling Unit Test
-  1. Create a build directory, e.g. in your home directory and change into it
+### Compilation
+  1. Create a build directory and compile `priset` from there
   ```
-  mkdir -p ~/builds/priset
-  cd ~/builds/priset
+  g++ priset.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -o priset
   ```
-  2. Compile complete test suite
+  2. Call binary with path to `genmap` binary, the source directory (location of fasta and taxonomy files) and a working directory for temporary output
   ```
-  cmake -DCMAKE_CXX_COMPILER=g++-mp-7 $PRISET_DIR/test/unit
+ ./priset <path_genmap_bin> <src_dir> <work_dir>
   ```
 
 ### Instructions for Local Database
