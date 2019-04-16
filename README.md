@@ -2,11 +2,31 @@
 Tool for assisting the search of primer sequences for metabarcoding experiments. Given a taxonomic identifier, a reference database, and a genetic target region, PriSeT identifies conserved sections suitable for PCR primers such that taxonomic coverage and separation are optimal.
 
 ## Requirements
-  * OS: Linux, MacOS
-  * genmap 
+
+| **Platform**                       | **Details**            | **Tested** |
+|:---------------------------------: | :--------------------: | :-----------: |
+| <img src="./.github/Linux.svg" width="100" height="100" /> | `Linux 64 bit` | - |
+| <img src="./.github/MacOS.svg" width="100" height="100" /> | `Mac OS 64 bit` | High Sierra 10.12.6 |
+
+### PostgreSQL
+For setting up the database you need PostgreSQL (arbitrary version) and the server. Use e.g. `apt-get` or `port` to install the latest distributions.
+
+On Linux:
+```
+sudo apt-get install postgresql postgresql-contrib
+```
+
+On MacOS
+```
+sudo port install postgresql11 postgresql11-server
+```
 
 ## Setup
-In the background PriSet uses database queries for walking in the taxonomy tree and collecting relevant sequences. Therefore you first need to setup the NCBI Taxonomy database. NCBI provides all data files necessary to build locally a database according to the scheme below.
+Clone PriSeT and its submodules
+```
+git clone --recurse-submodules https://github.com/mariehoffmann/PriSeT.git
+```
+
 
 ### Compilation
   1. Create a build directory and compile `priset` from there
