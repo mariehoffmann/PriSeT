@@ -1,0 +1,3 @@
+[submodule "submodules/genmap"]
+	path = submodules/genmap
+	url = https://github.com/mariehoffmann/genmap.git
