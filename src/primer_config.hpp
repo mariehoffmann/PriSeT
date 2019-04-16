@@ -141,6 +141,12 @@ struct primer_config
         return Na;
     }
 
+    //!\brief Get primer length range
+    constexpr interval<size_type> get_primer_length_range()
+    {
+        return primer_length_range;
+    }
+
     //!\brief Set method for computing primer melting temperature.
     void set_primer_melt_method(chemistry::method method_)
     {

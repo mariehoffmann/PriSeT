@@ -11,6 +11,7 @@
 #include "genmap.hpp"
 #include "io_config.hpp"
 #include "primer_config.hpp"
+#include "taxonomy.hpp"
 
 /*
  * usage        g++ priset.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -o priset
@@ -22,15 +23,20 @@
  */
 int main(int argc, char** argv)
 {
-
     if (argc < 4)
         std::cout << "ERROR: " << ARG_ERROR << std::endl, exit(0);
     // set path prefixes for fasta and taxonomy files
     io_config io_cfg{argv[1], argv[2], argv[3]};
-    run_genmap(io_cfg);
+    // build taxonomy in RAM
+    taxonomy taxtree{io_cfg.tax_file};
+
+    //set primer constraints and k-mer length
+    priset::primer_config<std::string> primer_cfg{};
+
+    run_genmap(io_cfg, primer_cfg);
     std::cout << "fasta_file: " << io_cfg.fasta_file << std::endl;
 
     // use rotifera.genmap.freq16
-    priset::primer_config<std::string> primer_cfg{};
 
+    return 0;
 }
