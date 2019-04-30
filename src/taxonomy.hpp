@@ -1,69 +1,115 @@
 #include <algorithm>
+#include <experimental/filesystem>
+#include <fstream>
+#include <iostream>
+#include <set>
+#include <sstream>
+#include <stack>
 #include <unordered_map>
 #include <vector>
 
+namespace fs = std::experimental::filesystem;
+
+namespace priset
+{
 /*
  * A taxonomy tree stores the hierarchy of taxonomic nodes given their integer
- * identifier.
+ * identifier. The taxonomy might be incomplete in terms of that there are multiple
+ * root nodes. The taxonomy is retrieved from a text file where the first column
+ * corresponds to the taxonomy identifier and the second column to its parent.
  * Implementation details: It is stored as an unordered_map with the taxonomic
- * identifier of the parent as key and the list of child IDs as a sorted vector
- * to support binary search.
+ * identifier of the parent as key and an std::set of child IDs.
  */
 struct taxonomy
 {
     using key_type = unsigned int;
-    using node_type = unordered_map<key_type, std::vector<key_type>>::value_type;
-    using node_map_type = typename unordered_map<key_type, std::vector<key_type>>;
+    using value_type = std::set<key_type>;
+    using node_map_type = typename std::unordered_map<key_type, value_type>;
     using iterator_type = node_map_type::iterator;
 
-    // tax file is comma separated tuple list [parent_id, child_id]
-    taxonomy(std::string & tax_file)
+    taxonomy(fs::path & tax_file)
     {
-        std::ifstream ifs(tax_file, std::ifstream::in);
+        std::ifstream ifs{tax_file, std::ifstream::in};
         if (!ifs.is_open())
             std::cout << "Error: could not open taxonomy file, namely '" << tax_file << "'\n", exit(0);
-        std::cout << "ifs is open: " << ifs.is_open() << std::endl;
 
-        // store flat, i.e., [pid1, cid1, pid2, cid2, ...]
-        std::vector<key_type> raw_taxa;
-        std::string cell = "";
-        // Iterate through each line and split the content using delimeter
-        while (getline(istr, cell, ','))
+        // Temporary set of all taxids assigned as child (for root list determination)
+        std::set<key_type> someones_child{};
+        // Iterate through tax_file and split content using delimeter
+        std::string line, taxid_str;
+        key_type taxid, p_taxid;
+        while (std::getline(ifs, line))
         {
-            std::cout << cell << ", ";
-            raw_taxa.push_back(cell);
+            std::istringstream iline(line);
+            std::getline(iline, taxid_str, ',');
+            taxid = char2key(taxid_str);
+            std::getline(iline, taxid_str, ',');
+            p_taxid = char2key(taxid_str);
+            someones_child.insert(taxid);
+            insert_node(taxid, p_taxid);
         }
-        std::cout << std::endl;
-        std::cout << "raw_taxa.size() = " << raw_taxa.size() << std::endl;
         ifs.close();
-        build_tree(raw_taxa);
-        // destroy raw_taxa
-        ~raw_taxa;
+        // determine root nodes, i.e. keys that are not in the children set
+        std::vector<int> keys;
+        std::transform(node_map.begin(), node_map.end(), std::back_inserter(keys),
+            [](const node_map_type::value_type &keyval){return keyval.first;});
+        for (key_type key : keys)
+            if (someones_child.find(key) == someones_child.end())
+                root_nodes.push_back(key);
     };
+
+    // Display taxonomy by pre-order traversing tree/forest.
+    void print_taxonomy()
+    {
+        std::stack<std::pair<key_type, key_type>> lifo;
+        using tree_node_type = typename std::pair<key_type, key_type>;
+        unsigned short tree_id = 0;
+        unsigned short level = 0;
+        for (key_type root : root_nodes)
+        {
+            std::cout << "################ Tree " << tree_id++ << " ################\n";
+            level = 0;
+            lifo.push(std::make_pair(root, static_cast<key_type>(0)));
+            while (!lifo.empty())
+            {
+                    tree_node_type node = lifo.top();
+                    lifo.pop();
+                    level = node.second;
+                    std::cout << "\n" << std::string(level, '\t') << "|__\t";
+                    std::cout << node.first;
+                    // push back children
+                    for (key_type c : node_map[node.first])
+                        lifo.push(std::make_pair(c, level + 1));
+            }
+            std::cout << std::endl;
+        }
+    }
 
 private:
 
-    void insert_node(key_type const parent_id, key_type const node_id)
+    key_type char2key(std::string taxid_str)
+    {
+        std::stringstream taxid_ss;
+        taxid_ss << taxid_str;
+        key_type taxid;
+        taxid_ss >> taxid;
+        return taxid;
+    }
+
+    void insert_node(key_type const node_id, key_type const parent_id)
     {
         iterator_type it = node_map.find(parent_id);
         if (it == node_map.end())
-            node_map.insert(node_type{parent_id, std::vector<key_type>(node_id);
+            node_map.insert({{parent_id, value_type{node_id}}});
         else
-            it->second.push_back(node_id);
+            it->second.insert(node_id);
     }
 
-    void build_tree(std::vector<key_type> const & raw_taxa)
-    {
-        // for node pair in file apply insert_node
-
-        // sort node lists
-        for (iterator_type it = node_map.begin(); it != node_map.end(); ++it)
-        {
-            std::sort(it->second.begin(), it->second.end());
-        }
-    }
-
-    key_type root_node;
+    // taxid of root node(s)
+    std::vector<key_type> root_nodes{};
+    // Store hierarchy as map over set {p_taxid: (c_taxid1, c_taxid2, ...)}
     node_map_type node_map;
 
 };
+
+}  // namespace priset
