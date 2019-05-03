@@ -1,3 +1,9 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <cstring>
@@ -8,6 +14,9 @@
 #include "errors.hpp"
 
 namespace fs = std::experimental::filesystem;
+
+namespace priset
+{
 
 struct io_config
 {
@@ -20,18 +29,15 @@ private:
     fs::path fasta_file{};
     // Taxonomy file in csv format (set by PriSeT).
     fs::path tax_file{};
-
     // Working base directory for storing FM indices, mappings and results.
     fs::path work_dir;
-    // Working subdirectory for FM index (set by PriSeT)
+    // Working subdirectory for FM index (set by PriSeT).
     fs::path index_dir;
-    // Path to genmap binary (set by PriSeT)
+    // Path to genmap binary (set by PriSeT).
     fs::path genmap_bin;
-
+    // Path to computed FM index (set by PriSeT -> genmap).
     fs::path genmap_idx_dir;
-    //fs::path genmap_map_dir;
-
-    std::regex suffix_fasta_rx{"\\.(fa|fasta)"};
+    // Library file extensions.
     std::string ext_fasta = ".fasta";
     std::string ext_acc = ".acc";
     std::string ext_tax = ".tax";
@@ -86,21 +92,35 @@ public:
         };
 
     // Return accession file with absolute path as filesystem::path object.
-    fs::path get_acc_file()
+    fs::path get_acc_file() const noexcept
     {
         return acc_file;
     }
 
     // Return library file with absolute path as filesystem::path object.
-    fs::path get_fasta_file()
+    fs::path get_fasta_file() const noexcept
     {
         return fasta_file;
     }
 
+    // Return path of genmap binary
+    fs::path get_genmap_binary() const noexcept
+    {
+        return genmap_bin;
+    }
+
+    // Return directory where FM index is stored
+    fs::path get_genmap_idx_dir() const noexcept
+    {
+        return genmap_idx_dir;
+    }
+
     // Return taxonomy file with absolute path as filesystem::path object.
-    fs::path get_tax_file()
+    fs::path get_tax_file() const noexcept
     {
         return tax_file;
     }
 
 };
+
+} // namespace priset

@@ -1,13 +1,12 @@
 // ============================================================================
 //                    PriSeT - The Primer Search Tool
 // ============================================================================
+//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Manual: https://github.com/mariehoffmann/PriSeT
 
-/*!\file
- * \brief Primer Settings.
- * \author Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
- */
+// Primer Settings.
 
-// TODO: use seqan3 dna types, keep conversion table for ambiguous 1-letter encodings 
+// TODO: use seqan3 dna types, keep conversion table for ambiguous 1-letter encodings
 #pragma once
 
 #include <cassert>

@@ -1,6 +1,13 @@
 # Log files
 wget-log*
 
+# cmake
+Makefile
+CMakeCache.txt
+CTestTestfile.cmake
+cmake_install.cmake
+CMakeFiles
+
 # Prerequisites
 *.d
 

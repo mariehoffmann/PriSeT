@@ -1,9 +1,15 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
+//#include <dirent.h>
 #include <iostream>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -11,26 +17,44 @@
 #include <vector>
 
 #include "io_config.hpp"
+#include "primer_config.hpp"
 
-
+namespace priset
+{
 /*
 # Build genmap binary used for FM index building
 cmake ../genmap -DCMAKE_BUILD_TYPE=Release -DGENMAP_NATIVE_BUILD=OFF
 make genmap
 */
-
 /*
- * Create FM index with `genmap` and store in io_cfg.genmap_idx_dir
- */
-int fm_index(io_config & io_cfg, primer_config & primer_cfg)
+bool build_genmap(io_config & const io_cfg)
 {
-
-    
     pid_t pid;
     if ((pid = fork()) == -1)
         std::cout << "ERROR: " << FORK_ERROR << std::endl, exit(0);
     if (pid == 0) {
-        execl(io_cfg.genmap_bin.c_str(), "genmap", "index", "-F", &io_cfg.fasta_file[0u], "-I", &io_cfg.genmap_idx_dir[0u], NULL);
+        execl("cmake", "cmake", "../submodules/genmap", "-DCMAKE_BUILD_TYPE=Release", "-DGENMAP_NATIVE_BUILD=OFF", NULL);
+        std::cout << "ERROR: " << EXECV_ERROR << std::endl, exit(0);
+    }
+    else
+    {
+        wait(NULL);
+    }
+}
+*/
+/*
+ * Create FM index with `genmap` binary and store in io_cfg.genmap_idx_dir
+ */
+template<typename io_config>
+int fm_index(io_config & io_cfg)
+{
+
+    pid_t pid;
+    if ((pid = fork()) == -1)
+        std::cout << "ERROR: " << FORK_ERROR << std::endl, exit(0);
+    if (pid == 0) {
+        execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u],
+            "-I", &io_cfg.get_genmap_idx_dir().string()[0u], NULL);
         std::cout << "ERROR: " << EXECV_ERROR << std::endl, exit(0);
     }
     else
@@ -43,6 +67,7 @@ int fm_index(io_config & io_cfg, primer_config & primer_cfg)
 /*
  * Map frequent k-mers to exisiting FM index with `genmap` without file IO
  */
+template<typename io_config, typename primer_config>
 int fm_map(io_config & io_cfg, primer_config & primer_cfg)
 {
     // TODO: allow optional file I/O
@@ -71,3 +96,5 @@ int fm_map(io_config & io_cfg, primer_config & primer_cfg)
     */
     return 0;
 }
+
+} // namespace priset

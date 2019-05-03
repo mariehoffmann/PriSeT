@@ -1,3 +1,11 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
+#pragma once
+
 #include <algorithm>
 #include <experimental/filesystem>
 #include <fstream>
@@ -27,7 +35,7 @@ struct taxonomy
     using node_map_type = typename std::unordered_map<key_type, value_type>;
     using iterator_type = node_map_type::iterator;
 
-    taxonomy(fs::path & tax_file)
+    taxonomy(fs::path const & tax_file)
     {
         std::ifstream ifs{tax_file, std::ifstream::in};
         if (!ifs.is_open())
