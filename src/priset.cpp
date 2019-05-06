@@ -22,8 +22,7 @@
 /*
  * usage        g++ priset.cpp -Wno-write-strings -std=c++17 -lstdc++fs -Wall -Wextra -o priset
  *              ./priset <lib_dir> <work_dir>
- *              ./priset /Users/troja/tactac/subset/335928/ /Users/troja/
- * e.g.         ./priset $GENMAP ~/tmp/priset/library ~/tmp/priset/work
+ * e.g.         ./src/priset ~/priset/library ~/priset/work
  *
  * src_dir      path to folder containing fasta (*.fa) and taxonomy file (*.tax)
  * work_dir     path to store indices, mappings, annotations, and other results

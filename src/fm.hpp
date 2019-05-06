@@ -48,13 +48,12 @@ bool build_genmap(io_config & const io_cfg)
 template<typename io_config>
 int fm_index(io_config & io_cfg)
 {
-
     pid_t pid;
     if ((pid = fork()) == -1)
         std::cout << "ERROR: " << FORK_ERROR << std::endl, exit(0);
     if (pid == 0) {
         execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u],
-            "-I", &io_cfg.get_genmap_idx_dir().string()[0u], NULL);
+            "-I", &io_cfg.get_index_dir().string()[0u], NULL);
         std::cout << "ERROR: " << EXECV_ERROR << std::endl, exit(0);
     }
     else

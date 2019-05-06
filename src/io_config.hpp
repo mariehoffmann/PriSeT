@@ -35,8 +35,6 @@ private:
     fs::path index_dir;
     // Path to genmap binary (set by PriSeT).
     fs::path genmap_bin;
-    // Path to computed FM index (set by PriSeT -> genmap).
-    fs::path genmap_idx_dir;
     // Library file extensions.
     std::string ext_fasta = ".fasta";
     std::string ext_acc = ".acc";
@@ -46,8 +44,10 @@ public:
     io_config(fs::path const & lib_dir_, fs::path const & work_dir_) :
         lib_dir{fs::absolute(lib_dir_)},
         work_dir{fs::absolute(work_dir_)},
-        index_dir{fs::absolute(work_dir_)}
+        index_dir{fs::absolute(work_dir_)},
+        genmap_bin{fs::current_path()}
         {
+            genmap_bin /= "submodules/genmap/bin/genmap";
             // parse library directory and assign paths to the .acc, .fasta, and .tax files
             if (!fs::exists(lib_dir))
                 std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
@@ -81,7 +81,7 @@ public:
             }
 
             // set output directory for FM index, will be created by genmap
-            index_dir += fs::path("/index");
+            index_dir /= fs::path("/index");
             if (fs::exists(index_dir))
             {
                 char cmd_rm[50];
@@ -110,9 +110,9 @@ public:
     }
 
     // Return directory where FM index is stored
-    fs::path get_genmap_idx_dir() const noexcept
+    fs::path get_index_dir() const noexcept
     {
-        return genmap_idx_dir;
+        return index_dir;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.
