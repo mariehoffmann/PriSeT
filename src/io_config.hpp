@@ -33,6 +33,8 @@ private:
     fs::path work_dir;
     // Working subdirectory for FM index (set by PriSeT).
     fs::path index_dir;
+    // Working subdirectory for FM index mappings (set by PriSeT).
+    fs::path mapping_dir;
     // Path to genmap binary (set by PriSeT).
     fs::path genmap_bin;
     // Library file extensions.
@@ -45,6 +47,7 @@ public:
         lib_dir{fs::absolute(lib_dir_)},
         work_dir{fs::absolute(work_dir_)},
         index_dir{fs::absolute(work_dir_)},
+        mapping_dir{fs::absolute(work_dir_)},
         genmap_bin{fs::current_path()}
         {
             genmap_bin /= "submodules/genmap/bin/genmap";
@@ -89,6 +92,9 @@ public:
                 if (system(cmd_rm))
                     std::cout << "ERROR: Could not remove index directory " << index_dir << std::endl, exit(0);
             }
+            // set output directory for FM index mapping
+            mapping_dir /= fs::path("/mapping");
+
         };
 
     // Return accession file with absolute path as filesystem::path object.
@@ -113,6 +119,11 @@ public:
     fs::path get_index_dir() const noexcept
     {
         return index_dir;
+    }
+
+    fs::path get_mapping_dir() const noexcept
+    {
+        return mapping_dir;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.
