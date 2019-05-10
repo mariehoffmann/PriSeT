@@ -16,7 +16,7 @@
 #include "errors.hpp"
 #include "fm.hpp"
 #include "io_config.hpp"
-//#include "primer_config.hpp"
+#include "primer_config.hpp"
 #include "taxonomy.hpp"
 
 /*
@@ -43,18 +43,12 @@ int main(int argc, char** argv)
     // build taxonomy in RAM
     priset::taxonomy tax{io_cfg.get_tax_file()};
     tax.print_taxonomy();
-    // call genmap binary, done by cmake
-    //priset::build_genmap(io_cfg);
 
     // create FM index
     priset::fm_index(io_cfg);
 
-/*
-
-    fm_map(io_cfg, primer_cfg);
-    std::cout << "fasta_file: " << io_cfg.fasta_file << std::endl;
-*/
-    // use rotifera.genmap.freq16
+    // compute k-mer mappings
+    priset::fm_map(io_cfg, primer_cfg);
 
     return 0;
 }
