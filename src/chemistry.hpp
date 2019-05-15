@@ -13,8 +13,8 @@
 #include <cmath>
 #include <vector>
 
-#include "primer_config.hpp"
 #include "dna.hpp"
+#include "primer_config.hpp"
 
 // satisfies the primer_config_concept.
 namespace priset::chemistry
@@ -54,6 +54,7 @@ float_type primer_melt_salt(sequence_type primer, float_type Na, typename sequen
     return score
 */
 
+/*
 //!\brief Compress a window of aligned sequences to 1-letter encode.
 template<typename sequence_type>
 // todo: use aligned sequence type
@@ -97,7 +98,7 @@ std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequenc
         as_cx[i-offset] = str2dna[dna_str];
     }
     return as_cx;
-}
+}*/
 
 //!\brief Computer melting temperature of primer sequence.
 // make primer_config_type a const reference?

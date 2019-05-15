@@ -18,6 +18,8 @@ namespace fs = std::experimental::filesystem;
 namespace priset
 {
 
+#define MAX_PATH_LENGTH 100
+
 struct io_config
 {
 private:

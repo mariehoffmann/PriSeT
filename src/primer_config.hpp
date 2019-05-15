@@ -10,8 +10,9 @@
 
 #include <unordered_map>
 
+#include <seqan/basic.h>
+
 #include "chemistry.hpp"
-#include "dna.hpp"
 #include "types.hpp"
 
 namespace priset

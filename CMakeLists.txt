@@ -13,9 +13,10 @@ project (priset CXX)
 set(CMAKE_CXX_STANDARD 17)  # or target_compile_features(priset_lib PUBLIC cxx_std_17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-message ("${BoldBlue}Adding submodule genmap ...${ColourReset}") # This needs to go before "project ()".
+# This needs to go before "project ()".
+#message ("${BoldBlue}Adding submodule genmap ...${ColourReset}")
 #add_subdirectory(submodules/genmap)
-message ("${BoldBlue}Done.${ColourReset}")
+#message ("${BoldBlue}Done.${ColourReset}")
 
 message ("${BoldBlue}Link priset ...${ColourReset}")
 add_subdirectory(src)

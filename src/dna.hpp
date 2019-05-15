@@ -12,12 +12,16 @@
 #include <cassert>
 #include <unordered_map>
 
+#include <seqan/basic.h>
+
 namespace priset
 {
+    //using dna = seqan::Dna;
 //!\brief DNA codes as enums.
-enum dna {A, C, G, T, B, CGT, D, AGT, H, ACT, K, GT, M, AC, N, ACGT, R, AG, S, \
-    CG, V, ACG, W, AT, Y, CT};
+// TODO: use seqan Dna
+enum dna {A, C, G, T, B, CGT, D, AGT, H, ACT, K, GT, M, AC, N, ACGT, R, AG, S, CG, V, ACG, W, AT, Y, CT};
 
+/*
 //!\brief Complement map of DNA codes.
 std::array<dna,4> cdna = {dna::T, dna::G, dna::C, dna::A};
 
@@ -90,5 +94,7 @@ static constexpr std::array<priset::dna, 26> dna_decode
         bimap[priset::dna::CT] = priset::dna::Y;
         return bimap;
     }()
-};
+
+
+};*/
 }

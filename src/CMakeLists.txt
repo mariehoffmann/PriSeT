@@ -29,9 +29,12 @@ message ("priset, SEQAN_LIBRARIES: ${SEQAN_LIBRARIES}")
 # PROBLEM: lambda doesn't find calling genmap header
 
 # Add executable and link against SeqAn dependencies.
+set(GLOB_SOURCES ../submodules/genmap/src/*.hpp)
+
 set(SOURCE_FILES    priset.cpp
                     ../submodules/genmap/src/mappability.hpp
                     ../submodules/genmap/src/common.hpp
+                    ../submodules/genmap/src/genmap_helper.hpp
                     ../submodules/genmap/src/indexing.hpp
                     ../submodules/genmap/src/mappability.hpp
                     ../submodules/genmap/src/algo.hpp
@@ -42,7 +45,8 @@ set(SOURCE_FILES    priset.cpp
 #../submodules/genmap/include/lambda/src/mkindex_misc.hpp
 #../submodules/genmap/include/lambda/src/mkindex_saca.hpp
 
-add_executable(priset ${SOURCE_FILES})
+# add_executable(yourProj ${SOURCES})
+add_executable(priset ${SOURCE_FILES} ${SOURCES})
 set_target_properties(priset PROPERTIES LINKER_LANGUAGE CXX)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC stdc++fs ${SEQAN_LIBRARIES})
