@@ -16,21 +16,6 @@ namespace priset
 {
 
 /*
- * A tuple with lower and upper values and a range check.
- */
-template<typename value_type>
-struct interval
-{
-    bool in(value_type const value) const
-    {
-        assert(min <= max && "max set to a value less than min!");
-        return min <= value && value <= max;
-    }
-    value_type min;
-    value_type max;
-};
-
-/*
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and
  * a unique integer ID.
  */

@@ -59,11 +59,11 @@ int main(int argc, char** argv)
     TLocations locations;
 
     // compute k-mer mappings
-    priset::fm_map<priset::io_config, priset::primer_config, TLocations>(io_cfg, primer_cfg, locations);
+    priset::fm_map<priset::io_config, priset::primer_config<sequence_type>, TLocations>(io_cfg, primer_cfg, locations);
 
     // filter k-mers by frequency and chemical properties
-    // TODO: result structure for references and k-mer pairs
-    priset::filter<priset::io_config, priset::primer_config, TLocations>(io_cfg, primer_cfg, locations, /*candidates*/);
+    // TODO: result structure for references and k-mer pairs: candidates/matches
+    priset::filter<priset::io_config, priset::primer_config<sequence_type>, TLocations>(io_cfg, primer_cfg, locations);
 
     // display
     priset::display(/*candidates*/);
