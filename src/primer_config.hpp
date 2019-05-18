@@ -25,7 +25,10 @@ struct primer_config
     using float_type = float;
     // todo: require member typename sequence_type::size_type
     //using sequence_type = sequence_type; // seqan dna string
-    using size_type = typename sequence_type::size_type;
+    using size_type = uint32_t;
+
+    // interval type for primer length ranges
+    using size_interval_type = typename std::pair<size_type, size_type>;
 
     // The taxonomic identifier type.
     using taxid_type = unsigned int;
@@ -86,8 +89,7 @@ struct primer_config
     }
 
     // Set melting temperature range.
-    template<typename interval_type>
-    constexpr interval_type get_Tm_range() const noexcept
+    constexpr size_interval_type get_Tm_range() const noexcept
     {
         return primer_melt_range;
     }
@@ -173,11 +175,11 @@ private:
     // Occurrence frequency of primer sequences relative to the number of taxa with at least one existing reference sequence.
     float occurrence_freq{0.5};
 
-    // Primer length rang
-    std::pair<size_type, size_type> primer_length_range{18, 24};
+    // Primer length range
+    size_interval_type primer_length_range{18, 24};
 
     // Transcript length range.
-    std::pair<size_type, size_type> transcript_range{30, 700};
+    size_interval_type transcript_range{30, 700};
 
     // Range of primer melting temperatures (best results in range [52-58] degree C).
     std::pair<float, float> primer_melt_range{52.0, 58.0};
