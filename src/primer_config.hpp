@@ -173,7 +173,7 @@ private:
     taxid_type root_taxid{1};
 
     // Occurrence frequency of primer sequences relative to the number of taxa with at least one existing reference sequence.
-    float occurrence_freq{0.5};
+    float occurrence_freq{0.1};
 
     // Primer length range
     size_interval_type primer_length_range{18, 24};

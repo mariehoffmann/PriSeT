@@ -27,7 +27,8 @@ private:
     typename std::add_pointer_t<primer_config_type const> primer_cfg{nullptr};
     //primer_config_type &primer_cfg{};
     // Pointer to DNA sequence of k-mer
-    typename std::add_pointer_t<typename primer_config_type::sequence_type const> sequence{nullptr};
+    //typename std::add_pointer_t<typename primer_config_type::sequence_type const> sequence{nullptr};
+    typename primer_config_type::sequence_type const sequence;
 
     // Unique numerical identifier.
     typename primer_config_type::kmer_ID_type ID;

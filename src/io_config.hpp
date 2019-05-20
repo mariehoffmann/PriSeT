@@ -11,6 +11,8 @@
 #include <iostream>
 #include <regex>
 
+#include <seqan/basic.h>
+
 #include "errors.hpp"
 
 namespace fs = std::experimental::filesystem;
@@ -45,6 +47,7 @@ private:
     std::string ext_tax = ".tax";
 
 public:
+
     io_config(fs::path const & lib_dir_, fs::path const & work_dir_) :
         lib_dir{fs::absolute(lib_dir_)},
         work_dir{fs::absolute(work_dir_)},
