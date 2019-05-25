@@ -42,6 +42,7 @@
 
 #include "io_config.hpp"
 #include "primer_config.hpp"
+#include "types.hpp"
 #include "utilities.hpp"
 
 namespace priset
@@ -69,66 +70,91 @@ int fm_index(io_cfg_type & io_cfg)
 
 /*
  * Map frequent k-mers to exisiting FM index with `genmap` without file IO
- * io_cfg_type        I/O configurator type
- * primer_config    primer configurator type
- * TLocations       type for storing locations
+ * io_cfg_type              I/O configurator type
+ * primer_config            primer configurator type
+ * TLocations               type for storing locations
+ * TDirectoryInformation    directory information type
+ * fasta_header_type        container type for storing fasta header lines
+ * fasta_length_type        container type for storing fasta entry lengths (for txt.concat)
  */
-template<typename io_cfg_type, typename primer_config, typename TLocations, typename TDirectoryInformation>
-int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation)
+template<typename io_cfg_type, typename primer_config, typename TLocations, typename TDirectoryInformation, typename TsequenceNames, typename TsequenceLengths>
+int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
 {
     // omit file I/O
-    // ./bin/genmap map -I ~/tmp/genmap -O ~/tmp/genmap -K 8 -E 1 --raw -t -d -fl
+    // ./bin/genmap map -I ~/tmp/genmap/index -O ~/priset/genmap/mapping -K 18 -E 1 --raw -t -d -fl
     // FM index mapper settings (see mappability.hpp for further information)
     // parameter definitions for setting the index type
     using key_type = typename TLocations::key_type;
     using TSeqNo = typename seqan::Value<key_type, 1>::Type;
-    using TSeqPos = typename seqan::Value<key_type, 2>::Type;
-
-    // use frequency_large, other from ./genmap map: frequency_small (uint8_t)
-    using TValue = uint16_t;
-    //using size_type = typename primer_config::size_type;
     using size_interval_type = typename primer_config::size_interval_type;
-    // Dna5 alphabet = {A, C, G, T, N}, letters other than dna4 are casted to 'N'
     // seqan::Alloc - for direct memory mapping use seqan::MMap<> instad of seqan::Alloc<>, relevant for benchmarking,
     // since loading index of human genome from disk to main memory may take several minutes
-    typedef String<seqan::Dna5, seqan::Alloc<>> TString;
-    typedef seqan::StringSet<TString, seqan::Owner<seqan::ConcatDirect<SizeSpec_<TSeqNo, TSeqPos> > > > TStringSet;
-    using TBWTLen = uint64_t;
-    using TFMIndexConfig = TGemMapFastFMIndexConfig<TBWTLen>;
-    // set sampling rate, TODO: verify if 10 is ok
     TFMIndexConfig::SAMPLING = 10;
-    // set index type
-    using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig> >;
-    // path to index plus basename without suffix, i.e. <path_to_index>/<basename>
-    std::string index_path_base = std::string(io_cfg.get_index_dir()) + "/index";
-    std::string index_path_base_ids = index_path_base + ".ids";
     // load index
     TIndex index;
-    // what happens here?
-    open(index, seqan::toCString(index_path_base), OPEN_RDONLY); //open(index, toCString(opt.indexPath), OPEN_RDONLY);
+    // should be: /Users/troja/priset/work/index/index
+    std::cout << "Load index from: (fs::path -> std::string -> toCString)" << seqan::toCString(std::string(io_cfg.get_index_base_path())) << std::endl;
+    std::cout << "Load index from: (fs::path -> std::string -> CharString -> toCString)" << seqan::toCString(seqan::CharString(std::string(io_cfg.get_index_base_path()))) << std::endl;
+
+    // load index
+    if (!genmap::detail::open(index, seqan::toCString(std::string(io_cfg.get_index_base_path())), seqan::OPEN_RDONLY))
+        std::cout << "Error in loading index to index obj.\n", exit(0);
 
     // set directory information
-    set_directoryInformation(index_path_base_ids, directoryInformation);
+    if (!seqan::open(directoryInformation, seqan::toCString(std::string(io_cfg.get_index_base_path_ids())), seqan::OPEN_RDONLY))
+        std::cout << "Error in loading index.ids to directoryInformation obj.\n", exit(0);
+    seqan::appendValue(directoryInformation, "dummy.entry;0;chromosomename"); // dummy entry enforces that the mappability is
+    uint16_t ctr = 0; // continue here: what is stored in dirInfo
+    for (auto it = begin(directoryInformation); it != end(directoryInformation); ++it, ++ctr)
+        std::cout << ctr << ": " << (*it) << std::endl;
 
     // remains empty when excludePseudo == false (store fileIDs for counting matches once per file!)
     std::vector<TSeqNo> mappingSeqIdFile(length(directoryInformation) - 1);
+    std::string fastaFile = std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
+    std::cout << "fastaFile = " << fastaFile << std::endl;
 
-    auto const & text = indexText(index); // line 213
-    std::vector<TValue> c(length(text), 0); // line 143, filled by computeMappability, purpose?
-    seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > chromosomeNames;
-    seqan::StringSet<uint64_t> chromosomeLengths; // filled by computeMappability
-    uint64_t startPos = 0;
-    uint64_t fastaFileLength = 0;
-    std::string fastaFile =  std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
+    // set search parameters (see genmap/src/common.hpp), set in mappabilityMain
+    uint16_t K = primer_cfg.template get_primer_length_range<size_interval_type>().first;
+    std::cout << "K set to " << K;
+    // TODO: when allowing errors, overlap size is different, see formular in mappability.hpp
+    uint16_t overlap = std::ceil(0.3 * float(K));
+    uint8_t threads = 1; // TODO: set to omp_get_max_threads();
+    bool revCompl = false;
+    bool excludePseudo = false;
+    SearchParams searchParams = SearchParams{K, overlap, threads, revCompl, excludePseudo};
 
-    // set search parameters (see common.hpp) with SearchParams{length, overlap, threads, revCompl, excludePseudo}, set in mappabilityMain
-    SearchParams searchParams = SearchParams{primer_cfg.template get_primer_length_range<size_interval_type>().first, 12, 1, false, false};
+    //opt{mmap = 0, indels = 0, wigFile = 0, bedFile = 0, rawFile = 1, txtFile = 1, csvFile = 1, outputType = 0, directory = 0, verbose = 0, indexPath = /Users/troja/priset/work/index/index, outputPath = /Users/troja/priset/work/mapping/, alphabet = dna5, seqNoWidth = 16, maxSeqLengthWidth = 32, totalLengthWidth = 32, errors = 0, sampling = 10}
+
+    bool mmap = false;
+    bool indels = false;
+    bool wigFile = false; // group files into mergable flags, i.e., BED | WIG, etc.
+    bool bedFile = false;
+    bool rawFile = true;
+    bool txtFile = true;
+    bool csvFile = true;
+    OutputType outputType = OutputType::mappability;
+    bool directory = false;
+    bool verbose = false;
+    CharString indexPath = seqan::CharString(std::string(io_cfg.get_index_base_path()));
+    CharString outputPath = ".";
+    CharString alphabet = "dna5";
+    uint32_t seqNoWidth = 16;
+    uint32_t maxSeqLengthWidth = 32;
+    uint32_t totalLengthWidth = 32;
+    unsigned errors = 0;
+    unsigned sampling = 10;
+
+    Options opt{mmap, indels, wigFile, bedFile, rawFile, txtFile, csvFile, outputType, directory, verbose, indexPath, outputPath, alphabet, seqNoWidth, maxSeqLengthWidth, totalLengthWidth, errors, sampling};
     // flag for indicating that index is built on entire directory
-    bool directoryFlag = false;
+    //bool directoryFlag = false;
 
     // open index file directory
     std::cout << "io_cfg.index_dir : " << io_cfg.get_index_dir() << std::endl;
 
+    run1<TLocations, seqan::Dna5>(locations, opt, searchParams);
+
+
+    /*
     for (uint64_t i = 0; i < seqan::length(directoryInformation); ++i)  // line 218
     {
         auto const row = retrieveDirectoryInformationLine(directoryInformation[i]);
@@ -138,24 +164,41 @@ int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locati
             std::cout << std::get<0>(row) << " != fastaFile\n";
             // fastaInfix is now 'text' in mappability.hpp!
             auto const & fastaInfix = seqan::infixWithLength(text.concat, startPos, fastaFileLength);
+            std::cout << "fastaInfix = " << fastaInfix << ", fastaFileLength = " << fastaFileLength << std::endl;
             double start = get_wall_time();
-            // set <errors=0, csvComputation=true>()
-            // computeMappability<0, csvComputation>(index, text, c, searchParams, opt.directory, chromLengths, locations, mappingSeqIdFile);
-            // TODO: continue here
-            computeMappability<0, true>(index, fastaInfix, c, searchParams, directoryFlag, chromosomeLengths, locations, mappingSeqIdFile);
+            // run<TDistance, value_type, csvComputation, TSeqNo, TSeqPos>(index, fastaInfix, opt, searchParams, fastaFile, sequenceNames, sequenceLengths, directoryInformation, mappingSeqIdFile);
+            // TODO: continue here with text -> fastaInfix (see renaming in caller cascade in mappability.hpp)
+            std::vector<TValue> c(length(fastaInfix), 0); // line 143, filled by computeMappability, purpose?
+
+            // set <errors=0, csvComputation=false>()
+            //run<seqan::HammingDistance, uint16_t, true, TSeqNo, TSeqPos>(index, fastaInfix, opt, searchParams, fastaFile, chromosomeNames, chromosomeLengths, directoryInformation, mappingSeqIdFile);
+
+            //computeMappability<0, false>(index, fastaInfix, c, searchParams, directoryFlag, sequenceLengths, locations, mappingSeqIdFile);
             std::cout << "Mappability computed in " << (round((get_wall_time() - start) * 100.0) / 100.0) << " seconds\n";
 
             startPos += fastaFileLength;
             fastaFile = std::get<0>(row);
             fastaFileLength = 0;
-            clear(chromosomeNames);
-            clear(chromosomeLengths);
+            for (uint32_t i = 0; i < length(sequenceNames); ++i)
+            {
+                unsigned id = positionToId(sequenceNames, i);
+                std::cout << "chromosomeName = " << valueById(sequenceNames, id);
+                id = positionToId(sequenceLengths, i);
+                std::cout << ", chromosomeLength = " << valueById(sequenceLengths, id);
+
+            }
+
+            clear(sequenceNames);
+            clear(sequenceLengths);
         }
         std::cout << "append len = " << std::get<1>(row) << " to fastaFileLength\n";
+        // accumulate fasta entry lengths
         fastaFileLength += std::get<1>(row);
-        appendValue(chromosomeNames, std::get<2>(row));
-        appendValue(chromosomeLengths, std::get<1>(row));
-    }
+        std::cout << "fastaFileLength acc = " << fastaFileLength << std::endl;
+        std::cout << "append chromosomeName = " << std::get<2>(row) << ", chromLength = " << std::get<1>(row) << std::endl;
+        appendValue(sequenceNames, std::get<2>(row));
+        appendValue(sequenceLengths, std::get<1>(row));
+    }*/
 
     return 0;
 }

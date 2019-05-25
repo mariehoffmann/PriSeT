@@ -13,8 +13,9 @@
 #include <cmath>
 #include <vector>
 
-#include "dna.hpp"
+//#include "dna.hpp"
 #include "primer_config.hpp"
+#include "types.hpp"
 
 // satisfies the primer_config_concept.
 namespace priset::chemistry

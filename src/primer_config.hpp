@@ -120,9 +120,15 @@ struct primer_config
 
     // Get primer length range
     template<typename interval_type>
-    constexpr interval_type get_primer_length_range()
+    constexpr interval_type get_primer_length_range() const noexcept
     {
         return primer_length_range;
+    }
+
+    // Get kmer length, which is the lower bound of the primer length range
+    constexpr size_type get_kmer_length() const noexcept
+    {
+        return primer_length_range.first;
     }
 
     // Set method for computing primer melting temperature.

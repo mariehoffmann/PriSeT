@@ -19,7 +19,7 @@ namespace priset
     //using dna = seqan::Dna;
 //!\brief DNA codes as enums.
 // TODO: use seqan Dna
-enum dna {A, C, G, T, B, CGT, D, AGT, H, ACT, K, GT, M, AC, N, ACGT, R, AG, S, CG, V, ACG, W, AT, Y, CT};
+//enum dna {A, C, G, T, B, CGT, D, AGT, H, ACT, K, GT, M, AC, N, ACGT, R, AG, S, CG, V, ACG, W, AT, Y, CT};
 
 /*
 //!\brief Complement map of DNA codes.

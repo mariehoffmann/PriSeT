@@ -5,88 +5,54 @@
 #include <string>
 
 #include "../submodules/genmap/src/common.hpp"
+#include "../submodules/genmap/src/genmap_helper.hpp"
+
+#include "types.hpp"
+#include "utilities.hpp"
 
 namespace priset
 {
-/*
-    using TLocations = std::map<seqan::Pair<TSeqNo, TSeqPos>,
-             std::pair<std::vector<seqan::Pair<TSeqNo, TSeqPos> >,
-                       std::vector<seqan::Pair<TSeqNo, TSeqPos> > > >;
-                       */
-
 // TODO: globally or hierarchical?
 // pre-filter and sequence fetch
 // 1. filter candidates by number of occurences only independent of their chemical suitability
 // 2. fetch sequence and check chemical constraints that need to hold for a single primer
-template<typename io_cfg_type, typename primer_cfg_type, typename TLocations, typename TKmerLocations, typename TSeqSize, typename TDirectoryInformation>
-void pre_frequency_filter(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations,
-    TKmerLocations & kmer_locations, TSeqSize min_occ, TDirectoryInformation & directoryInformation)
+template<typename primer_cfg_type, typename TLocations, typename TKmerLocations, typename TSeqSize, typename TDirectoryInformation, typename TSequenceNames, typename TSequenceLengths>
+void pre_frequency_filter(priset::io_config & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations,
+    TKmerLocations & kmer_locations, TSeqSize min_occ, TDirectoryInformation & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
-    // TODO: verify if locations are sorted by SeqID
-    using key_type = typename TLocations::key_type;
-    //using TSeqNo = typename seqan::Value<key_type, 1>::Type;
-    //using TSeqPos = typename seqan::Value<key_type, 2>::Type;
-    std::set<key_type> seen;
-    key_type current;
-    // kmer locations: std::vector<std::pair<TSeq, std::vector<seqan::Pair<TSeqNo, TSeqPos> > > >
+    // = seqan::Pair<TSeqNo, TSeqPos>
+    using TLocationKey = typename TLocations::key_type;
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
 
-    //TSeqSize chromosomeCount = 0;
-    std::vector<std::pair<std::string, TSeqSize> > fastaFiles; // fasta file, cumulative nbr. of chromosomes
-
-    std::string lastFastaFile = std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
-
-    std::cout << "print dirInfo: " << std::endl;
-    for (auto const & row : directoryInformation)
-    { // TODO: continue here
-        auto const line = retrieveDirectoryInformationLine(row);
-        std::cout << std::get<0>(line) << ", " << std::get<1>(line) << std::endl;
-        /*
-        if (lastFastaFile != std::get<0>(line))
-        {
-            fastaFiles.push_back({lastFastaFile, chromosomeCount - 1});
-            lastFastaFile = std::get<0>(line);
-        }
-        ++chromosomeCount;
-        */
-    }
-    /*
-    for (auto const & location : locations)
+    std::cout << "unique k-mers:\n";
+    TSeqNo seqno;
+    TSeqPos seqpos;
+    // current location row
+    std::vector<TLocationKey> row;
+    // unique k-mers for retrieving sequences
+    std::vector<seqan::Pair<TSeqNo, TSeqPos>> lookup();
+    for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        // TODO: check vector lengths
-        auto const & kmerPos = location.first;
-        auto const & plusStrandLoc = location.second.first;
-        auto const & minusStrandLoc = location.second.second;
-
-        std::cout << kmerPos.i1 << ',' << kmerPos.i2 << std::endl;
-        TSeqSize i = 0;
-        TSeqSize nbrChromosomesInPreviousFastas = 0;
-        for (auto const & fastaFile : fastaFiles)
-        {
-            csvFile << ';';
-            bool subsequentIterations = false;
-            TSeqSize num_occ = 0;
-            while (i < plusStrandLoc.size() && plusStrandLoc[i].i1 <= fastaFile.second)
-            {
-                if (subsequentIterations)
-                    csvFile << '|'; // separator for multiple locations in one column
-                seqan::Pair<TSeqSize, TSeqSize> loc{plusStrandLoc[i].i1 - nbrChromosomesInPreviousFastas, plusStrandLoc[i].i2};
-                //csvFile << (plusStrandLoc[i].i1 - nbrChromosomesInPreviousFastas) << ',' << plusStrandLoc[i].i2;
-                subsequentIterations = true;
-                ++num_occ; // TODO: checkable without loop?
-                ++i;
-            }
-            nbrChromosomesInPreviousFastas = fastaFile.second + 1;
-        }
-
+        seqno = seqan::getValueI1<TSeqNo, TSeqPos>(it->first);
+        seqpos = seqan::getValueI2<TSeqNo, TSeqPos>(it->first);
+        // not enough k-mer occurences => continue
         if ((it->second).first.size() < min_occ)
             continue;
-        current = it->first;
-        if (seen.find(current) != seen.end())
-            std::cout << "Location: (" << seqan::getValueI1(current) << ", " << seqan::getValueI2(current) << ") already seen.\n";
-        seen.insert(current);
+        // use symmetry and lexicographical ordering of locations to skip already seen ones
+        if (seqan::getValueI1<TSeqNo, TSeqPos>((it->second).first[0]) < seqpos)
+            continue
+        // invariant: min_occ is always ≥ 2
+        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).first)
+        {
+            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
+            row.push_back(pair);
+        }
+        // store locations, dna sequence retrieved later
+        kmer_locations.push_back(std::make_pair(TSeq(0), row));
+        row.clear();
     }
-    */
+
+    //lookup_sequences<primer_cfg_type>(kmer_locations, io_cfg, primer_cfg);
 }
 
 // post-filter candidates fulfilling chemical constraints by their relative frequency
@@ -97,8 +63,8 @@ void post_frequency_filter(TKmerLocations kmer_locations, TSeqNo occurrence_freq
 }
 
 // filter k-mers by frequency and chemical properties
-template<typename io_cfg_type, typename primer_cfg_type, typename TLocations, typename TKmerLocations, typename TDirectoryInformation>
-void filter(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TKmerLocations & kmer_locations, TDirectoryInformation & directoryInformation)
+template<typename primer_cfg_type, typename TLocations, typename TKmerLocations, typename TDirectoryInformation, typename TSequenceNames, typename TSequenceLengths>
+void filter(priset::io_config & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TKmerLocations & kmer_locations, TDirectoryInformation & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
     // get number of taxids with at least one accession assigned to it
@@ -111,15 +77,15 @@ void filter(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & loc
 	       getline(in, line);
 	       ++min_occ;
     }
-    min_occ = (min_occ) ? min_occ - 1 : 0;
     in.close();
-    std::cout << "number of lines " << min_occ;
+    min_occ = (min_occ) ? min_occ - 1 : 0;
+    std::cout << "STATS: Number of taxids with one or more accessions:\t" << min_occ << std::endl;
     // scale to be lower frequency bound for filters
-    min_occ = TSeqNo(float(min_occ) * primer_cfg.get_occurence_freq());
-    std::cout << "lower freq bound = " << min_occ << std::endl;
-    pre_frequency_filter<io_cfg_type, primer_cfg_type, TLocations, TKmerLocations, TSeqNo>(io_cfg, primer_cfg, locations, kmer_locations, min_occ, directoryInformation);
+    min_occ = std::max<TSeqNo>(2, TSeqNo(float(min_occ) * primer_cfg.get_occurence_freq()));
+    std::cout << "MESSAGE: Cut-off frequency:\t" << min_occ << std::endl;
+    pre_frequency_filter<primer_cfg_type, TLocations, TKmerLocations, TSeqNo, TDirectoryInformation, TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, min_occ, directoryInformation, sequenceNames, sequenceLengths);
 
-    post_frequency_filter(kmer_locations, primer_cfg.get_occurence_freq());
+    //post_frequency_filter(kmer_locations, primer_cfg.get_occurence_freq());
 
 }
 

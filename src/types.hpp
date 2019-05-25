@@ -10,10 +10,36 @@
 
 #include <stdlib.h>
 
+#include "../submodules/genmap/src/common.hpp"
+
 #include "primer_config.hpp"
 
 namespace priset
 {
+
+// type declarations
+using TSeqNo = uint64_t;
+using TSeqPos = uint64_t;
+using TBWTLen = uint64_t;
+using TFMIndexConfig = TGemMapFastFMIndexConfig<TBWTLen>;
+typedef String<seqan::Dna, seqan::Alloc<>> TString;
+typedef seqan::StringSet<TString, seqan::Owner<seqan::ConcatDirect<SizeSpec_<TSeqNo, TSeqPos> > > > TStringSet;
+// set index type, TBiIndexConfig defined src/common.hpp
+using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig> >;
+typedef seqan::Dna5 dna;
+typedef std::vector<priset::dna> TSeq;
+// map of k-mer locations (determined by genmap)
+typedef std::map<seqan::Pair<priset::TSeqNo, priset::TSeqPos>,
+         std::pair<std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> >,
+                   std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TLocations;
+// vector type of k-mers and their locations
+typedef std::vector<std::pair<TSeq, std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TKmerLocations;
+//
+typdef typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > TDirectoryInformation;
+// container for fasta header lines
+using TSequenceNames = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > >;
+// container for fasta sequence lengths
+using TSequenceLengths = typename seqan::StringSet<uint64_t>;
 
 /*
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and

@@ -126,6 +126,18 @@ public:
         return index_dir;
     }
 
+    // path to index plus basename without suffix, i.e. <path_to_index>/<basename>
+    fs::path get_index_base_path() const noexcept
+    {
+        return index_dir / "index";
+    }
+
+    // path to index plus basename without suffix, i.e. <path_to_index>/<basename>
+    fs::path get_index_base_path_ids() const noexcept
+    {
+        return index_dir / "index.ids";
+    }
+
     fs::path get_mapping_dir() const noexcept
     {
         return mapping_dir;
@@ -135,6 +147,11 @@ public:
     fs::path get_tax_file() const noexcept
     {
         return tax_file;
+    }
+
+    fs::path get_work_dir() const noexcept
+    {
+        return work_dir;
     }
 
 };

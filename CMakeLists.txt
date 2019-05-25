@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # This needs to go before "project ()".
 #message ("${BoldBlue}Adding submodule genmap ...${ColourReset}")
-#add_subdirectory(submodules/genmap)
+add_subdirectory(submodules/genmap)
 #message ("${BoldBlue}Done.${ColourReset}")
 
 message ("${BoldBlue}Link priset ...${ColourReset}")

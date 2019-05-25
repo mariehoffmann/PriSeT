@@ -40,9 +40,14 @@ git clone --recurse-submodules https://github.com/mariehoffmann/PriSeT.git
 ### Compilation
   1. Create a build directory and compile with `cmake`
   ```shell
-  cmake ../PriSeT/ -DGENMAP_NATIVE_BUILD=OFF
+  cmake -DCMAKE_BUILD_TYPE=Debug ../PriSeT
   ```
-  2. Call binary with the library directory containing:
+  2. Build
+  ```shell
+  make -j
+  ```
+
+  3. Call binary with the library directory containing:
     * Taxonomy `root_<taxid>.tax`
     * Taxid to accessions map `root_<taxid>.acc`
     * Library with reference sequences `root_<taxid>.fasta`

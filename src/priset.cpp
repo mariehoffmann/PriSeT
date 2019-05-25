@@ -21,6 +21,7 @@
 #include "io_config.hpp"
 #include "primer_config.hpp"
 #include "taxonomy.hpp"
+#include "types.hpp"
 #include "utilities.hpp"
 
 /*
@@ -36,24 +37,11 @@ int main(int argc, char** argv)
     if (argc < 3)
         std::cout << "ERROR: " << ARG_ERROR << std::endl, exit(0);
 
-    using TSeq = std::vector<seqan::Dna5>;
-    using TSeqNo = uint64_t;
-    using TSeqPos = uint64_t;
-    // map of k-mer locations (determined by genmap)
-    using TLocations = std::map<seqan::Pair<TSeqNo, TSeqPos>,
-             std::pair<std::vector<seqan::Pair<TSeqNo, TSeqPos> >,
-                       std::vector<seqan::Pair<TSeqNo, TSeqPos> > > >;
-
-    // vector type of k-mers and their locations
-    using TKmerLocations = std::vector<std::pair<TSeq, std::vector<seqan::Pair<TSeqNo, TSeqPos> > > >;
-    using TDirectoryInformation = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > >;
-
-
     // set path prefixes for library files
     priset::io_config io_cfg{argv[1], argv[2]};
 
     // get instance to primer sequence settings
-    priset::primer_config<TSeq> primer_cfg{};
+    priset::primer_config<priset::TSeq> primer_cfg{};
 
     // build taxonomy in RAM
     priset::taxonomy tax{io_cfg.get_tax_file()};
@@ -63,24 +51,30 @@ int main(int argc, char** argv)
     priset::fm_index<priset::io_config>(io_cfg);
 
     // dictionary for storing FM mapping results
-    TLocations locations;
+    priset::TLocations locations;
 
     // directory info needed for genmap's fasta file parser
-    TDirectoryInformation directoryInformation;
+    priset::TDirectoryInformation directoryInformation;
+
+    // container for fasta header lines
+    priset::TSequenceNames sequenceNames;
+
+    // container for fasta sequence lengths
+    priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map<priset::io_config, priset::primer_config<TSeq>, TLocations, TDirectoryInformation>(io_cfg, primer_cfg, locations, directoryInformation);
+    priset::fm_map<priset::io_config, priset::primer_config<priset::TSeq>, priset::TLocations, priset::TDirectoryInformation, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, directoryInformation, sequenceNames, sequenceLengths);
     print_locations(locations);
 
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches
     // dictionary for storing k-mers and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
-    TKmerLocations kmer_locations;
-    priset::filter<priset::io_config, priset::primer_config<TSeq>, TLocations, TKmerLocations, TDirectoryInformation>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation);
+    priset::TKmerLocations kmer_locations;
+    priset::filter<priset::primer_config<priset::TSeq>, priset::TLocations, priset::TKmerLocations, priset::TDirectoryInformation, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation, sequenceNames, sequenceLengths);
     // TODO: delete locations
 
     // display
-    priset::display(/*candidates*/);
+    priset::display(io_cfg/*, candidates*/);
 
     return 0;
 }
