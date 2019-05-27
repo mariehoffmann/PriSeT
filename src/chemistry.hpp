@@ -13,157 +13,126 @@
 #include <cmath>
 #include <vector>
 
-//#include "dna.hpp"
-#include "primer_config.hpp"
+#include <seqan/basic.h>
+
+//#include "seqan::Dna5.hpp"
+//#include "primer_config.hpp"
 #include "types.hpp"
 
 // satisfies the primer_config_concept.
 namespace priset::chemistry
 {
-//!\brief Enums for computational methods for primer melting temperature.
-enum method {wallace, salt_adjusted};
 
 //!\brief Wallace rule to compute the melting temperature of a primer sequence.
-template<typename sequence_type, typename float_type>
-// todo: require sequence_type comparable with dna aka char and provides iterator
-//sequence_type::value_type == dna
-float_type primer_melt_wallace(sequence_type primer, typename sequence_type::iterator it1, typename sequence_type::iterator it2)
+float primer_melt_wallace(seqan::String<priset::dna> const & sequence)
 {
-    assert((std::is_same<typename sequence_type::value_type, dna>::value));
-    size_t cnt_AT = std::count_if(it1, it2, [](dna n) {return n == dna::A || n == dna::T;});
-    size_t cnt_CG = std::count_if(it1, it2, [](dna n) {return n == dna::C || n == dna::G;});
-    return 2*cnt_AT + 4*cnt_CG;
+    assert(length(sequence) < (1 << 8));
+    uint8_t cnt_AT = 0;
+    uint8_t CG_cnt = 0;
+    for (auto c : sequence)
+    {
+        switch(char(c))
+        {
+            case 'A':
+            case 'T': ++cnt_AT; break;
+            case 'C':
+            case 'G': ++CG_cnt; break;
+            default: std::cout << "ERROR: unsupported sequence character '" << c << "'\n";
+        }
+    }
+    return 2*cnt_AT + 4*CG_cnt;
 }
 
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
 // input primer:string sequence, Na:float molar Natrium ion concentration
-template<typename sequence_type, typename float_type>
-float_type primer_melt_salt(sequence_type primer, float_type Na, typename sequence_type::iterator it1, typename sequence_type::iterator it2)
+inline float primer_melt_salt(seqan::String<priset::dna> const & sequence, float const Na)
 {
-    float_type cnt_CG = std::count_if(it1, it2, \
-        [](char c) {return c == 'C' || c == 'G';});
-    typename sequence_type::size_type primer_len = static_cast<typename sequence_type::size_type>(it2-it1);
-    return 100.5 + 41.0*cnt_CG/primer_len - 820.0/primer_len + 16.6*std::log10(Na);
+    assert(length(sequence) < (1 << 8));
+    uint8_t cnt_AT = 0;
+    uint8_t CG_cnt = 0;
+    for (auto c : sequence)
+    {
+        switch(char(c))
+        {
+            case 'A':
+            case 'T': ++cnt_AT; break;
+            case 'C':
+            case 'G': ++CG_cnt; break;
+            default: std::cout << "ERROR: unsupported sequence character '" << c << "'\n";
+        }
+    }
+    return 100.5 + 41.0 * CG_cnt / seqan::length(sequence) - 820.0 / seqan::length(sequence) + 16.6 * std::log10(Na);
 }
 
-//!\brief  variation measure for a block of aligned sequences in terms of number of columns
-// having different nucleotides. A low score indicates high conservation.
-// input sequences:[[]], pos:int, offset:int
-/*def variation_score(aligned_sequences, pos, offset):
-    transposed = [[aseq.seq[i] for aseq in aligned_sequences] for i in range(pos, pos+offset)]
-    score = sum([1 if len(set(col)) > 1 else 0 for col in transposed])
-    return score
-*/
-
-/*
-//!\brief Compress a window of aligned sequences to 1-letter encode.
-template<typename sequence_type>
-// todo: use aligned sequence type
-// block needs to be gap-free, N is ignored due to its ambiguity, all sequences are padded to the same length
-std::vector<dna> block_compress(std::vector<sequence_type> const aligned_sequences,
-    size_t const pos, size_t const offset)
+//!\brief Compute melting temperature of primer sequence with method set in primer configuration.
+template<typename primer_config_type>
+float get_Tm(primer_config_type const & primer_cfg, seqan::String<priset::dna> const & sequence) noexcept
 {
-    // assert that block end doesn't exceed the aligned sequences lengths
-    assert(aligned_sequences[0].size() - pos >= offset);
-    //matchstr = ['N' for _ in range(min(offset, len(aligned_sequences[0].seq)-pos))]
-    std::vector<dna> as_cx(offset);
-    //codes = {1: '|', 2: '2', 3: '3', 4: '4'}
-    unsigned short int mask_A = 1, mask_C = 2, mask_G = 4, mask_T = 8;
-    unsigned short int column_mask = 0;
-    for (unsigned int i = pos; i < pos + offset; ++i)  //  pos, pos + offset?
-    {
-        for (unsigned int j = 0; j < aligned_sequences.size(); ++j)
-        {
-            column_mask = 0;
-            switch(aligned_sequences[i][j])
-            {
-                case 'A': column_mask |= mask_A; break;
-                case 'C': column_mask |= mask_C; break;
-                case 'G': column_mask |= mask_G; break;
-                case 'T': column_mask |= mask_T; break;
-                default: std::cout << "Warning: block_compress scans block with unknown symbol '" <<
-                    aligned_sequences[i][j] << "'" << std::endl;
-            }
-        }
-        // build dna string conform to key set of priset::str2dna map
-        std::string dna_str = "";
-        if ((column_mask & mask_A) == mask_A)
-            dna_str.append("A");
-        if ((column_mask & mask_C) == mask_C)
-            dna_str.append("C");
-        if ((column_mask & mask_G) == mask_G)
-            dna_str.append("G");
-        if ((column_mask & mask_T) == mask_T)
-            dna_str.append("T");
-
-        as_cx[i-offset] = str2dna[dna_str];
-    }
-    return as_cx;
-}*/
-
-//!\brief Computer melting temperature of primer sequence.
-// make primer_config_type a const reference?
-template<typename primer_config_type, typename float_type>
-float_type get_Tm(typename primer_config_type::sequence_type const primer, primer_config_type & primer_cfg) noexcept
-{
-    // enum method {wallace, salt_adjusted};
     switch(primer_cfg.get_primer_melt_method())
     {
-        case wallace: return primer_melt_wallace(primer);
-        default: return primer_melt_salt(primer, primer_cfg.get_Na());
+        case WALLACE: return primer_melt_wallace(sequence);
+        default: return primer_melt_salt(sequence, primer_cfg.get_Na());
     }
 }
 
-//!\brief Check for all target sequences the melting temperature range.
-template<typename primer_config_type, typename float_type>
-bool filter_Tm(primer_config_type & primer_cfg, typename primer_config_type::sequence_type & sequence)
+//!\brief Check if melting temperature is in range set by the primer configurator.
+template<typename primer_config_type>
+inline bool filter_Tm(primer_config_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
 {
-    return filter_Tm<primer_config_type::sequence_type, float_type>(primer_cfg, sequence, 0, sequence.size());
-}
-
-/*
-//!\brief Check melting temperature for subsequence.
-template<typename primer_config_type, typename float_type>
-bool filter_Tm(primer_config_type& const primer_cfg, primer_config_type::sequence_type& const sequence,
-    typename sequence_type::size_type const offset, typename sequence_type::size_type const size)
-{
-    float_type Tm = get_Tm(primer, primer_cfg, offset, size);
+    float Tm = get_Tm(primer_cfg, sequence);
     if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
         return true;
     return false;
 }
 
-//!\brief Compute relative GC content.
-// TODO: require sequence_concept (includes sequence has iterator)
-template<typename sequence_type, typename float_type>
-float_type get_GC_content(sequence_type sequence, primer_config & cfg,
-    sequence_type::iterator_type it1, sequence_type::iterator_type it2) noexcept
+//!\brief Check if CG content is in range set by the primer configurator.
+// Returns false if constraint is violated.
+template<typename primer_cfg_type>
+inline bool filter_CG(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
 {
-    size_t cnt_GC = std::count_if(it1, it2, [](dna b) {return b == dna::C || b == dna::G;});
-    return static_cast<float_type>(cnt_GC)/static_cast<float_type>(it2-it1);
+    assert(length(sequence) < (1 << 8));
+    uint8_t CG_cnt = 0;
+    for (auto c : sequence)
+    {
+        switch(char(c))
+        {
+            case 'A': break;
+            case 'C':
+            case 'G': ++CG_cnt; break;
+            case 'T': break;
+            default: std::cout << "ERROR: unsupported sequence character '" << c << "'\n";
+        }
+    }
+    float CG = float(CG_cnt) / float(seqan::length(sequence));
+    return (CG >= primer_cfg.get_min_CG_content() && CG <= primer_cfg.get_max_CG_content());
 }
 
-//!\brief Check if GC content is in the recommended range.
-template<typename sequence_type, typename float_type>
-bool filter_GC_content(sequence_type sequence, primer_config & cfg,
-    typename sequence_type::size_type offset, typename sequence_type::size_type size) noexcept
+//!\brief Check if not more than 3 out of the 5 last bases at the 3' end are CG.
+//  DNA sense/'+': 5' to 3', antisense/'-': 3' to 5'
+// Returns false if constraint is violated.
+template<typename primer_config_type>
+inline bool filter_CG_clamp(primer_config_type const & primer_cfg, seqan::String<priset::dna> const & sequence, char const sense)
 {
-    float_type CG_content = get_CG_content(sequence, cfg, offset, size);
-    if (CG_content < cfg.get_min_CG_content() || CG_content > cfg.get_max_CG_content())
-        return false;
+    assert(seqan::length(sequence) < (1 << 8));
+    assert(sense == '+' || sense == '-');
+    uint8_t CG_cnt = 0;
+    uint8_t offset = (sense == '+') ? 0 : seqan::length(sequence) - 6;
+    for (uint8_t i = 0; i < 5; ++i)
+        CG_cnt += (sequence[i + offset] == 'C' || sequence[i + offset] == 'G') ? 1 : 0;
+    return CG_cnt <= 3;
+}
+
+/* !\brief Check for low energy secondary structures.
+ * Returns true if generation of secondary structures is improbable.
+ * Tested are hairpins, self- and cross dimerization.
+ */
+template<typename primer_cfg_type>
+inline bool filter_secondary_structures(primer_cfg_type const & primer_cfg)
+{
     return true;
 }
-*/
+
 /*
-# check for GC at 3' end, DNA sense/'+': 5' to 3', antisense/'-': 3' to 5', should be <= 3 in last 5 bps
-def filter_GC_clamp(sequence, sense='+'):
-    if sense == '+':
-        gc = len([1 for nt in sequence[-5:] if nt in ['C', 'G']])
-    else:
-        gc = len([1 for nt in sequence[:5] if nt in ['C', 'G']])
-    if gc > 3:
-        return False, gc
-    return True, gc
 
 # check for 2ndary structure hairpin, may only be present at 3' end with a delta(G) = -2 kcal/mol,
 # or internally with a delta(G) of -3 kcal/mol
