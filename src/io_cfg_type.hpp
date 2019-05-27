@@ -13,6 +13,7 @@
 
 #include <seqan/basic.h>
 
+#include "chemistry.hpp"
 #include "errors.hpp"
 
 namespace fs = std::experimental::filesystem;
@@ -22,7 +23,7 @@ namespace priset
 
 #define MAX_PATH_LENGTH 100
 
-struct io_config
+struct io_cfg_type
 {
 private:
     // Directory that contains library, taxonomy, and taxid to accession files.
@@ -48,7 +49,7 @@ private:
 
 public:
 
-    io_config(fs::path const & lib_dir_, fs::path const & work_dir_) :
+    io_cfg_type(fs::path const & lib_dir_, fs::path const & work_dir_) :
         lib_dir{fs::absolute(lib_dir_)},
         work_dir{fs::absolute(work_dir_)},
         index_dir{fs::absolute(work_dir_)},

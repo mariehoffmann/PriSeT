@@ -40,7 +40,7 @@
 
 #pragma GCC diagnostic pop
 
-#include "io_config.hpp"
+#include "io_cfg_type.hpp"
 #include "primer_config.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
@@ -77,7 +77,7 @@ int fm_index(io_cfg_type & io_cfg)
  * fasta_header_type        container type for storing fasta header lines
  * fasta_length_type        container type for storing fasta entry lengths (for txt.concat)
  */
-template<typename io_cfg_type, typename primer_config, typename TLocations, typename TDirectoryInformation, typename TsequenceNames, typename TsequenceLengths>
+template<typename io_cfg_type, typename primer_config, typename TLocations, typename TsequenceNames, typename TsequenceLengths>
 int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
 {
     // omit file I/O
@@ -92,9 +92,6 @@ int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locati
     TFMIndexConfig::SAMPLING = 10;
     // load index
     TIndex index;
-    // should be: /Users/troja/priset/work/index/index
-    std::cout << "Load index from: (fs::path -> std::string -> toCString)" << seqan::toCString(std::string(io_cfg.get_index_base_path())) << std::endl;
-    std::cout << "Load index from: (fs::path -> std::string -> CharString -> toCString)" << seqan::toCString(seqan::CharString(std::string(io_cfg.get_index_base_path()))) << std::endl;
 
     // load index
     if (!genmap::detail::open(index, seqan::toCString(std::string(io_cfg.get_index_base_path())), seqan::OPEN_RDONLY))

@@ -16,6 +16,8 @@
 
 namespace priset
 {
+//using dna = typename seqan::Dna5;
+typedef seqan::Dna5 dna;
 
 // type declarations
 using TSeqNo = uint64_t;
@@ -26,8 +28,7 @@ typedef String<seqan::Dna, seqan::Alloc<>> TString;
 typedef seqan::StringSet<TString, seqan::Owner<seqan::ConcatDirect<SizeSpec_<TSeqNo, TSeqPos> > > > TStringSet;
 // set index type, TBiIndexConfig defined src/common.hpp
 using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig> >;
-typedef seqan::Dna5 dna;
-typedef std::vector<priset::dna> TSeq;
+typedef seqan::String<priset::dna> TSeq;
 // map of k-mer locations (determined by genmap)
 typedef std::map<seqan::Pair<priset::TSeqNo, priset::TSeqPos>,
          std::pair<std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> >,
@@ -35,7 +36,7 @@ typedef std::map<seqan::Pair<priset::TSeqNo, priset::TSeqPos>,
 // vector type of k-mers and their locations
 typedef std::vector<std::pair<TSeq, std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TKmerLocations;
 //
-typdef typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > TDirectoryInformation;
+using TDirectoryInformation = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > ;
 // container for fasta header lines
 using TSequenceNames = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > >;
 // container for fasta sequence lengths

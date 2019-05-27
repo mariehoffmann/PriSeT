@@ -18,7 +18,7 @@
 #include "errors.hpp"
 #include "filter.hpp"
 #include "fm.hpp"
-#include "io_config.hpp"
+#include "io_cfg_type.hpp"
 #include "primer_config.hpp"
 #include "taxonomy.hpp"
 #include "types.hpp"
@@ -38,7 +38,7 @@ int main(int argc, char** argv)
         std::cout << "ERROR: " << ARG_ERROR << std::endl, exit(0);
 
     // set path prefixes for library files
-    priset::io_config io_cfg{argv[1], argv[2]};
+    priset::io_cfg_type io_cfg{argv[1], argv[2]};
 
     // get instance to primer sequence settings
     priset::primer_config<priset::TSeq> primer_cfg{};
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     //tax.print_taxonomy();
 
     // create FM index
-    priset::fm_index<priset::io_config>(io_cfg);
+    priset::fm_index<priset::io_cfg_type>(io_cfg);
 
     // dictionary for storing FM mapping results
     priset::TLocations locations;
@@ -63,8 +63,8 @@ int main(int argc, char** argv)
     priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map<priset::io_config, priset::primer_config<priset::TSeq>, priset::TLocations, priset::TDirectoryInformation, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, directoryInformation, sequenceNames, sequenceLengths);
-    print_locations(locations);
+    priset::fm_map<priset::io_cfg_type, priset::primer_config<priset::TSeq>, priset::TLocations, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, directoryInformation, sequenceNames, sequenceLengths);
+    priset::print_locations(locations);
 
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches

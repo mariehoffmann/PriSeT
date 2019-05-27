@@ -17,6 +17,8 @@
 
 namespace priset
 {
+//!\brief Enums for computational methods for primer melting temperature.
+enum melt_method_type {WALLACE, SALT_ADJUSTED};
 
 template<typename sequence_type>
 struct primer_config
@@ -132,13 +134,13 @@ struct primer_config
     }
 
     // Set method for computing primer melting temperature.
-    void set_primer_melt_method(chemistry::method method_)
+    void set_primer_melt_method(enum melt_method_type method_)
     {
         primer_melt_method = method_;
     }
 
     // Get method for computing primer melting temperature.
-    constexpr chemistry::method get_primer_melt_method() const noexcept
+    enum melt_method_type get_primer_melt_method() const noexcept
     {
         return primer_melt_method;
     }
@@ -173,6 +175,18 @@ struct primer_config
         return CG_content_range;
     }
 
+    // Get lower bound for recommended CG content (relative)
+    float get_min_CG_content() const noexcept
+    {
+        return CG_content_range.first;
+    }
+
+    // Get lower bound for recommended CG content (relative)
+    float get_max_CG_content() const noexcept
+    {
+        return CG_content_range.second;
+    }
+
 private:
 
     // Root taxonomic identifier below which references are sampled.
@@ -181,6 +195,9 @@ private:
     // Occurrence frequency of primer sequences relative to the number of taxa with at least one existing reference sequence.
     float occurrence_freq{0.1};
 
+    // Default primer melting temperature formular (see chemistry.hpp for details)
+    melt_method_type melt_method = WALLACE;
+
     // Primer length range
     size_interval_type primer_length_range{18, 24};
 
@@ -188,14 +205,14 @@ private:
     size_interval_type transcript_range{30, 700};
 
     // Range of primer melting temperatures (best results in range [52-58] degree C).
-    std::pair<float, float> primer_melt_range{52.0, 58.0};
+    std::pair<float, float> primer_melt_range{50.0, 62.0};
 
     // Maximal permitted temperature difference [Kelvin] of primers.
     // Differences above 5 Kelvin can lead to no amplification.
     float primer_melt_diff{4.0};
 
     // Method for computing melting temperature of primer.
-    chemistry::method primer_melt_method{chemistry::method::wallace};
+    melt_method_type primer_melt_method{melt_method_type::WALLACE};
 
     // Molar Natrium concentration for salt-adjusted primer_melt_method.
     float Na{.0};
