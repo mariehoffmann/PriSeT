@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <bitset>
 #include <stdlib.h>
 
 #include "../submodules/genmap/src/common.hpp"
@@ -35,44 +36,29 @@ typedef std::map<seqan::Pair<priset::TSeqNo, priset::TSeqPos>,
                    std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TLocations;
 // vector type of k-mers and their locations
 typedef std::vector<std::pair<TSeq, std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TKmerLocations;
+// store kmer identifier combinations corresponding to primer pairs
+typedef std::vector<std::pairs<TSeqPos, TSeqPos>> TPairs;
 //
 using TDirectoryInformation = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > ;
 // container for fasta header lines
 using TSequenceNames = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > >;
 // container for fasta sequence lengths
-using TSequenceLengths = typename seqan::StringSet<uint64_t>;
+using TSequenceLengths = typename seqan::StringSet<uint32_t>;
 
 /*
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and
  * a unique integer ID.
  */
-template<typename primer_config_type>
 struct kmer
 {
-private:
-    // Pointer to primer configurator.
-    typename std::add_pointer_t<primer_config_type const> primer_cfg{nullptr};
-    //primer_config_type &primer_cfg{};
-    // Pointer to DNA sequence of k-mer
-    //typename std::add_pointer_t<typename primer_config_type::sequence_type const> sequence{nullptr};
-    typename primer_config_type::sequence_type const sequence;
+    // DNA sequence it represents
+    typename TSeq const sequence;
 
     // Unique numerical identifier.
-    typename primer_config_type::kmer_ID_type ID;
-
-    //typename primer_config_type::sequence_type sequence;
+    typename uint64_t const ID;
 
     // Melting temperature of k-mer sequence.
-    typename primer_config_type::float_type Tm;
-
-public:
-    constexpr kmer() = default;
-    kmer(primer_config_type const & primer_cfg_, typename primer_config_type::sequence_type const & sequence_) :
-        primer_cfg(&primer_cfg_), sequence(sequence_)
-    {
-        Tm = primer_cfg.compute_primer_Tm(sequence_);
-    }
-    ~kmer() = default;
+    typename float const Tm;
 };
 
 /*

@@ -6,12 +6,6 @@
 
 #include "types.hpp"
 
-/*
- * TLocations = std::map<seqan::Pair<TSeqNo, TSeqPos>,
- *         std::pair<   std::vector<seqan::Pair<TSeqNo, TSeqPos> >,
- *                      std::vector<seqan::Pair<TSeqNo, TSeqPos> > > >
- */
-
 namespace priset
 {
 template<typename TLocations>
@@ -35,7 +29,6 @@ void print_locations(TLocations & locations)
 }
 
 // Retrieve DNA sequence from txt.concat given a set of locations
-template<typename primer_cfg_type>
 // lookup_sequences<primer_cfg_type>(kmer_locations, io_cfg, primer_cfg, directoryInformation);
 void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TDirectoryInformation const & directoryInformation)
 {
@@ -78,25 +71,31 @@ void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cf
         std::cout << "loc = (" << seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(kmer_it->second[0]) << ") has kmer sequence = " << kmer << std::endl;
         // copy kmer into first position of locations vector
         seqan::String<priset::dna> str;
-        append(str, kmer);
-        (*kmer_it).first = kmer;
+        std::cout << "append kmer sequence to str" << std::endl;
+        seqan::append(str, kmer);
+        std::cout << "assign to 1st position of kmer_locs: " << std::endl;
+        (*kmer_it).first = str; // direct assignment of kmer possible?
         // forward next kmer iterator and abort if no more kmers to resolve
+        std::cout << "increment kmer iterator: " << std::endl;
         ++kmer_it;
+        std::cout << "query for end: " << std::endl;
         if (kmer_it == kmer_locations.end())
         {
             std::cout << "kmer_locations end reached\n";
             break;
         }
+        std::cout << "get next kmer id: " << std::endl;
+        assert(kmer_it->second.size() > 0);
         next_kmer_id = seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]);
     }
 }
 
 // set directory information as needed by genmap's fasta file parsing
-template<typename TDirectoryInformation>
 void set_directoryInformation(std::string & index_path_base_ids, TDirectoryInformation & directoryInformation)
 {
     seqan::open(directoryInformation, seqan::toCString(index_path_base_ids), seqan::OPEN_RDONLY);
     // dummy entry enforces that the mappability is computed for the last file in the while loop.
     seqan::appendValue(directoryInformation, "dummy.entry;0;chromosomename");
 }
-}
+
+}  // namespace priset

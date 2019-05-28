@@ -81,9 +81,6 @@ template<typename io_cfg_type, typename primer_config, typename TLocations, type
 int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
 {
     // omit file I/O
-    // ./bin/genmap map -I ~/tmp/genmap/index -O ~/priset/genmap/mapping -K 18 -E 1 --raw -t -d -fl
-    // FM index mapper settings (see mappability.hpp for further information)
-    // parameter definitions for setting the index type
     using key_type = typename TLocations::key_type;
     using TSeqNo = typename seqan::Value<key_type, 1>::Type;
     using size_interval_type = typename primer_config::size_interval_type;
@@ -119,8 +116,6 @@ int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locati
     bool revCompl = false;
     bool excludePseudo = false;
     SearchParams searchParams = SearchParams{K, overlap, threads, revCompl, excludePseudo};
-
-    //opt{mmap = 0, indels = 0, wigFile = 0, bedFile = 0, rawFile = 1, txtFile = 1, csvFile = 1, outputType = 0, directory = 0, verbose = 0, indexPath = /Users/troja/priset/work/index/index, outputPath = /Users/troja/priset/work/mapping/, alphabet = dna5, seqNoWidth = 16, maxSeqLengthWidth = 32, totalLengthWidth = 32, errors = 0, sampling = 10}
 
     bool mmap = false;
     bool indels = false;
