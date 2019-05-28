@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <iostream>
+#include <functional>
 #include <vector>
 
 #include <seqan/basic.h>
@@ -123,13 +125,80 @@ inline bool filter_CG_clamp(primer_config_type const & primer_cfg, seqan::String
 }
 
 /* !\brief Check for low energy secondary structures.
- * Returns true if generation of secondary structures is improbable.
- * Tested are hairpins, self- and cross dimerization.
+ * Returns true if stability of a hairpin structure above the annealing temperature is improbable.
+ * It is assumed that the annealing temperature
+ * is 5°C below the Tｍ of the sequence.
+ * TODO: implement Zuker Recursion
  */
 template<typename primer_cfg_type>
-inline bool filter_secondary_structures(primer_cfg_type const & primer_cfg)
+inline bool filter_hairpin(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
 {
+    float Ta = get_Tm(primer_cfg, sequence) - 5;
+    // check for hairpins
+
+        // check its melting temperature
     return true;
+}
+
+/* Helper function for computing the convolution of two sequences. For each overlap
+ *position the Gibb's free energy is computed and the minimum returned;
+ */
+float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<priset::dna> const & t)
+{
+    int8_t offset = 2;
+    int8_t const n = seqan::length(s);
+    int8_t const m = seqan::length(t);
+    int8_t s1, s2;
+    int8_t t1, t2;
+    int8_t cnt_AT, cnt_CG;
+    auto energy = [](int8_t const & cnt_CG, int8_t const &cnt_AT) { return -(cnt_CG + 2*cnt_AT);};
+    //auto lambda = [](const std::string& s) { return std::stoi(s); };
+    int8_t energy_min = 0;
+    for (int8_t i = 0; i < n + m - 2 * offset + 1; ++i)
+    {
+        s1 = (n - offset - i < 0) ? 0 : n - offset - i; // std::max<int8_t>(n - offset - i, 0);
+        t1 = std::max<int8_t>(i - n + offset, 0);
+        t2 = std::min<int8_t>(i + offset, m);
+        s2 = std::min<int8_t>(s1 + t2 - t1, n);
+        // count complementary bps
+        cnt_CG = 0;
+        cnt_AT = 0;
+        for (auto j = 0; j < s2-s1; ++j)
+        {
+            switch(char(s[s1+j]))
+            {
+                case 'A': cnt_AT += (t[t1+j] == 'T') ? 1 : 0; break;
+                case 'T': cnt_AT += (t[t1+j] == 'A') ? 1 : 0; break;
+                case 'C': cnt_CG += (t[t1+j] == 'G') ? 1 : 0; break;
+                case 'G': cnt_CG += (t[t1+j] == 'C') ? 1 : 0; break;
+                default: std::cout << "ERROR: primer contains unknown symbol '" << s[s1+j] << "'" << std::endl;
+            }
+            // update minimal energy
+            if (energy(cnt_CG, cnt_AT) < energy_min)
+                energy_min = energy(cnt_CG, cnt_AT);
+        }
+    }
+    return energy_min;
+}
+
+/* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
+ * Returns true if ΔG ≥ -5kcal/mol
+ */
+inline bool filter_self_dimerization(seqan::String<priset::dna> const & sequence)
+{
+    float dG = gibbs_free_energy(sequence, sequence);
+    std::cout << "minimal free energy for self-dimerization of s = " << sequence << " is " << dG << std::endl;
+    return (dG < -10) ? false : true;
+}
+
+/* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
+ * Returns true if ΔG ≥ -5kcal/mol
+ */
+inline bool filter_cross_dimerization(seqan::String<priset::dna> const & s, seqan::String<priset::dna> const & t)
+{
+    float dG = gibbs_free_energy(s, t);
+    std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
+    return (dG < -10) ? false : true;
 }
 
 /*
@@ -169,22 +238,6 @@ def filter_crossdimer(s, t, cfg):
     if min(cnv) < cfg.var['delta_G_cross']:
         return False
     return True, min(cnv)
-*/
-
-/*
-# one-letter encoding for set of aligned sequences, no gaps
-def compress_helper(aligned_sequences, pos, length, bin_codes):
-    seq_x = ''
-    for i in range(pos, pos+length):
-        code = reduce(lambda x, y: x|y, [bin_codes[aseq.seq[i]] for aseq in aligned_sequences])
-        seq_x += one_letter_encode[code]
-    return seq_x
-
-def compress(aligned_sequences, pos, length):
-    return compress_helper(aligned_sequences, pos, length, {'A': 1, 'C': 2, 'G': 4, 'T': 8})
-
-def complement_compress(aligned_sequences, pos, length):
-    return compress_helper(aligned_sequences, pos, length, {'A': 8, 'C': 4, 'G': 2, 'T': 1})[::-1]
 */
 
 } // namespace chemistry
