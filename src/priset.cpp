@@ -70,9 +70,12 @@ int main(int argc, char** argv)
     // TODO: result structure for references and k-mer pairs: candidates/matches
     // dictionary for storing k-mers and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     priset::TKmerLocations kmer_locations;
-    priset::filter<priset::primer_config<priset::TSeq>, priset::TLocations, priset::TKmerLocations, priset::TDirectoryInformation, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation, sequenceNames, sequenceLengths);
+    priset::pre_filter_main<priset::primer_config<priset::TSeq>, priset::TLocations, priset::TKmerLocations, priset::TDirectoryInformation, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation, sequenceNames, sequenceLengths);
     // TODO: delete locations
-
+    TMatrix pairs;
+    priset::combine<priset::primer_config<priset::TSeq>>(primer_cfg, kmer_locations, pairs);
+    // test chemical constraints of pairs and filter
+    priset::post_filter_main(primer_cfg, kmer_locations, pairs);
     // display
     priset::display(io_cfg/*, candidates*/);
 
