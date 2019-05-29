@@ -19,7 +19,7 @@
 #include "filter.hpp"
 #include "fm.hpp"
 #include "io_cfg_type.hpp"
-#include "primer_config.hpp"
+#include "primer_cfg_type.hpp"
 #include "taxonomy.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
@@ -41,7 +41,7 @@ int main(int argc, char** argv)
     priset::io_cfg_type io_cfg{argv[1], argv[2]};
 
     // get instance to primer sequence settings
-    priset::primer_config<priset::TSeq> primer_cfg{};
+    priset::primer_cfg_type primer_cfg{};
 
     // build taxonomy in RAM
     priset::taxonomy tax{io_cfg.get_tax_file()};
@@ -63,19 +63,19 @@ int main(int argc, char** argv)
     priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map<priset::io_cfg_type, priset::primer_config<priset::TSeq>, priset::TLocations, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, directoryInformation, sequenceNames, sequenceLengths);
+    priset::fm_map<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, directoryInformation, sequenceNames, sequenceLengths);
     priset::print_locations(locations);
 
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches
     // dictionary for storing k-mers and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     priset::TKmerLocations kmer_locations;
-    priset::pre_filter_main<priset::primer_config<priset::TSeq>, priset::TLocations, priset::TKmerLocations, priset::TDirectoryInformation, priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation, sequenceNames, sequenceLengths);
+    priset::pre_filter_main<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation, sequenceNames, sequenceLengths);
     // TODO: delete locations
-    TMatrix pairs;
-    priset::combine<priset::primer_config<priset::TSeq>>(primer_cfg, kmer_locations, pairs);
+    priset::TPairs pairs;
+    priset::combine(primer_cfg, kmer_locations, pairs);
     // test chemical constraints of pairs and filter
-    priset::post_filter_main(primer_cfg, kmer_locations, pairs);
+    //priset::post_filter_main(primer_cfg, kmer_locations, pairs);
     // display
     priset::display(io_cfg/*, candidates*/);
 

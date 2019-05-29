@@ -17,8 +17,6 @@
 
 namespace priset
 {
-//!\brief Enums for computational methods for primer melting temperature.
-enum melt_method_type {WALLACE, SALT_ADJUSTED};
 
 struct primer_cfg_type
 {
@@ -45,27 +43,17 @@ struct primer_cfg_type
     constexpr primer_cfg_type(primer_cfg_type const &) = default;
 
     // Default copy construction via assignment.
-    constexpr primer_cfg_type & operator=(primer_cfg_type const &) = default;
+    primer_cfg_type & operator=(primer_cfg_type const &) = default;
 
     // Move constructor.
     constexpr primer_cfg_type (primer_cfg_type && rhs) = default;
 
     // Move assignment.
-    constexpr primer_cfg_type & operator=(primer_cfg_type && rhs) = default;
+    primer_cfg_type & operator=(primer_cfg_type && rhs) = default;
 
     // Use default deconstructor.
     ~primer_cfg_type() = default;
     //!\}
-
-    bool check_primer_constraints(TSeq p) const noexcept
-    {
-        return true;
-    }
-
-    constexpr bool check_primerpair_constraints(TSeq p, TSeq q) const noexcept
-    {
-        return true;
-    }
 
     //
     constexpr void set_root_taxid(taxid_type taxid)
@@ -133,28 +121,26 @@ struct primer_cfg_type
     }
 
     // Set method for computing primer melting temperature.
-    void set_primer_melt_method(enum melt_method_type method_)
+    void set_primer_melt_method(enum TMeltMethod method_)
     {
         primer_melt_method = method_;
     }
 
     // Get method for computing primer melting temperature.
-    enum melt_method_type get_primer_melt_method() const noexcept
+    enum TMeltMethod get_primer_melt_method() const noexcept
     {
         return primer_melt_method;
     }
 
     // Set distance_range.
-    template<typename interval_type>
-    void set_transcript_range(interval_type transcript_range_)
+    void set_transcript_range(size_interval_type transcript_range_)
     {
         assert(transcript_range_.first >= 50 && transcript_range_.second <= 2000);
         transcript_range = transcript_range_;
     }
 
     // Get distance_range.
-    template<typename interval_type>
-    constexpr interval_type get_transcript_range() const noexcept
+    constexpr size_interval_type get_transcript_range() const noexcept
     {
         return transcript_range;
     }
@@ -195,7 +181,7 @@ private:
     float occurrence_freq{0.1};
 
     // Default primer melting temperature formular (see chemistry.hpp for details)
-    melt_method_type melt_method = WALLACE;
+    TMeltMethod melt_method{TMeltMethod::WALLACE};
 
     // Primer length range
     size_interval_type primer_length_range{18, 24};
@@ -211,7 +197,7 @@ private:
     float primer_melt_diff{4.0};
 
     // Method for computing melting temperature of primer.
-    melt_method_type primer_melt_method{melt_method_type::WALLACE};
+    TMeltMethod primer_melt_method{TMeltMethod::WALLACE};
 
     // Molar Natrium concentration for salt-adjusted primer_melt_method.
     float Na{.0};

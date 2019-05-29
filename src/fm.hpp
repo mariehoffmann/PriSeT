@@ -41,7 +41,7 @@
 #pragma GCC diagnostic pop
 
 #include "io_cfg_type.hpp"
-#include "primer_config.hpp"
+#include "primer_cfg_type.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
 
@@ -71,19 +71,19 @@ int fm_index(io_cfg_type & io_cfg)
 /*
  * Map frequent k-mers to exisiting FM index with `genmap` without file IO
  * io_cfg_type              I/O configurator type
- * primer_config            primer configurator type
+ * primer_cfg_type          primer configurator type
  * TLocations               type for storing locations
  * TDirectoryInformation    directory information type
  * fasta_header_type        container type for storing fasta header lines
  * fasta_length_type        container type for storing fasta entry lengths (for txt.concat)
  */
-template<typename io_cfg_type, typename primer_config, typename TLocations, typename TsequenceNames, typename TsequenceLengths>
-int fm_map(io_cfg_type & io_cfg, primer_config & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
+template<typename TsequenceNames, typename TsequenceLengths>
+int fm_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
 {
     // omit file I/O
     using key_type = typename TLocations::key_type;
     using TSeqNo = typename seqan::Value<key_type, 1>::Type;
-    using size_interval_type = typename primer_config::size_interval_type;
+    using size_interval_type = typename primer_cfg_type::size_interval_type;
     // seqan::Alloc - for direct memory mapping use seqan::MMap<> instad of seqan::Alloc<>, relevant for benchmarking,
     // since loading index of human genome from disk to main memory may take several minutes
     TFMIndexConfig::SAMPLING = 10;

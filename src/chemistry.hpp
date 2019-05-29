@@ -21,9 +21,10 @@
 //#include "primer_config.hpp"
 #include "types.hpp"
 
-// satisfies the primer_config_concept.
 namespace priset::chemistry
 {
+
+//struct primer_cfg_type;
 
 //!\brief Wallace rule to compute the melting temperature of a primer sequence.
 float primer_melt_wallace(seqan::String<priset::dna> const & sequence)
@@ -67,19 +68,19 @@ inline float primer_melt_salt(seqan::String<priset::dna> const & sequence, float
 }
 
 //!\brief Compute melting temperature of primer sequence with method set in primer configuration.
-template<typename primer_config_type>
-float get_Tm(primer_config_type const & primer_cfg, seqan::String<priset::dna> const & sequence) noexcept
+template<typename primer_cfg_type>
+float get_Tm(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence) noexcept
 {
     switch(primer_cfg.get_primer_melt_method())
     {
-        case WALLACE: return primer_melt_wallace(sequence);
+        case TMeltMethod::WALLACE: return primer_melt_wallace(sequence);
         default: return primer_melt_salt(sequence, primer_cfg.get_Na());
     }
 }
 
 //!\brief Check if melting temperature is in range set by the primer configurator.
-template<typename primer_config_type>
-inline bool filter_Tm(primer_config_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
+template<typename primer_cfg_type>
+inline bool filter_Tm(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
 {
     float Tm = get_Tm(primer_cfg, sequence);
     if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
@@ -112,8 +113,8 @@ inline bool filter_CG(primer_cfg_type const & primer_cfg, seqan::String<priset::
 //!\brief Check if not more than 3 out of the 5 last bases at the 3' end are CG.
 //  DNA sense/'+': 5' to 3', antisense/'-': 3' to 5'
 // Returns false if constraint is violated.
-template<typename primer_config_type>
-inline bool filter_CG_clamp(primer_config_type const & primer_cfg, seqan::String<priset::dna> const & sequence, char const sense)
+template<typename primer_cfg_type>
+inline bool filter_CG_clamp(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence, char const sense)
 {
     assert(seqan::length(sequence) < (1 << 8));
     assert(sense == '+' || sense == '-');
