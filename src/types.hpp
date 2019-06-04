@@ -47,12 +47,19 @@ typedef std::map<seqan::Pair<priset::TSeqNo, priset::TSeqPos>,
 
 //
 using TDirectoryInformation = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > ;
+
 // container for fasta header lines
 using TSequenceNames = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > >;
+
 // container for fasta sequence lengths
 using TSequenceLengths = typename seqan::StringSet<uint32_t>;
 
+// The type for kmer identifiers.
 typedef uint64_t TKmerID;
+
+// The type for taxonomic identifiers.
+typedef uint32_t TTaxid;
+
 /*
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and
  * a unique integer ID.
@@ -78,32 +85,20 @@ typedef std::vector<std::pair<TKmer, std::vector<seqan::Pair<priset::TSeqNo, pri
 /*
  * Datatype to store matches of two k-mers within a list of accessions.
  */
-template<typename kmer_type>
-struct match
+struct TPair
 {
 private:
-
     // k-mer identifier for forward (5') primer sequence
-    kmer_type kmer_fwd;
+    TKmerID kmer_fwd;
     // k-mer identifier for reverse (3') primer sequence
-    kmer_type kmer_rev;
-    // taxid of all accessions in the accession list
-    typename kmer_type::primer_cfg_type::taxid_type taxid;
+    TKmerID kmer_rev;
     // absolute difference of their melting temperatures
-    typename kmer_type::primer_cfg_type::float_type Tm_delta;
-    // accessions from library where both k-mers match and which are directly assigned
-    // to the taxid (e.g. taxid is not the lca)
-    // TODO: decide to store here also the location asscociated with an accession
-    std::vector<typename kmer_type::primer_cfg::accession_type> accession_list;
-public:
-    //using = ;
-    constexpr match() = default;
-    match(kmer_type kmer_fwd, kmer_type kmer_rev)
-    {
-        Tm_delta = std::abs(kmer_fwd.get_Tm() - kmer_fwd.getTm());
-    }
-    ~match() = default;
+    float Tm_delta;
+    // The set of locations given by sequence id and position index.
+    std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > locations;
 };
+
+typedef std::vector<TPair> TPairs;
 
 // TODO: use key value tuple and use ordered set or map
 /*
