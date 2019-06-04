@@ -107,9 +107,16 @@ struct primer_cfg_type
         return Na;
     }
 
+    // Set primer length range.
+    void set_primer_length_range(size_interval_type range_)
+    {
+        assert(range_.first <= range_.second);
+        primer_length_range = range_;
+    }
+
+
     // Get primer length range
-    template<typename interval_type>
-    constexpr interval_type get_primer_length_range() const noexcept
+    constexpr size_interval_type get_primer_length_range() const noexcept
     {
         return primer_length_range;
     }
