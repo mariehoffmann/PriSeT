@@ -68,9 +68,11 @@ int main(int argc, char** argv)
 
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches
-    // dictionary for storing k-mers and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
+    // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     priset::TKmerLocations kmer_locations;
-    priset::pre_filter_main<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, directoryInformation, sequenceNames, sequenceLengths);
+    // dictionary to resolve kmer IDs and their sequences
+    prisest::TKmerMap kmer_map;
+    priset::pre_filter_main<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, directoryInformation, sequenceNames, sequenceLengths);
     // TODO: delete locations
     priset::TPairs pairs;
     priset::combine(primer_cfg, kmer_locations, pairs);

@@ -40,10 +40,13 @@ using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig> >;
 
 typedef seqan::String<priset::dna> TSeq;
 
-// map of k-mer locations (determined by genmap)
-typedef std::map<seqan::Pair<priset::TSeqNo, priset::TSeqPos>,
-         std::pair<std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> >,
-                   std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TLocations;
+// The location type defined by sequence ID and position.
+typedef seqan::Pair<priset::TSeqNo, priset::TSeqPos> TLocation;
+
+// The map of k-mer locations.
+typedef std::map<TLocation,
+         std::pair<std::vector<TLocation >,
+                   std::vector<TLocation > > > TLocations;
 
 //
 using TDirectoryInformation = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > ;
@@ -66,28 +69,26 @@ typedef uint32_t TTaxid;
  */
 struct TKmer
 {
-    // DNA sequence it represents
+    // alphabet sequence of k-mer
     TSeq seq{};
 
-    // Unique numerical identifier.
-    TKmerID ID{static_cast<TKmerID>(1<<24)};
+    // Unique numerical identifier. Default 0 means unset.
+    TKmerID ID{static_cast<TKmerID>(0)};
 
     // Melting temperature of k-mer sequence.
     float Tm{0};
 };
 
-// store kmer combinations by their IDs
-typedef std::vector<std::pair< TKmerID, TKmerID > > TPairs;
+// The map to resolve kmer IDs and their structs.
+// TODO: ID redundant, see application to possibly remove from struct
+typedef std::map<TKmerID, TKmer> TKmerMap;
 
 // vector type of k-mers and their locations
-typedef std::vector<std::pair<TKmer, std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > > > TKmerLocations;
+typedef std::vector<std::pair<TKmerID, std::vector<TLocation > > > TKmerLocations;
 
-/*
- * Datatype to store matches of two k-mers within a list of accessions.
- */
+ // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TPair
 {
-private:
     // k-mer identifier for forward (5') primer sequence
     TKmerID kmer_fwd;
     // k-mer identifier for reverse (3') primer sequence
@@ -95,12 +96,12 @@ private:
     // absolute difference of their melting temperatures
     float Tm_delta;
     // The set of locations given by sequence id and position index.
-    std::vector<seqan::Pair<priset::TSeqNo, priset::TSeqPos> > locations;
+    std::vector<TLocation > locations;
 };
 
-typedef std::vector<TPair> TPairs;
+// List type of pairs.
+typedef std::vector<TPair> TKmerPairs;
 
-// TODO: use key value tuple and use ordered set or map
 /*
 * Struct to associate a taxonomic identifier with a set of accession numbers and sequences.
 */

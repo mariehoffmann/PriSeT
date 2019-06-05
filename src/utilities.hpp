@@ -4,12 +4,15 @@
 
 #include <seqan/basic.h>
 
+#include "../submodules/genmap/src/genmap_helper.hpp"
+
 #include "chemistry.hpp"
+#include "io_cfg_type.hpp"
 #include "types.hpp"
 
 namespace priset
 {
-template<typename TLocations>
+
 void print_locations(TLocations & locations)
 {
     using key_type = typename TLocations::key_type;
@@ -29,21 +32,44 @@ void print_locations(TLocations & locations)
     }
 }
 
+void print_kmer_locations(TKmerLocations const & kmer_locations, TKmerMap & kmer_map)
+{
+    for (typename TKmerLocations::const_iterator it = kmer_locations.begin(); it != kmer_locations.end(); ++it)
+    {
+        const TKmer kmer{kmer_map.at((*it).first)};
+        std::cout << kmer.seq << ": [";
+        for (seqan::Pair<priset::TSeqNo, priset::TSeqPos> loc : it->second)
+            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(loc) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(loc) << ") ";
+
+        std::cout << "]" << std::endl;
+    }
+}
+
+void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
+{
+    std::unordered_set<TKmerID> legend;
+    for (typename TKmerPairs::const_iterator it = kmer_pairs.begin(); it != kmer_pairs.end(); ++it)
+    {
+        std::cout << "[" << (*it).kmer_fwd << ", " << (*it).kmer_rev << "] at locations: ";
+        for (TLocation loc : (*it).locations)
+            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(loc) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(loc) << ") ";
+        std::cout << "]\n";
+    }
+}
+
 // forward declaration
 struct primer_cfg_type;
 
 // Retrieve DNA sequence from txt.concat given a set of locations
 // lookup_sequences<primer_cfg_type>(kmer_locations, io_cfg, primer_cfg, directoryInformation);
 template<typename primer_cfg_type>
-void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TDirectoryInformation const & directoryInformation)
+void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TDirectoryInformation const & directoryInformation)
 {
     std::string fastaFile = std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
     TSeqNo startPos = 0;    // accession separation offset
     TSeqPos offset;         // kmer offset within accession
     TSeqPos kmer_length = primer_cfg.get_kmer_length();
     TKmerLocations::iterator kmer_it = kmer_locations.begin();
-    // unique identifier to be assigned to TKmer struct
-    TKmerID ID = 0;
     // index to load in order to extract strings
     TIndex index;
     if (!genmap::detail::open(index, seqan::toCString(std::string(io_cfg.get_index_base_path())), seqan::OPEN_RDONLY))
@@ -79,8 +105,8 @@ void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cf
         std::cout << "append kmer sequence to str" << std::endl;
         seqan::append(str, kmer_str);
         std::cout << "assign to 1st position of kmer_locs: " << std::endl;
-        // kmer is struct
-        (*kmer_it).first = TKmer{str, ID++, chemistry::get_Tm(primer_cfg, str)}; // direct assignment of kmer possible?
+        // insert into kmer map
+        kmer_map[(*kmer_it).first] = TKmer{str, (*kmer_it).first, chemistry::get_Tm(primer_cfg, str)};
         // forward next kmer iterator and abort if no more kmers to resolve
         std::cout << "increment kmer iterator: " << std::endl;
         ++kmer_it;
