@@ -195,9 +195,9 @@ inline bool filter_self_dimerization(seqan::String<priset::dna> const & sequence
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_cross_dimerization(seqan::String<priset::dna> const & s, seqan::String<priset::dna> const & t)
+inline bool filter_cross_dimerization(TKmer const & kmer1, TKmer const & kmer2)
 {
-    float dG = gibbs_free_energy(s, t);
+    float dG = gibbs_free_energy(kmer1.seq, kmer2.seq);
     std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
     return (dG < -10) ? false : true;
 }

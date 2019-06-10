@@ -62,6 +62,7 @@ struct primer_cfg_type;
 
 // Retrieve DNA sequence from txt.concat given a set of locations
 // lookup_sequences<primer_cfg_type>(kmer_locations, io_cfg, primer_cfg, directoryInformation);
+// locations: [(ID, kmer_locations)]
 template<typename primer_cfg_type>
 void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TDirectoryInformation const & directoryInformation)
 {
@@ -106,7 +107,7 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
         seqan::append(str, kmer_str);
         std::cout << "assign to 1st position of kmer_locs: " << std::endl;
         // insert into kmer map
-        kmer_map[(*kmer_it).first] = TKmer{str, (*kmer_it).first, chemistry::get_Tm(primer_cfg, str)};
+        kmer_map[(*kmer_it).first] = TKmer{(*kmer_it).first, str, chemistry::get_Tm(primer_cfg, str)};
         // forward next kmer iterator and abort if no more kmers to resolve
         std::cout << "increment kmer iterator: " << std::endl;
         ++kmer_it;

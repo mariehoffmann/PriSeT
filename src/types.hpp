@@ -69,12 +69,12 @@ typedef uint32_t TTaxid;
  */
 struct TKmer
 {
-    // alphabet sequence of k-mer
-    TSeq seq{};
-
     // Unique numerical identifier. Default 0 means unset.
     TKmerID ID{static_cast<TKmerID>(0)};
 
+    // alphabet sequence of k-mer
+    TSeq seq{};
+    
     // Melting temperature of k-mer sequence.
     float Tm{0};
 };

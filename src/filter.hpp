@@ -184,7 +184,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
-void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerPairs & pairs)
+void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TKmerPairs & pairs)
 {
     primer_cfg_type::size_interval_type transcript_range = primer_cfg.get_transcript_range();
     using it_loc_type = TKmerLocations::value_type::second_type::const_iterator;
