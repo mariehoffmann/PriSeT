@@ -74,7 +74,7 @@ struct TKmer
 
     // alphabet sequence of k-mer
     TSeq seq{};
-    
+
     // Melting temperature of k-mer sequence.
     float Tm{0};
 };
@@ -89,14 +89,15 @@ typedef std::vector<std::pair<TKmerID, std::vector<TLocation > > > TKmerLocation
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TPair
 {
+    using TPairLocations = typename std::vector<std::tuple<TSeqNo, TSeqPos, TSeqPos> >;
     // k-mer identifier for forward (5') primer sequence
     TKmerID kmer_fwd;
     // k-mer identifier for reverse (3') primer sequence
     TKmerID kmer_rev;
     // absolute difference of their melting temperatures
     float Tm_delta;
-    // The set of locations given by sequence id and position index.
-    std::vector<TLocation > locations;
+    // The set of locations given by sequence id and position indices of fwd and rev sequence IDs.
+    TPairLocations pair_locations;
 };
 
 // List type of pairs.
