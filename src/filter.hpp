@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cmath>
 #include <fstream>
 #include <string>
 #include <unordered_set>
@@ -184,7 +185,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
-void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TKmerPairs & pairs)
+void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TKmerPairs & kmer_pairs)
 {
     primer_cfg_type::size_interval_type transcript_range = primer_cfg.get_transcript_range();
     using it_loc_type = TKmerLocations::value_type::second_type::const_iterator;
@@ -198,13 +199,16 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
             // iterator to start position of current location for k-mer 2
             it2_start = (*it2).second.begin();
             // forward iterators to correspond to refer to same sequence ID or end
-            while (seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
+            while (it1_start != (*it1).second.end() && it2_start != (*it2).second.end() &&
+                    seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
             {
+                // speedup: use lower_bound/upper_bound
                 while (it1_start != (*it1).second.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
                     ++it1_start;
                 while (it2_start != (*it2).second.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start))
                     ++it2_start;
             }
+
             // foward iterator for k-mer 1 on same sequence (loc)
             it1_aux = it1_start;
             // foward iterator for k-mer 2 on same sequence (loc)
@@ -212,30 +216,53 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
             // invariant after entering this loop: loc(it1) == loc(it2)
             while (it1_start != (*it1).second.end() && it1_aux != (*it1).second.end() && it2_start != (*it2).second.end())
             {
+                auto seq_pos = seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start);
                 // valid combination?
                 auto pos_kmer1 = seqan::getValueI2<TSeqNo, TSeqPos>(*it1_aux);
-                auto pos_kmer2 = seqan::getValueI2<TSeqNo, TSeqPos>(*it2_aux);
                 if (it2_aux != (*it2).second.end())
                 {
+                    auto pos_kmer2 = seqan::getValueI2<TSeqNo, TSeqPos>(*it2_aux);
                     auto pos_delta = (pos_kmer1 < pos_kmer2) ? pos_kmer2 - pos_kmer1 : pos_kmer1 - pos_kmer2;
-                        pos_delta += primer_cfg.get_kmer_length();
-                        if (pos_delta >= primer_cfg.get_transcript_range().first && pos_delta <= primer_cfg.get_transcript_range().second)
-                            pairs.push_back((pos_kmer1 < pos_kmer2) ? TPair{(*it1).first, (*it2).first} : TPair{(*it2).first, (*it1).first});
+                    pos_delta += primer_cfg.get_kmer_length();
+                    if (pos_delta >= primer_cfg.get_transcript_range().first && pos_delta <= primer_cfg.get_transcript_range().second)
+                    {
+                        TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).first : (*it2).first;
+                        TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).first : (*it1).first;
+                        auto pair_location = std::make_tuple(seq_pos, std::min<TSeqPos>(pos_kmer1, pos_kmer2), std::max<TSeqPos>(pos_kmer1, pos_kmer2));
+                        std::cout << "(kmer_fwd_new, kmer_rev_new) = (" << kmer_fwd_new << ", " << kmer_rev_new << ") at [(refID = " << std::get<0>(pair_location) << " at positions: " << std::get<1>(pair_location) << ", " << std::get<2>(pair_location) << ")]\n";
+                        // extend location vector if pair combinations already in result
+                        if (kmer_pairs.size() && kmer_pairs.back().kmer_fwd == kmer_fwd_new && kmer_pairs.back().kmer_rev == kmer_rev_new)
+                            kmer_pairs[kmer_pairs.size()-1].pair_locations.push_back(pair_location);
+                        else
+                        {
+                            TPair pair{kmer_fwd_new, kmer_rev_new, abs(kmer_map.at(kmer_fwd_new).Tm - kmer_map.at(kmer_rev_new).Tm), TPair::TPairLocations{pair_location}};
+                            kmer_pairs.push_back(pair);
+                        }
+                    }
                 }
+                ++it2_aux;
                 // all combinations tested for second k-mer
                 if (it2_aux == (*it2).second.end())
                 {
+                    std::cout << "LOGGING: forward it1 and reset it2\n";
                     // reset to start of current sequence if next k-mer of it1 refers to same sequence, else forward it2
-                    if (++it1_start == (*it1).second.end())
+                    if (++it1_aux == (*it1).second.end())
                         break;
-                    while (seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*++it2_start));
-                    it2_aux = it2_start;
+                    if (seqan::getValueI1<TSeqNo, TSeqPos>(*it1_aux) == seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
+                        it2_aux = it2_start;
+                    else
+                        while (++it2_start != (*it2).second.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start));
+                    if (it2_start == (*it2).second.end())
+                        std::cout << "LOGGING: forward it2_start points to end of location list of 2nd candidate\n";
+                    else
+                        std::cout << "LOGGING: forward it1 and reset it2\n";
 
+                    it2_aux = it2_start;
                 }
             }
         }
     }
-    std::cout << "LOGGING: # KMER PAIRS combined from " << kmer_locations.size() << " kmers: " << pairs.size() << std::endl;
+    std::cout << "LOGGING: # KMER PAIRS combined from " << kmer_locations.size() << " kmers: " << kmer_pairs.size() << std::endl;
 }
 
 /*void post_filter_main(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerPairs & pairs)

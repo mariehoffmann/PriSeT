@@ -47,13 +47,24 @@ void print_kmer_locations(TKmerLocations const & kmer_locations, TKmerMap & kmer
 
 void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
 {
-    std::unordered_set<TKmerID> legend;
+    std::set<TKmerID> legend;
+    std::cout << "\n(kmer ID1, kmer ID2) | reference ID | (pos1, pos2)\n";
+    std::cout << "-------------------------------------------------------\n";
+    if (!kmer_pairs.size())
+        std::cout << "<None>\n";
     for (typename TKmerPairs::const_iterator it = kmer_pairs.begin(); it != kmer_pairs.end(); ++it)
     {
-        std::cout << "[" << (*it).kmer_fwd << ", " << (*it).kmer_rev << "] at locations: ";
-        for (TLocation loc : (*it).locations)
-            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(loc) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(loc) << ") ";
-        std::cout << "]\n";
+        std::cout << "(" << (*it).kmer_fwd << ", " << (*it).kmer_rev << ")\t\t| ";
+        legend.insert((*it).kmer_fwd);
+        legend.insert((*it).kmer_rev);
+        for (auto it_loc = (*it).pair_locations.begin(); it_loc != (*it).pair_locations.end(); ++it_loc)
+            std::cout << std::get<0>(*it_loc) << "\t\t| (" << std::get<1>(*it_loc) << ", " << std::get<2>(*it_loc) << ")\n";
+    }
+    if (kmer_pairs.size())
+    {
+        std::cout << "\n\nkmer ID\t | sequence\n------------------------------\n";
+        for (TKmerID kmer_ID : legend)
+            std::cout << kmer_ID << "\t| " << kmer_map.at(kmer_ID).seq << std::endl;
     }
 }
 
