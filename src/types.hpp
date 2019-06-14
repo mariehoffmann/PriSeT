@@ -57,11 +57,14 @@ using TSequenceNames = typename seqan::StringSet<seqan::CharString, seqan::Owner
 // container for fasta sequence lengths
 using TSequenceLengths = typename seqan::StringSet<uint32_t>;
 
-// The type for kmer identifiers.
+// The type for kmer identifiers, 1-based.
 typedef uint64_t TKmerID;
 
 // The type for taxonomic identifiers.
 typedef uint32_t TTaxid;
+
+// The type for numerical accession identifiers, 1-based.
+typedef uint64_t TAccID;
 
 /*
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and
@@ -84,7 +87,8 @@ struct TKmer
 typedef std::map<TKmerID, TKmer> TKmerMap;
 
 // vector type of k-mers and their locations
-typedef std::vector<std::pair<TKmerID, std::vector<TLocation > > > TKmerLocations;
+typedef std::pair<TKmerID, std::vector<TLocation > > TKmerLocation;
+typedef std::vector<TKmerLocation > TKmerLocations;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TPair
@@ -102,6 +106,23 @@ struct TPair
 
 // List type of pairs.
 typedef std::vector<TPair> TKmerPairs;
+
+// Result table output for app
+struct TResult
+{
+    // taxonomic node identifier
+    TTaxid taxid;
+    // forward kmer identifier
+    TKmerID fwd;
+    // reverse kmer identifier
+    TKmerID rev;
+    // taxonomic node counter with suitable fwd/rev primer matches in their descendents
+    uint16_t match_ctr;
+    // total number of taxonomic nodes in subtree having non-zero accessions assigned
+    uint16_t covered_taxids;
+    // list of references (empty for taxids having no direct assignments)
+    std::vector<std::string> accs;
+};
 
 /*
 * Struct to associate a taxonomic identifier with a set of accession numbers and sequences.

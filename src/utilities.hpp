@@ -142,4 +142,154 @@ void set_directoryInformation(std::string & index_path_base_ids, TDirectoryInfor
     seqan::appendValue(directoryInformation, "dummy.entry;0;chromosomename");
 }
 
+// split csv row into tokens
+void split(std::string const & line, std::string const & delimiter = ",", std::vector<std::string> & tokens)
+{
+    tokens.resize(0);
+    size_t pos = 0, pos_old = 0;
+    std::string token;
+    do
+    {
+        pos = line.find(delimiter, pos_old);
+        if (pos == string::npos)
+            pos = line.length();
+        token = line.substr(pos_old, pos - pos_old);
+        if (!token.empty())
+            tokens.push_back(token);
+        pos_prev = pos + delim.length();
+    }
+     while (pos < line.length() && pos_old < line.length());
+}
+
+// Filter accessions from location vector by given taxid and transform TAccID to TAcc.
+void filter_acc_by_tax(std::vector<TLocation> const & locations, std::unordered_map<TTaxid, std::vector<TAccID > > const & tax2accID, TTaxid const & taxid, std::unordered_map<TAccID, std::string> const & accID2acc, std::vector<std::string> & result)
+{
+    result.resize(0);
+    // assert non-monotonouos TAccID sequence
+    if (!std::is_sorted(tax2accID[taxid]))
+        std::cout << "ERROR: accesion ID list in map not sorted!\n", exit(0);
+    for (auto it = locations.begin() + 1; it != locations.end(); ++it)
+        if (seqan::getValueI1<TSeqNo, TSeqPos>(*(it-1)) > seqan::getValueI1<TSeqNo, TSeqPos>(*it)))
+            std::cout << "ERROR: accesion ID list in TLocations not sorted!\n", exit(0);
+
+    auto it1 = locations.begin();
+    auto it2 = tax2accID.at(taxid).begin();
+    while (it1 != locations.end() && it2 != tax2accID.at(taxid).end())
+    {
+        if (seqan::getValueI1<TSeqNo, TSeqPos>(*it1) == *it2)
+            result.push_back(accID2acc.at(*it2));
+        while (it1 != locations.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1) <
+                *it2) ++it1;
+        while (it2 != tax2accID.at(taxid).end() && (*it2) <
+                seqan::getValueI1<TSeqNo, TSeqPos>(*it1)) ++it2;
+    }
+}
+
+// write results in csv format
+// columns: taxid, fwd, rev, num_IDs_match, num_IDs_total, ID_list
+void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TPairs const & pairs)
+{
+    // load id file for mapping reference IDs (1-based) to accession numbers
+    std::unordered_map<std::string, TAccID> acc2id;
+    std::unordered_map<TAccID, std::string> accID2acc;
+    ifstream id_file(io_cfg.get_id_file());
+    std::vector<std::string> tokens;
+    while (id_file)
+    {
+        std::string line;
+        if (!getline(id_file, line)) break;
+        if (line[0] != '#')
+        {
+            split(line, tokens);
+            if (tokens.size() != 2)
+                std::cout << "ERROR: unknown id,acc format in " << id_file << std::endl, exit(0);
+            acc2id[atoi(tokens[0])] = tokens[1];
+            acc2id_rev[tokens[1]] = atoi(tokens[0]);
+        }
+    }
+
+    // build dictionary for taxids and counter for assigned accessions
+    ifstream acc_file(io_cfg.get_acc_file());
+    std::vector<std::string> tokens;
+    // taxid: (ctr_match, ctr_total), ctrs for accessions
+    std::unordered_map<TTaxid, std::vector<TAccID > > tax2accID;
+    while (acc_file)
+    {
+        std::string line;
+        if (!getline(acc_file, line)) break;
+        if (line[0] != '#')
+        {
+            split(line, tokens);
+            auto taxid = atoi(tokens[0]);
+            std::vector<TAccID> accessionIDs(tokens.size() - 1);
+            tax2accID[taxid] = std::transform(tokens.begin() + 1, tokens.end(), accessionIDs.begin(), [](std::string const & acc){ return acc2id[acc];});
+        }
+    }
+
+    // load taxonomy as map {taxid: p_taxid}
+    ifstream tax_file(io_cfg.get_tax_file());
+    std::unordered_map<TTaxid, TTaxid> tax_map;
+    size_t pos;
+    while (tax_file)
+    {
+        std::string line;
+        if (!getline(tax_file, line)) break;
+        pos = line.find(",")
+        if (pos == string::npos)
+            continue;
+        tax_map[atoi(line.substr(0, pos))] = atoi(line.substr(pos + 1, string::npos))
+    }
+
+    // get output file
+    std::ofstream table;
+    table.open(io_cfg.get_table_path());
+    // collect single kmer matches for bottom nodes
+    std::unordered_map<TKmerID, std::vector<TSeqNo> > kmer2loc; // relates kmer IDs and location IDs
+    for (auto it = kmer_locations.begin(); it != kmer_locations.end(); ++it)
+    {
+        TKmerID kmer_ID = it.first;
+        std::vector<TSeqNo> seq_IDs;
+        for (auto it_loc : it.second)
+            seq_IDs.push_back(it_loc.first);
+        kmer2loc[kmer_ID] = seq_IDs;
+    }
+
+    // collect
+    std::vector<uint16_t> stack, stack_new;
+    for (auto const & [tax, accs] : tax2acc)
+        stack.push_back(tax);
+    std::sort(stack.begin(), stack.end());
+    while (stack.size())
+    {
+        for (auto taxid : stack)
+        {
+            std::vector<TResult> results;
+            // write out single primer results
+            for (TKmerLocation kmer_loc : kmer_locations) // taxid, kmer fixed
+            {
+                TKmerID kmerID = kmer_loc.first;
+                // if one of the reference IDs of the kmer's locations is also in tax2accID, then set match counter to 1, else 0
+                std::vector<std::string> acc_by_tax;
+                filter_acc_by_tax(kmer_loc.second, tax2accID, taxid, accID2acc, joint_accs);
+
+                result.push_back(TResult{taxid, kmer_loc.first, acc_by_tax.size() == 1, 1, acc_by_tax});
+            }
+            // replace nodes by their parent taxids
+            // TODO: continue here
+        }
+
+    }
+    table << ;
+
+
+
+
+    // accumulate counters until root is reached
+
+    // collect kmer pair matches for bottom nodes
+
+    // accumulate counters until root is reached
+    table.close()
+}
+
 }  // namespace priset

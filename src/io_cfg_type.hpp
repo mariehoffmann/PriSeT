@@ -32,6 +32,8 @@ private:
     fs::path acc_file{};
     // Sequence library file in fasta format (set by PriSeT).
     fs::path fasta_file{};
+    // 1-based IDs and accession numbers.
+    fs::path id_file{};
     // Taxonomy file in csv format (set by PriSeT).
     fs::path tax_file{};
     // Working base directory for storing FM indices, mappings and results.
@@ -46,6 +48,11 @@ private:
     std::string ext_fasta = ".fasta";
     std::string ext_acc = ".acc";
     std::string ext_tax = ".tax";
+    std::string ext_id = ".id";
+    // Path to R shiny app template
+    fs::path app_template = "../gui/app_template.R";
+    // Path to store result tables to load in Shiny.
+    fs::path table_path;
 
 public:
 
@@ -54,7 +61,8 @@ public:
         work_dir{fs::absolute(work_dir_)},
         index_dir{fs::absolute(work_dir_)},
         mapping_dir{fs::absolute(work_dir_)},
-        genmap_bin{fs::current_path()}
+        genmap_bin{fs::current_path(),
+        table_dir{fs::absolute(work_dir_)}}
         {
             genmap_bin /= "submodules/genmap/bin/genmap";
             // parse library directory and assign paths to the .acc, .fasta, and .tax files
@@ -69,6 +77,8 @@ public:
                     fasta_file = p;
                 else if (p.path().extension().compare(ext_tax) == 0)
                     tax_file = p;
+                else if (p.path().extension().compare(ext_id) == 0)
+                    id_file = p;
             }
             if (!acc_file.has_filename())
                 std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
@@ -79,13 +89,16 @@ public:
             if (!tax_file.has_filename())
                 std::cout << "ERROR: Unable to locate taxonomy file in: " << lib_dir << std::endl, exit(-1);
             std::cout << "STATUS\tSet taxonomy file: \t" << tax_file << std::endl;
+            if (!id_file.has_filename())
+                std::cout << "ERROR: Unable to locate id file in: " << lib_dir << std::endl, exit(-1);
+            std::cout << "STATUS\tSet id file: \t" << tax_file << std::endl;
 
             // create working directory if not existing after clearing
-            char cmd_mkdir[50];
             if (!fs::exists(work_dir))
             {
-                sprintf(cmd_mkdir, "mkdir -p %s", work_dir.c_str());
-                if (system(cmd_mkdir))
+                char cmd[50];
+                sprintf(cmd, "mkdir -p %s", work_dir.c_str());
+                if (system(cmd))
                     std::cout << "ERROR: " << WRK_DIR_ERROR << std::endl, exit(-1);
             }
 
@@ -93,13 +106,24 @@ public:
             index_dir /= fs::path("/index");
             if (fs::exists(index_dir))
             {
-                char cmd_rm[50];
-                sprintf(cmd_rm, "rm -r %s", index_dir.c_str());
-                if (system(cmd_rm))
+                char cmd[50];
+                sprintf(cmd, "rm -r %s", index_dir.c_str());
+                if (system(cmd))
                     std::cout << "ERROR: Could not remove index directory " << index_dir << std::endl, exit(0);
             }
             // set output directory for FM index mapping
             mapping_dir /= fs::path("/mapping");
+
+            // create table output directory
+            table_path = work_dir / "table";
+            if (!fs::exists(table_path))
+            {
+                char cmd[50];
+                sprintf(cmd, "mkdir %s", table_path.c_str());
+                if (system(cmd))
+                    std::cout << "ERROR: Creating result table directory = " << table_path << std::endl, exit(-1);
+            }
+            table_path /= "results.csv";
 
         };
 
@@ -107,6 +131,17 @@ public:
     fs::path get_acc_file() const noexcept
     {
         return acc_file;
+    }
+
+    fs::path get_id_file() const noexcept
+    {
+        return id_file;
+    }
+
+    // Return template file for shiny app.
+    fs::path get_app_template() const noexcept
+    {
+        return app_template;
     }
 
     // Return library file with absolute path as filesystem::path object.
@@ -142,6 +177,12 @@ public:
     fs::path get_mapping_dir() const noexcept
     {
         return mapping_dir;
+    }
+
+    // Return file to store results in csv format
+    fs::path get_table_path() const noexcept
+    {
+        return table_path;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.
