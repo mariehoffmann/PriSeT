@@ -121,7 +121,19 @@ struct TResult
     // total number of taxonomic nodes in subtree having non-zero accessions assigned
     uint16_t covered_taxids;
     // list of references (empty for taxids having no direct assignments)
-    std::vector<std::string> accs;
+    std::vector<std::string> accIDs{};
+    // Return comma-separated result string
+    // Q: can R read csv tables with varying columns? if not use array notation
+    std::string to_string()
+    {
+        std::stringstream ss;
+        ss << taxid << "," << fwd << "," << rev << "," << match_ctr << "," << covered_taxids;
+        if (accIDs.size())
+            for (auto accID : accIDs)
+                ss << "," << accID
+        ss << "\n";
+        return ss.str();
+    }
 };
 
 /*

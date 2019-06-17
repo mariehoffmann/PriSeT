@@ -1,6 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <iostream>
+#include <iterator>
+#include <vector>
 
 #include <seqan/basic.h>
 
@@ -160,7 +163,7 @@ void split(std::string const & line, std::string const & delimiter = ",", std::v
     }
      while (pos < line.length() && pos_old < line.length());
 }
-
+/*
 // Filter accessions from location vector by given taxid and transform TAccID to TAcc.
 void filter_acc_by_tax(std::vector<TLocation> const & locations, std::unordered_map<TTaxid, std::vector<TAccID > > const & tax2accID, TTaxid const & taxid, std::unordered_map<TAccID, std::string> const & accID2acc, std::vector<std::string> & result)
 {
@@ -183,15 +186,12 @@ void filter_acc_by_tax(std::vector<TLocation> const & locations, std::unordered_
         while (it2 != tax2accID.at(taxid).end() && (*it2) <
                 seqan::getValueI1<TSeqNo, TSeqPos>(*it1)) ++it2;
     }
-}
+}*/
 
-// write results in csv format
-// columns: taxid, fwd, rev, num_IDs_match, num_IDs_total, ID_list
-void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TPairs const & pairs)
+
+// create_table helper to build accession ID to accession number map
+void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, io_cfg_type const & io_cfg)
 {
-    // load id file for mapping reference IDs (1-based) to accession numbers
-    std::unordered_map<std::string, TAccID> acc2id;
-    std::unordered_map<TAccID, std::string> accID2acc;
     ifstream id_file(io_cfg.get_id_file());
     std::vector<std::string> tokens;
     while (id_file)
@@ -203,16 +203,17 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
             split(line, tokens);
             if (tokens.size() != 2)
                 std::cout << "ERROR: unknown id,acc format in " << id_file << std::endl, exit(0);
-            acc2id[atoi(tokens[0])] = tokens[1];
-            acc2id_rev[tokens[1]] = atoi(tokens[0]);
+            accID2acc[tokens[1]] = atoi(tokens[0]);
         }
     }
+}
 
-    // build dictionary for taxids and counter for assigned accessions
+// create_table helper to build accession ID to taxon ID map
+void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, io_cfg_type const & io_cfg)
+{
     ifstream acc_file(io_cfg.get_acc_file());
     std::vector<std::string> tokens;
     // taxid: (ctr_match, ctr_total), ctrs for accessions
-    std::unordered_map<TTaxid, std::vector<TAccID > > tax2accID;
     while (acc_file)
     {
         std::string line;
@@ -221,14 +222,15 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
         {
             split(line, tokens);
             auto taxid = atoi(tokens[0]);
-            std::vector<TAccID> accessionIDs(tokens.size() - 1);
-            tax2accID[taxid] = std::transform(tokens.begin() + 1, tokens.end(), accessionIDs.begin(), [](std::string const & acc){ return acc2id[acc];});
+            for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
+                accID2taxID[acc2id[tokens[token_idx]]] = taxid;
         }
     }
+}
 
-    // load taxonomy as map {taxid: p_taxid}
+// load taxonomy from file and store as map {taxid: p_taxid}
+void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type const & io_cfg)
     ifstream tax_file(io_cfg.get_tax_file());
-    std::unordered_map<TTaxid, TTaxid> tax_map;
     size_t pos;
     while (tax_file)
     {
@@ -239,10 +241,25 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
             continue;
         tax_map[atoi(line.substr(0, pos))] = atoi(line.substr(pos + 1, string::npos))
     }
+}
 
-    // get output file
-    std::ofstream table;
-    table.open(io_cfg.get_table_path());
+// write results in csv format
+// columns: taxid, fwd, rev, num_IDs_match, num_IDs_total, ID_list
+void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TKmerPairs const & pairs)
+{
+    // TODO: check if unordered_map instead of map
+    // load id file for mapping reference IDs (1-based) to accession numbers
+    std::unordered_map<TAccID, std::string> accID2acc;
+    create_accID2acc_map(accID2acc, io_cfg)
+
+    // build dictionary for taxids and counter for assigned accessions
+    std::unordered_map<TAccID, TTaxid> accID2taxID;
+    create_accID2taxID_map(accID2taxID, io_cfg);
+
+    // load taxonomy as map {taxid: p_taxid}, taxid is root if not in key set
+    std::unordered_map<TTaxid, TTaxid> tax_map;
+    create_tax_map(tax_map, io_cfg);
+
     // collect single kmer matches for bottom nodes
     std::unordered_map<TKmerID, std::vector<TSeqNo> > kmer2loc; // relates kmer IDs and location IDs
     for (auto it = kmer_locations.begin(); it != kmer_locations.end(); ++it)
@@ -254,42 +271,100 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
         kmer2loc[kmer_ID] = seq_IDs;
     }
 
-    // collect
-    std::vector<uint16_t> stack, stack_new;
+    // 0-based height, correct level info iff a taxonomic node is in the predecessor lineaage of another one
+    std::set<std::pair<TTaxid, uint16_t>, LeafCmp> leaves; //<taxid, height_from_bottom>
     for (auto const & [tax, accs] : tax2acc)
-        stack.push_back(tax);
-    std::sort(stack.begin(), stack.end());
-    while (stack.size())
+        leaves.insert(std::make_pair<TTaxid, uint16_t>(tax, 0));
+    for (auto it_lv1 = leaves.begin(); it_lv1 != leaves.end(); ++it_lv1)
     {
-        for (auto taxid : stack)
+        uint16_t level = leaves[i].second;
+        while (auto it{tax_map.find(level_tax.second)} != tax_map.end())
         {
-            std::vector<TResult> results;
-            // write out single primer results
-            for (TKmerLocation kmer_loc : kmer_locations) // taxid, kmer fixed
+            ++level;
+            TTaxid p_taxid = it->second;
+
+            auto it_lv = leaves.find(p_taxid);
+            if (it_lv != leaves.end() && !(p_taxid < (*it_lv).first));)
             {
-                TKmerID kmerID = kmer_loc.first;
-                // if one of the reference IDs of the kmer's locations is also in tax2accID, then set match counter to 1, else 0
-                std::vector<std::string> acc_by_tax;
-                filter_acc_by_tax(kmer_loc.second, tax2accID, taxid, accID2acc, joint_accs);
-
-                result.push_back(TResult{taxid, kmer_loc.first, acc_by_tax.size() == 1, 1, acc_by_tax});
+                *it_lv.second = level;
             }
-            // replace nodes by their parent taxids
-            // TODO: continue here
         }
-
     }
-    table << ;
 
+    // taxids sorted by level to have correct upstreams stats
+    std::vector<std::pair<TTaxid, uint16_t>> leaves_srt_by_level(leaves.size());
+    std::copy(leaves.begin(), leaves.end(), leaves_srt_by_level.begin());
+    std::sort(leaves_srt_by_level.begin(), leaves_srt_by_level.end(), [](auto const & l1, auto const & l2){ return l1.second < l2.second; });
 
+    using TUpstreamKey = typename std::tuple<TTaxid, TKmerID, TKmerID>;
+    using TUpstreamValue = std::pair<uint16_t, uint16_t>; // match_ctr, covered_taxids
+    std::unordered_map<TUpstreamKey, TUpstreamValue > upstream_map;
 
+    // get output file
+    std::ofstream table;
+    table.open(io_cfg.get_table_path());
 
-    // accumulate counters until root is reached
+    for (auto const & [taxid, level] : leaves_srt_level)
+    {
+        std::vector<TResult> results;
+        // write out single primer results
+        for (TKmerLocation kmer_loc : kmer_locations) // taxid, kmer fixed
+        {
+            TKmerID kmerID = kmer_loc.first;
+            // if one of the reference IDs of the kmer's locations is also in tax2accID, then set match counter to 1, else 0
+            std::vector<std::string> acc_by_tax;
+            for (TLocation loc : kmer_locations.second) // loc = seqan::Pair<TSeqNo, TSeqPos>
+            {
+                TSeqNo accID = seqan::getValueI1<TSeqNo, TSeqPos>(loc);
+                if (accID2tax[accID] == taxid)
+                    acc_by_tax.push_back(accID2acc[accID]);
+            }
+            uint16_t match_ctr = acc_by_tax.size() > 0;
+            TResult result{taxid, kmer_loc.first, 0, match_ctr, 1, acc_by_tax};
+            // we may write back accumulated stats if current node is in lineage of already processed, lower-level node
+            if (level)
+            {
+                TUpstreamKey key{taxid, kmer_loc.first, 0};
+                if (auto it = upstream_map.find(key) != upstream_map.end())
+                {
+                    result.match_ctr += it->second.first;
+                    result.covered_taxids += it->second.second;
+                }
+            }
+            results.push_back(result);
 
+            // accumulate stats for upstream until root
+            TTaxid taxid_aux = taxid;
+            while (auto p_it{tax_map.find(taxid_aux)} != tax_map.end())
+            {
+                // proceed with taxonomic parent
+                taxid_aux = tax_map[taxid_aux];
+                // key for parental stats
+                TUpstreamKey key{taxid_aux, kmer_loc.first, 0};
+                if (auto st_it{upstream_map.find(key)} != upstream_map.end())
+                {
+                    st_it.second.first += result.match_ctr;
+                    st_it.second.second += result.covered_taxids;
+                }
+                else
+                    upstream_map[key] = TUpstreamValue{result.match_ctr, result.covered_taxids};
+            }
+            // else taxid is root, no further bottom-up accumulation
+        }
+    }
+    // all taxids processed, write out leave nodes and upstream stats
+    for (TResult result : results)
+        table << result.to_string();
+    for (auto const & [key, value] : upstream_map)
+        table << std::get<0>(key) << "," << std::get<1>(key) << "," << std::get<2>(key) << "," << value.first << "," << value.second << "\n";
+
+    // clear upstream map for new kmer combinations
+    upstream_map.clear();
     // collect kmer pair matches for bottom nodes
 
     // accumulate counters until root is reached
     table.close()
+
 }
 
 }  // namespace priset
