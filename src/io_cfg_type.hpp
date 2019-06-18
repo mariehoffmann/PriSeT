@@ -57,14 +57,15 @@ private:
 public:
 
     io_cfg_type(fs::path const & lib_dir_, fs::path const & work_dir_) :
-        lib_dir{fs::absolute(lib_dir_)},
-        work_dir{fs::absolute(work_dir_)},
-        index_dir{fs::absolute(work_dir_)},
-        mapping_dir{fs::absolute(work_dir_)},
+        lib_dir{lib_dir_},
+        work_dir{work_dir_},
+        index_dir{work_dir_},
+        mapping_dir{work_dir_},
         genmap_bin{fs::current_path()}
     {
         genmap_bin /= "submodules/genmap/bin/genmap";
         // parse library directory and assign paths to the .acc, .fasta, and .tax files
+        std::cout << "lib_dir = " << lib_dir << std::endl;
         if (!fs::exists(lib_dir))
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
         for (auto & p : fs::directory_iterator(lib_dir))
