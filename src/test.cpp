@@ -1,4 +1,5 @@
 #include <iostream>
+#include <experimental/filesystem>
 #include <fstream>
 #include <regex>
 #include <sys/wait.h>
@@ -10,12 +11,14 @@
 #include "types.hpp"
 #include "utilities.hpp"
 
-// g++ test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -o test
+namespace fs = std::experimental::filesystem;
+
+// g++ ../PriSeT/src/test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -o test
 
 // k1: [(1,2), (1,75)], i.e. kmer1 occurs in  sequence 1 at position 2 and 75
 // k2: [(1,5), (1,80)], i.e. kmer2 occurs in sequence 2 at positions 20 and 80
 // -k1[2]-k2[20]-------------k1[75]/k2[80]
-void test_combine()
+void combine_test()
 {
     // init primer configurator
     priset::primer_cfg_type primer_cfg{};
@@ -39,9 +42,19 @@ void test_combine()
     priset::print_pairs(pairs, kmer_map);
 }
 
+void create_table_test()
+{
+    fs::path const lib_dir = "~/priset/library";
+//    fs::path const work_dir{"~/priset/work"};
+/*    priset::io_cfg_type io_cfg{lib_dir, work_dir};
+    priset::TKmerLocations kmer_locations{};
+    priset::TKmerMap kmer_map{};
+    priset::TKmerPairs pairs{};
+    create_table(io_cfg, kmer_locations, kmer_map, pairs);
+*/
+}
 
 int main()
 {
-    test_combine();
-
+    create_table_test();
 }

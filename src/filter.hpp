@@ -235,7 +235,7 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
                             kmer_pairs[kmer_pairs.size()-1].pair_locations.push_back(pair_location);
                         else
                         {
-                            TPair pair{kmer_fwd_new, kmer_rev_new, abs(kmer_map.at(kmer_fwd_new).Tm - kmer_map.at(kmer_rev_new).Tm), TPair::TPairLocations{pair_location}};
+                            TKmerPair pair{kmer_fwd_new, kmer_rev_new, abs(kmer_map.at(kmer_fwd_new).Tm - kmer_map.at(kmer_rev_new).Tm), TKmerPair::TKmerPairLocations{pair_location}};
                             kmer_pairs.push_back(pair);
                         }
                     }

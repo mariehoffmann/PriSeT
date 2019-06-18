@@ -52,7 +52,7 @@ private:
     // Path to R shiny app template
     fs::path app_template = "../gui/app_template.R";
     // Path to store result tables to load in Shiny.
-    fs::path table_path;
+    fs::path table_file;
 
 public:
 
@@ -61,71 +61,69 @@ public:
         work_dir{fs::absolute(work_dir_)},
         index_dir{fs::absolute(work_dir_)},
         mapping_dir{fs::absolute(work_dir_)},
-        genmap_bin{fs::current_path(),
-        table_dir{fs::absolute(work_dir_)}}
+        genmap_bin{fs::current_path()}
+    {
+        genmap_bin /= "submodules/genmap/bin/genmap";
+        // parse library directory and assign paths to the .acc, .fasta, and .tax files
+        if (!fs::exists(lib_dir))
+            std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
+        for (auto & p : fs::directory_iterator(lib_dir))
         {
-            genmap_bin /= "submodules/genmap/bin/genmap";
-            // parse library directory and assign paths to the .acc, .fasta, and .tax files
-            if (!fs::exists(lib_dir))
-                std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
-            for (auto & p : fs::directory_iterator(lib_dir))
-            {
-                std::cout << p << std::endl;
-                if (p.path().extension().compare(ext_acc) == 0)
-                    acc_file = p;
-                else if (p.path().extension().compare(ext_fasta) == 0)
-                    fasta_file = p;
-                else if (p.path().extension().compare(ext_tax) == 0)
-                    tax_file = p;
-                else if (p.path().extension().compare(ext_id) == 0)
-                    id_file = p;
-            }
-            if (!acc_file.has_filename())
-                std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
-            std::cout << "STATUS\tSet accessions file: \t" << acc_file << std::endl;
-            if (!fasta_file.has_filename())
-                std::cout << "ERROR: Unable to locate fasta file in: " << lib_dir << std::endl, exit(-1);
-            std::cout << "STATUS\tSet fasta file: \t" << fasta_file << std::endl;
-            if (!tax_file.has_filename())
-                std::cout << "ERROR: Unable to locate taxonomy file in: " << lib_dir << std::endl, exit(-1);
-            std::cout << "STATUS\tSet taxonomy file: \t" << tax_file << std::endl;
-            if (!id_file.has_filename())
-                std::cout << "ERROR: Unable to locate id file in: " << lib_dir << std::endl, exit(-1);
-            std::cout << "STATUS\tSet id file: \t" << tax_file << std::endl;
+            std::cout << p << std::endl;
+            if (p.path().extension().compare(ext_acc) == 0)
+                acc_file = p;
+            else if (p.path().extension().compare(ext_fasta) == 0)
+                fasta_file = p;
+            else if (p.path().extension().compare(ext_tax) == 0)
+                tax_file = p;
+            else if (p.path().extension().compare(ext_id) == 0)
+                id_file = p;
+        }
+        if (!acc_file.has_filename())
+            std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
+        std::cout << "STATUS\tSet accessions file: \t" << acc_file << std::endl;
+        if (!fasta_file.has_filename())
+            std::cout << "ERROR: Unable to locate fasta file in: " << lib_dir << std::endl, exit(-1);
+        std::cout << "STATUS\tSet fasta file: \t" << fasta_file << std::endl;
+        if (!tax_file.has_filename())
+            std::cout << "ERROR: Unable to locate taxonomy file in: " << lib_dir << std::endl, exit(-1);
+        std::cout << "STATUS\tSet taxonomy file: \t" << tax_file << std::endl;
+        if (!id_file.has_filename())
+            std::cout << "ERROR: Unable to locate id file in: " << lib_dir << std::endl, exit(-1);
+        std::cout << "STATUS\tSet id file: \t" << tax_file << std::endl;
 
-            // create working directory if not existing after clearing
-            if (!fs::exists(work_dir))
-            {
-                char cmd[50];
-                sprintf(cmd, "mkdir -p %s", work_dir.c_str());
-                if (system(cmd))
-                    std::cout << "ERROR: " << WRK_DIR_ERROR << std::endl, exit(-1);
-            }
+        // create working directory if not existing after clearing
+        if (!fs::exists(work_dir))
+        {
+            char cmd[50];
+            sprintf(cmd, "mkdir -p %s", work_dir.c_str());
+            if (system(cmd))
+                std::cout << "ERROR: " << WRK_DIR_ERROR << std::endl, exit(-1);
+        }
 
-            // set output directory for FM index, will be created by genmap
-            index_dir /= fs::path("/index");
-            if (fs::exists(index_dir))
-            {
-                char cmd[50];
-                sprintf(cmd, "rm -r %s", index_dir.c_str());
-                if (system(cmd))
-                    std::cout << "ERROR: Could not remove index directory " << index_dir << std::endl, exit(0);
-            }
-            // set output directory for FM index mapping
-            mapping_dir /= fs::path("/mapping");
+        // set output directory for FM index, will be created by genmap
+        index_dir /= fs::path("/index");
+        if (fs::exists(index_dir))
+        {
+            char cmd[50];
+            sprintf(cmd, "rm -r %s", index_dir.c_str());
+            if (system(cmd))
+                std::cout << "ERROR: Could not remove index directory " << index_dir << std::endl, exit(0);
+        }
+        // set output directory for FM index mapping
+        mapping_dir /= fs::path("/mapping");
 
-            // create table output directory
-            table_path = work_dir / "table";
-            if (!fs::exists(table_path))
-            {
-                char cmd[50];
-                sprintf(cmd, "mkdir %s", table_path.c_str());
-                if (system(cmd))
-                    std::cout << "ERROR: Creating result table directory = " << table_path << std::endl, exit(-1);
-            }
-            table_path /= "results.csv";
-
-        };
+        // create table output directory
+        fs::path table_path = work_dir / "table";
+        if (!fs::exists(table_path))
+        {
+            char cmd[50];
+            sprintf(cmd, "mkdir %s", table_path.c_str());
+            if (system(cmd))
+                std::cout << "ERROR: Creating result table directory = " << table_path << std::endl, exit(-1);
+        }
+        table_file = table_path / "results.csv";
+    };
 
     // Return accession file with absolute path as filesystem::path object.
     fs::path get_acc_file() const noexcept
@@ -180,9 +178,9 @@ public:
     }
 
     // Return file to store results in csv format
-    fs::path get_table_path() const noexcept
+    fs::path get_table_file() const noexcept
     {
-        return table_path;
+        return table_file;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.

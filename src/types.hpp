@@ -66,6 +66,9 @@ typedef uint32_t TTaxid;
 // The type for numerical accession identifiers, 1-based.
 typedef uint64_t TAccID;
 
+// The type of an accession
+typedef std::string TAcc;
+
 /*
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and
  * a unique integer ID.
@@ -91,9 +94,9 @@ typedef std::pair<TKmerID, std::vector<TLocation > > TKmerLocation;
 typedef std::vector<TKmerLocation > TKmerLocations;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
-struct TPair
+struct TKmerPair
 {
-    using TPairLocations = typename std::vector<std::tuple<TSeqNo, TSeqPos, TSeqPos> >;
+    using TKmerPairLocations = typename std::vector<std::tuple<TSeqNo, TSeqPos, TSeqPos> >;
     // k-mer identifier for forward (5') primer sequence
     TKmerID kmer_fwd;
     // k-mer identifier for reverse (3') primer sequence
@@ -101,11 +104,11 @@ struct TPair
     // absolute difference of their melting temperatures
     float Tm_delta;
     // The set of locations given by sequence id and position indices of fwd and rev sequence IDs.
-    TPairLocations pair_locations;
+    TKmerPairLocations pair_locations;
 };
 
 // List type of pairs.
-typedef std::vector<TPair> TKmerPairs;
+typedef std::vector<TKmerPair> TKmerPairs;
 
 // Result table output for app
 struct TResult
@@ -130,10 +133,31 @@ struct TResult
         ss << taxid << "," << fwd << "," << rev << "," << match_ctr << "," << covered_taxids;
         if (accIDs.size())
             for (auto accID : accIDs)
-                ss << "," << accID
+                ss << "," << accID;
         ss << "\n";
         return ss.str();
     }
+};
+
+// Upstream result collection as map. Since tuples are not hashable, it is converted into a string before hashing.
+struct TUpstreamKey
+{
+    using THash = std::string;
+    TUpstreamKey(TTaxid taxid_, TKmerID fwd_, TKmerID rev_) : taxid(taxid_), fwd(fwd_), rev(rev_)
+    {
+    }
+
+    // String represenation, usable as dictionary key or direct csv output.
+    THash to_string()
+    {
+        std::stringstream s;
+        s << taxid << "," << fwd << "," << rev;
+        return s.str();
+    }
+
+    TTaxid taxid;
+    TKmerID fwd;
+    TKmerID rev;
 };
 
 /*
