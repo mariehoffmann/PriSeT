@@ -1,9 +1,13 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -17,6 +21,18 @@
 
 namespace priset
 {
+
+// Execute in terminal and collect command return value.
+std::string exec(char const * cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe)
+        throw std::runtime_error("ERROR: popen() failed!");
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
+        result += buffer.data();
+    return result;
+}
 
 void print_locations(TLocations & locations)
 {
@@ -237,7 +253,8 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
 }
 
 // write results in csv format
-// columns: taxid, fwd, rev, num_IDs_match, num_IDs_total, ID_list
+// columns: taxid, fwd, rev, matches, coverage, ID_list
+// TODO: write out kmer IDs and DNA sequences
 void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TKmerPairs const & pairs)
 {
     // TODO: check if unordered_map instead of map
@@ -306,6 +323,7 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     std::ofstream table;
     table.open(io_cfg.get_table_file());
         std::cout << "ct5\n";
+    table << "#taxid, fwd, rev, matches, coverage, ID_list\n";
     for (auto const & [taxid, level] : leaves_srt_by_level)
     {
         // write out single primer results

@@ -51,11 +51,15 @@ private:
     std::string ext_id = ".id";
     // Path to R shiny app template
     fs::path app_template = "../gui/app_template.R";
+    // Path to generated copy of R script to be run in terminal.
+    fs::path script_file;
     // Path to store result tables to load in Shiny.
-    fs::path table_file;
+    fs::path result_file;
+    // Path to primer info file (sequences and chemical attributes)
+    fs::path primer_info_file;
 
 public:
-
+    // give full path, no ~/!
     io_cfg_type(fs::path const & lib_dir_, fs::path const & work_dir_) :
         lib_dir{lib_dir_},
         work_dir{work_dir_},
@@ -115,15 +119,18 @@ public:
         mapping_dir /= fs::path("/mapping");
 
         // create table output directory
-        fs::path table_path = work_dir / "table";
-        if (!fs::exists(table_path))
+        fs::path result_path = work_dir / "table";
+        if (!fs::exists(result_path))
         {
             char cmd[50];
-            sprintf(cmd, "mkdir %s", table_path.c_str());
+            sprintf(cmd, "mkdir %s", result_path.c_str());
             if (system(cmd))
-                std::cout << "ERROR: Creating result table directory = " << table_path << std::endl, exit(-1);
+                std::cout << "ERROR: Creating result table directory = " << result_path << std::endl, exit(-1);
         }
-        table_file = table_path / "results.csv";
+        result_file = result_path / "results.csv";
+        primer_info_file = result_path / "primer_info.csv";
+        script_file = get_work_dir() / "app" / "app_template.R";
+
     };
 
     // Return accession file with absolute path as filesystem::path object.
@@ -178,10 +185,22 @@ public:
         return mapping_dir;
     }
 
-    // Return file to store results in csv format
-    fs::path get_table_file() const noexcept
+    // Return primer info file.
+    fs::path get_primer_info_file() const noexcept
     {
-        return table_file;
+        return primer_info_file;
+    }
+
+    // Return file to store results in csv format.
+    fs::path get_result_file() const noexcept
+    {
+        return result_file;
+    }
+
+    // Return path to R script file to be run in terminal.
+    fs::path get_script_file() const noexcept
+    {
+        return script_file;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.
