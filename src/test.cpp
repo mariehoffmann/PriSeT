@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "filter.hpp"
+#include "gui.hpp"
 #include "primer_cfg_type.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
@@ -15,12 +16,11 @@ namespace fs = std::experimental::filesystem;
 
 // g++ ../PriSeT/src/test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -o test
 
-
 struct setup
 {
     // TODO: make this runnable with arbitrarily located build folders
     fs::path const lib_dir = "../PriSet/src/tests/library";
-    fs::path const work_dir = "../PriSet/src//tests/work";
+    fs::path const work_dir = "../PriSet/src/tests/work";
     priset::io_cfg_type io_cfg;
     priset::primer_cfg_type primer_cfg;
     priset::TKmerLocations kmer_locations;
@@ -29,6 +29,9 @@ struct setup
     setup() : io_cfg{lib_dir, work_dir}, primer_cfg{}
     {
         // init primer configurator
+        // k1: [(1,2), (1,75)], i.e. kmer1 occurs in  sequence 1 at position 2 and 75
+        // k2: [(1,5), (1,80)], i.e. kmer2 occurs in sequence 2 at positions 20 and 80
+        // -k1[2]-k2[20]-------------k1[75]/k2[80]
         primer_cfg.set_primer_length_range(priset::primer_cfg_type::size_interval_type{4, 8});
         primer_cfg.set_transcript_range(priset::primer_cfg_type::size_interval_type{50,800});
 
@@ -48,9 +51,15 @@ struct setup
 
 };
 
-// k1: [(1,2), (1,75)], i.e. kmer1 occurs in  sequence 1 at position 2 and 75
-// k2: [(1,5), (1,80)], i.e. kmer2 occurs in sequence 2 at positions 20 and 80
-// -k1[2]-k2[20]-------------k1[75]/k2[80]
+void gui_test()
+{
+    setup up{};
+    if (priset::gui::generate_app(up.io_cfg) && priset::gui::compile_app(up.io_cfg))
+        std::cout << "success" << std::endl;
+    else
+        std::cout << "failed to generate and compile app" << std::endl;
+}
+
 void combine_test()
 {
     setup s{};
@@ -73,5 +82,5 @@ void create_table_test()
 
 int main()
 {
-    create_table_test();
+    gui_test();
 }
