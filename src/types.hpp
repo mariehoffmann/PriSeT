@@ -95,10 +95,20 @@ struct TKmerLocation
 {
 private:
     TKmerID kmer_ID{0};
-    std::vector<TLocation> locations{};
 
 public:
-    using size_type = std::vector<TLocation>::size_type;
+    using TLocationVec = typename std::vector<TLocation>;
+
+    TLocationVec locations{}; // TODO: make private and provide public const_iterator for it
+
+    TKmerLocation(TKmerID kmer_ID_, TLocationVec & locations_) : kmer_ID{kmer_ID_}
+    {
+        locations.resize(locations_.size());
+        std::copy(locations_.begin(), locations_.end(), locations.begin());
+    }
+
+    using size_type = TLocationVec::size_type;
+    using const_iterator = TLocationVec::const_iterator;
 
     TKmerID get_kmer_ID() const noexcept
     {
@@ -140,6 +150,7 @@ struct TKmerPair
 {
     // The container type for storing a pair location, i.e. sequence ID, and start positions of fwd and rev primer.
     using TKmerPairLocations = typename std::vector<std::tuple<TSeqNo, TSeqPos, TSeqPos> >;
+    using const_iterator = TKmerPairLocations::const_iterator;
     using size_type = TKmerPairLocations::size_type;
 private:
     // k-mer identifier for forward (5') primer sequence
@@ -148,9 +159,15 @@ private:
     TKmerID kmer_ID2{0};
     // absolute difference of their melting temperatures
     float Tm_delta;
-    // The container for storing pair locations.
-    TKmerPairLocations pair_locations;
+
 public:
+    // The container for storing pair locations.
+    // TODO: make private and provide push_back and at functions
+    TKmerPairLocations pair_locations;
+
+    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_) :
+        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_} {}
+
     TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_, TKmerPairLocations & pair_locations_) :
         kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_}
     {

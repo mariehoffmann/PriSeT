@@ -78,7 +78,7 @@ void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
         std::cout << "(" << (*it).get_kmer_ID1() << ", " << (*it).get_kmer_ID2() << ")\t\t| ";
         legend.insert((*it).get_kmer_ID1());
         legend.insert((*it).get_kmer_ID2());
-        for (auto i = 0; i < (*it).container_size(); ++i)
+        for (TKmerPairs::size_type i = 0; i < (*it).container_size(); ++i)
             std::cout << (*it).accession_ID_at(i) << "\t\t| (" << (*it).kmer_pos_at(i, 1) << ", " << (*it).kmer_pos_at(i, 2) << ")\n";
     }
     if (kmer_pairs.size())
@@ -257,7 +257,7 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
 
 // accumulate statistics upstream for both container types - TKmerLocations and TKmerPairs
 template<typename TKmerContainer>
-void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::pair<TTaxid, uint16_t>> const & leaves, std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type const & io_cfg)
+void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::pair<TTaxid, uint16_t>> const & leaves, std::unordered_map<TTaxid, TTaxid> const & tax_map, std::unordered_map<TAccID, TTaxid> const & accID2taxID, std::unordered_map<TAccID, TAcc> const & accID2acc, io_cfg_type const & io_cfg)
 {
     // type for upstream stats collection: (match_ctr, covered_taxids)
     using TUpstreamValue = std::pair<uint16_t, uint16_t>;
@@ -270,19 +270,19 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
     {
         // write out single primer results
         // value_type is either TKmerLocation or TKmerPair
-        for (TKmerContainer::value_type kmer_location : kmer_container) // taxid, kmer fixed
+        for (typename TKmerContainer::value_type kmer_location : kmer_container) // taxid, kmer fixed
         {
 
-            TKmerID kmerID1 = kmer_location.get_kmer_ID1;
-            TKmerID kmerID2 = kmer_location.get_kmer_ID2;
+            TKmerID kmerID1 = kmer_location.get_kmer_ID1();
+            TKmerID kmerID2 = kmer_location.get_kmer_ID2();
 
             // collect all accessions (not accession IDs) assigned to current taxid where kmer matches
             std::vector<TAcc> acc_by_tax;
-            for (kmer_location::size_type i = 0; i < kmer_location.container_size(); ++i)  //TLocation location : kmer_location.second) // loc = seqan::Pair<TSeqNo, TSeqPos>
+            for (typename TKmerLocation::size_type i = 0; i < kmer_location.container_size(); ++i)  //TLocation location : kmer_location.second) // loc = seqan::Pair<TSeqNo, TSeqPos>
             {
                 TSeqNo accID = kmer_location.accession_ID_at(i);  //seqan::getValueI1<TSeqNo, TSeqPos>(location);
-                if (accID2taxID[accID] == taxid)
-                    acc_by_tax.push_back(accID2acc[accID]);
+                if (accID2taxID.at(accID) == taxid)
+                    acc_by_tax.push_back(accID2acc.at(accID));
             }
             uint16_t match_ctr = acc_by_tax.size() > 0;
             TResult result{taxid, kmerID1, kmerID2, match_ctr, 1, acc_by_tax};
@@ -306,7 +306,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
             while (tax_map.find(taxid_aux) != tax_map.end())
             {
                 // proceed with taxonomic parent
-                taxid_aux = tax_map[taxid_aux];
+                taxid_aux = tax_map.at(taxid_aux);
                 // key for parental stats
                 TUpstreamKey::THash key{TUpstreamKey(taxid_aux, kmerID1, kmerID2).to_string()};
                 auto st_it{upstream_map.find(key)};
@@ -324,7 +324,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 
     // create output stream to result table and append
     std::ofstream table;
-    table.open(io_cfg.get_table_file(), ios_base::ate);
+    table.open(io_cfg.get_result_file(), std::ios_base::ate);
 
     // flush leave node results
     for (TResult result : results){
@@ -339,13 +339,12 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
     }
 
     table.close();
-
 }
 
 // write results in csv format
 // columns: taxid, fwd, rev, matches, coverage, ID_list
 // TODO: write out kmer IDs and DNA sequences
-void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TKmerPairs const & pairs)
+void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TKmerPairs const & kmer_pairs)
 {
     // TODO: check if unordered_map instead of map
     // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
@@ -367,10 +366,10 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     std::unordered_map<TKmerID, std::vector<TSeqNo> > kmer2loc; // relates kmer IDs and location IDs
     for (auto it = kmer_locations.begin(); it != kmer_locations.end(); ++it)
     {
-        TKmerID kmer_ID = it->first;
+        TKmerID kmer_ID = it->get_kmer_ID();
         std::vector<TSeqNo> seq_IDs;
-        for (TLocation loc : it->second)
-            seq_IDs.push_back(seqan::getValueI1<TSeqNo, TSeqPos>(loc));
+        for (TKmerLocation::size_type i = 0; i < it->container_size(); ++i)
+            seq_IDs.push_back(it->accession_ID_at(i)); // seqan::getValueI1<TSeqNo, TSeqPos>(loc));
         kmer2loc[kmer_ID] = seq_IDs;
     }
     std::cout << "ct2\n";
@@ -406,15 +405,15 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     std::cout << "ct8\n";
     // write result table header
     std::ofstream table;
-    table.open(io_cfg.get_table_file());
+    table.open(io_cfg.get_result_file());
     table << "#taxid, fwd, rev, matches, coverage, ID_list\n";
     table.close();
 
     // collect single kmer matches
-    accumulation_loop<TKmerLocations>(kmer_locations, leaves_srt_by_level, tax_map, io_cfg);
+    accumulation_loop<TKmerLocations>(kmer_locations, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
 
     // collect kmer pair matches for bottom nodes
-    accumulation_loop<TKmerPairs>(kmer_pairs, leaves_srt_by_level, tax_map, io_cfg);
+    accumulation_loop<TKmerPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
 
 }
 

@@ -58,7 +58,7 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
         }
         std::cout << std::endl;
         // store locations,ID updated later
-        kmer_locations.push_back(std::make_pair(ID++, row));
+        kmer_locations.push_back(TKmerLocation{ID++, row}); //std::make_pair(ID++, row));
         row.clear();
     }
     lookup_sequences<primer_cfg_type>(kmer_locations, kmer_map, io_cfg, primer_cfg, directoryInformation);
@@ -99,7 +99,7 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
     {
         if (!mask[i])
         {
-            kmer_map.erase(kmer_locations[i].first); // delete from dictionary
+            kmer_map.erase(kmer_locations[i].get_kmer_ID()); // delete from dictionary
             kmer_locations.erase(kmer_locations.begin() + i); // erase associated locations
         }
     }
@@ -114,7 +114,7 @@ void chemical_filter_pairs(primer_cfg_type const & primer_cfg, TKmerPairs & kmer
     uint16_t i = 0;
     for (auto kmer_pair : kmer_pairs)
     {
-        if (chemistry::filter_cross_dimerization(kmer_map[kmer_pair.kmer_fwd], kmer_map[kmer_pair.kmer_rev]))
+        if (chemistry::filter_cross_dimerization(kmer_map[kmer_pair.get_kmer_ID1()], kmer_map[kmer_pair.get_kmer_ID2()]))
             mask.set(i);
         ++i;
     }
@@ -126,7 +126,7 @@ void chemical_filter_pairs(primer_cfg_type const & primer_cfg, TKmerPairs & kmer
     for (int16_t i = kmer_pairs.size()-1; i >= 0; --i)
     {
         if (mask[i])
-            unpaired.erase(kmer_pairs[i].kmer_fwd), unpaired.erase(kmer_pairs[i].kmer_rev);
+            unpaired.erase(kmer_pairs[i].get_kmer_ID1()), unpaired.erase(kmer_pairs[i].get_kmer_ID2());
         else
             kmer_pairs.erase(kmer_pairs.begin() + i);
     }
@@ -182,7 +182,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
 void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TKmerPairs & kmer_pairs)
 {
     primer_cfg_type::size_interval_type transcript_range = primer_cfg.get_transcript_range();
-    using it_loc_type = TKmerLocations::value_type::second_type::const_iterator;
+    using it_loc_type = TKmerLocations::value_type::const_iterator;
     it_loc_type it1_start, it1_aux, it2_start, it2_aux;
     for (auto it1 = kmer_locations.begin(); it1 != kmer_locations.end()-1; ++it1)
     {
@@ -220,16 +220,17 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
                     pos_delta += primer_cfg.get_kmer_length();
                     if (pos_delta >= primer_cfg.get_transcript_range().first && pos_delta <= primer_cfg.get_transcript_range().second)
                     {
-                        TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).kmer_ID : (*it2).kmer_ID;
-                        TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).kmer_ID : (*it1).kmer_ID;
+                        TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).get_kmer_ID() : (*it2).get_kmer_ID();
+                        TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).get_kmer_ID() : (*it1).get_kmer_ID();
                         auto pair_location = std::make_tuple(seq_pos, std::min<TSeqPos>(pos_kmer1, pos_kmer2), std::max<TSeqPos>(pos_kmer1, pos_kmer2));
                         std::cout << "(kmer_fwd_new, kmer_rev_new) = (" << kmer_fwd_new << ", " << kmer_rev_new << ") at [(refID = " << std::get<0>(pair_location) << " at positions: " << std::get<1>(pair_location) << ", " << std::get<2>(pair_location) << ")]\n";
                         // extend location vector if pair combinations already in result
-                        if (kmer_pairs.size() && kmer_pairs.back().kmer_fwd == kmer_fwd_new && kmer_pairs.back().kmer_rev == kmer_rev_new)
+                        if (kmer_pairs.size() && kmer_pairs.back().get_kmer_ID1() == kmer_fwd_new && kmer_pairs.back().get_kmer_ID2() == kmer_rev_new)
                             kmer_pairs[kmer_pairs.size()-1].pair_locations.push_back(pair_location);
                         else
                         {
-                            TKmerPair pair{kmer_fwd_new, kmer_rev_new, abs(kmer_map.at(kmer_fwd_new).Tm - kmer_map.at(kmer_rev_new).Tm), TKmerPair::TKmerPairLocations{pair_location}};
+                            TKmerPair::TKmerPairLocations first_pair{pair_location};
+                            TKmerPair pair{kmer_fwd_new, kmer_rev_new, abs(kmer_map.at(kmer_fwd_new).Tm - kmer_map.at(kmer_rev_new).Tm), first_pair};
                             kmer_pairs.push_back(pair);
                         }
                     }

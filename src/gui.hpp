@@ -19,37 +19,22 @@
 namespace priset::gui
 {
 
-// string substitution map to generate valid R-script for frontend
-struct TRScriptHelper
-{
-    io_cfg_type * io_cfg;
-
-    TRScriptHelper(io_cfg_type & io_cfg_) : io_cfg{io_cfg_} {}
-    using TValueMap = typename std::unordered_map<std::string, std::string>;
-
-    TValueMap value_map{
-        {"<tax_file>", io_cfg.get_tax_file()},
-        {"<primer_info>", io_cfg.get_primer_info_file()},
-        {"<result_file>", io_cfg.get_result_file()}
-    };
-};
-
 // Compiles Shiny app and starts browser on success.
 bool compile_app(priset::io_cfg_type & io_cfg)
 {
-    char const * cmd = "Rscript " + io_cfg.get_script_file().string() + "\0";
+    char const * cmd = std::string("Rscript " + io_cfg.get_script_file().string() + "\0").c_str();
     //execl("Rscript", &io_cfg.get_script_file().string()[0u], NULL);
     std::string result = exec(cmd);
     std::cout << result << std::endl;
-    std::basic_regex const url_rx = "Listening on (http\:\/\/\d+\.\d+\.\d+\.\d+:\d+)";
-    std::match_results match; // std::smatch matches;
-    if (std::regex_search(result.begin(), result.end(), match, url_rx))
+    std::basic_regex const url_rx("Listening on (http\\:\\/\\/[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\:[0-9]+)");
+    std::smatch url_match;
+    if (std::regex_search(result, url_match, url_rx))
     {
-        std::cout << "Match found: " << match[0].string() << std::endl;
+        std::cout << "Match found: " << url_match[0].str() << std::endl;
         if (IS_DARWIN)
-            execl("open", "-a", "firefox", &match[0].string()[0u]); //http://127.0.0.1:3144
+            execl("open", "-a", "firefox", &url_match[0].str()[0u]); //http://127.0.0.1:3144
         else
-            std::cout << "Start app manually in browser: " << match[0] << std::endl;
+            std::cout << "Start app manually in browser: " << url_match[0].str() << std::endl;
     }
     else
     {
@@ -62,24 +47,25 @@ bool compile_app(priset::io_cfg_type & io_cfg)
 // Generates app script from template.
 bool generate_app(priset::io_cfg_type & io_cfg)
 {
-    TRScriptHelper sh{};
-
     // copy first template into newly created `app` folder in working directory
-    fs::path const template = io_cfg.get_app_template();
+    fs::path const app_template = io_cfg.get_app_template();
     fs::path const script = io_cfg.get_script_file();
-    fs::create_directory(fs::path::parent_path(script));
-    std::ifstream  src(template.string(), std::ios::in);
-    std::ofstream  dst(script.string(), std::ios::out);
+    fs::create_directory(script.parent_path());
+    std::ifstream src(app_template.string(), std::ios::in);
+    std::ofstream dst(script.string(), std::ios::out);
 
-    auto buffer = src.rdbuf();
-    std::cout << src.rdbuf() << std::endl;
+    std::string code((std::istreambuf_iterator<char>(src)), (std::istreambuf_iterator<char>()));
     // replace tags
-    for (const auto & [tag, value]: sh.value_map)
+    std::unordered_map<std::string, std::string> value_map
+    {    {"<tax_file>", io_cfg.get_tax_file().string()},
+        {"<primer_info>", io_cfg.get_primer_info_file().string()},
+        {"<result_file>", io_cfg.get_result_file().string()}
+    };
+    for (const auto & [tag, value]: value_map)
     {
-        buffer = std::regex_replace(buffer, tag, value);
+        code = std::regex_replace(code, std::regex(tag), value);
     }
-
-    dst << buffer;
+    dst << code;
 
     std::cout << "R script copied to: \n" << script << std::endl;
     return true;
