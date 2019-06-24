@@ -89,22 +89,108 @@ struct TKmer
 // TODO: ID redundant, see application to possibly remove from struct
 typedef std::map<TKmerID, TKmer> TKmerMap;
 
+// todo: TKmerLocation and TKmerPair inherit from same base struct.
 // vector type of k-mers and their locations
-typedef std::pair<TKmerID, std::vector<TLocation > > TKmerLocation;
+struct TKmerLocation
+{
+private:
+    TKmerID kmer_ID{0};
+    std::vector<TLocation> locations{};
+
+public:
+    using size_type = std::vector<TLocation>::size_type;
+
+    TKmerID get_kmer_ID() const noexcept
+    {
+        return kmer_ID;
+    }
+
+    TKmerID get_kmer_ID1() const noexcept
+    {
+        return get_kmer_ID();
+    }
+
+    TKmerID get_kmer_ID2() const noexcept
+    {
+        return 0;
+    }
+
+    size_type container_size() const noexcept
+    {
+         return locations.size();
+    }
+
+    TSeqNo accession_ID_at(size_type i) const
+    {
+         return seqan::getValueI1<TSeqNo, TSeqPos>(locations[i]);
+    }
+
+    TSeqPos kmer_pos_at(size_type i) const
+    {
+        return seqan::getValueI2<TSeqNo, TSeqPos>(locations[i]);
+    }
+
+};
+
+// List type of TKmerLocation.
 typedef std::vector<TKmerLocation > TKmerLocations;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TKmerPair
 {
+    // The container type for storing a pair location, i.e. sequence ID, and start positions of fwd and rev primer.
     using TKmerPairLocations = typename std::vector<std::tuple<TSeqNo, TSeqPos, TSeqPos> >;
+    using size_type = TKmerPairLocations::size_type;
+private:
     // k-mer identifier for forward (5') primer sequence
-    TKmerID kmer_fwd;
+    TKmerID kmer_ID1{0};
     // k-mer identifier for reverse (3') primer sequence
-    TKmerID kmer_rev;
+    TKmerID kmer_ID2{0};
     // absolute difference of their melting temperatures
     float Tm_delta;
-    // The set of locations given by sequence id and position indices of fwd and rev sequence IDs.
+    // The container for storing pair locations.
     TKmerPairLocations pair_locations;
+public:
+    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_, TKmerPairLocations & pair_locations_) :
+        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_}
+    {
+        pair_locations.resize(pair_locations_.size());
+        std::copy(pair_locations_.begin(), pair_locations.end(), pair_locations.begin());
+    }
+
+    TKmerID get_kmer_ID1() const
+    {
+        return kmer_ID1;
+    }
+
+    TKmerID get_kmer_ID2() const
+    {
+        return kmer_ID2;
+    }
+
+    float get_Tm_delta() const noexcept
+    {
+        return Tm_delta;
+    }
+
+    size_t container_size() const noexcept
+    {
+        return pair_locations.size();
+    }
+
+    TSeqNo accession_ID_at(size_t i) const noexcept
+    {
+        return std::get<0>(pair_locations[i]);
+    }
+
+    TSeqPos kmer_pos_at(size_type i, TKmerID kmerID = 1) const
+    {
+        if (kmerID == 1)
+            return std::get<1>(pair_locations[i]);
+        return std::get<2>(pair_locations[i]);
+    }
+
+
 };
 
 // List type of pairs.
@@ -116,9 +202,9 @@ struct TResult
     // taxonomic node identifier
     TTaxid taxid;
     // forward kmer identifier
-    TKmerID fwd;
+    TKmerID kmer_ID1;
     // reverse kmer identifier
-    TKmerID rev;
+    TKmerID kmer_ID2;
     // taxonomic node counter with suitable fwd/rev primer matches in their descendents
     uint16_t match_ctr;
     // total number of taxonomic nodes in subtree having non-zero accessions assigned
@@ -130,7 +216,7 @@ struct TResult
     std::string to_string()
     {
         std::stringstream ss;
-        ss << taxid << "," << fwd << "," << rev << "," << match_ctr << "," << covered_taxids;
+        ss << taxid << "," << kmer_ID1 << "," << kmer_ID2 << "," << match_ctr << "," << covered_taxids;
         if (accIDs.size())
             for (auto accID : accIDs)
                 ss << "," << accID;

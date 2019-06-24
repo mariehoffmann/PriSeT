@@ -1,7 +1,7 @@
-library(d3treeR)
 library(DT)
 library(shiny)
 library(treemap)
+library(d3treeR)
 
 ##############################  Tree built ####################################
 # load taxonomy from /library/*.tax io_cfg.tax_file()

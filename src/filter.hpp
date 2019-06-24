@@ -39,12 +39,7 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
     TSeqPos seqpos_prev = 0;
     typename TLocations::const_iterator aux  = locations.end();
     --aux;
-    std::cout << "last unfiltered location: " << seqan::getValueI2<TSeqNo, TSeqPos>(aux->first);
-    for (seqan::Pair<TSeqNo, TSeqPos> pair : aux->second.first)
-    {
-        std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
-    }
-    //exit(0);
+
     TKmerID ID = 1;
     for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
@@ -85,7 +80,7 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
     TKmer kmer;
     for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
     {
-        kmer = kmer_map.at(kmer_locations[i].first);
+        kmer = kmer_map.at(kmer_locations[i].get_kmer_ID1());
         // filter by melting temperature
         if (kmer.Tm >= Tm_min && kmer.Tm <= Tm_max)
         {
@@ -108,8 +103,7 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
             kmer_locations.erase(kmer_locations.begin() + i); // erase associated locations
         }
     }
-
-     std::cout << "LOGGING: # KMERS after chemical_filter_single: " << kmer_locations.size() << std::endl;
+    std::cout << "LOGGING: # KMERS after chemical_filter_single: " << kmer_locations.size() << std::endl;
 }
 
 // check cross-dimerization.
@@ -195,17 +189,17 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
         for (auto it2 = it1+1; it2 != kmer_locations.end(); ++it2)
         {
             // iterator to start position of current location for k-mer 1
-            it1_start = (*it1).second.begin();
+            it1_start = (*it1).locations.begin();
             // iterator to start position of current location for k-mer 2
-            it2_start = (*it2).second.begin();
+            it2_start = (*it2).locations.begin();
             // forward iterators to correspond to refer to same sequence ID or end
-            while (it1_start != (*it1).second.end() && it2_start != (*it2).second.end() &&
+            while (it1_start != (*it1).locations.end() && it2_start != (*it2).locations.end() &&
                     seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
             {
                 // speedup: use lower_bound/upper_bound
-                while (it1_start != (*it1).second.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
+                while (it1_start != (*it1).locations.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
                     ++it1_start;
-                while (it2_start != (*it2).second.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start))
+                while (it2_start != (*it2).locations.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start))
                     ++it2_start;
             }
 
@@ -214,20 +208,20 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
             // foward iterator for k-mer 2 on same sequence (loc)
             it2_aux = it2_start;
             // invariant after entering this loop: loc(it1) == loc(it2)
-            while (it1_start != (*it1).second.end() && it1_aux != (*it1).second.end() && it2_start != (*it2).second.end())
+            while (it1_start != (*it1).locations.end() && it1_aux != (*it1).locations.end() && it2_start != (*it2).locations.end())
             {
                 auto seq_pos = seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start);
                 // valid combination?
                 auto pos_kmer1 = seqan::getValueI2<TSeqNo, TSeqPos>(*it1_aux);
-                if (it2_aux != (*it2).second.end())
+                if (it2_aux != (*it2).locations.end())
                 {
                     auto pos_kmer2 = seqan::getValueI2<TSeqNo, TSeqPos>(*it2_aux);
                     auto pos_delta = (pos_kmer1 < pos_kmer2) ? pos_kmer2 - pos_kmer1 : pos_kmer1 - pos_kmer2;
                     pos_delta += primer_cfg.get_kmer_length();
                     if (pos_delta >= primer_cfg.get_transcript_range().first && pos_delta <= primer_cfg.get_transcript_range().second)
                     {
-                        TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).first : (*it2).first;
-                        TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).first : (*it1).first;
+                        TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).kmer_ID : (*it2).kmer_ID;
+                        TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).kmer_ID : (*it1).kmer_ID;
                         auto pair_location = std::make_tuple(seq_pos, std::min<TSeqPos>(pos_kmer1, pos_kmer2), std::max<TSeqPos>(pos_kmer1, pos_kmer2));
                         std::cout << "(kmer_fwd_new, kmer_rev_new) = (" << kmer_fwd_new << ", " << kmer_rev_new << ") at [(refID = " << std::get<0>(pair_location) << " at positions: " << std::get<1>(pair_location) << ", " << std::get<2>(pair_location) << ")]\n";
                         // extend location vector if pair combinations already in result
@@ -242,17 +236,17 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations
                 }
                 ++it2_aux;
                 // all combinations tested for second k-mer
-                if (it2_aux == (*it2).second.end())
+                if (it2_aux == (*it2).locations.end())
                 {
                     std::cout << "LOGGING: forward it1 and reset it2\n";
                     // reset to start of current sequence if next k-mer of it1 refers to same sequence, else forward it2
-                    if (++it1_aux == (*it1).second.end())
+                    if (++it1_aux == (*it1).locations.end())
                         break;
                     if (seqan::getValueI1<TSeqNo, TSeqPos>(*it1_aux) == seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start))
                         it2_aux = it2_start;
                     else
-                        while (++it2_start != (*it2).second.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start));
-                    if (it2_start == (*it2).second.end())
+                        while (++it2_start != (*it2).locations.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_start));
+                    if (it2_start == (*it2).locations.end())
                         std::cout << "LOGGING: forward it2_start points to end of location list of 2nd candidate\n";
                     else
                         std::cout << "LOGGING: forward it1 and reset it2\n";

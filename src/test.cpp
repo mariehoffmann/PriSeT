@@ -42,8 +42,8 @@ struct setup
 
         // init locations
         using TLocationVec = typename std::vector<priset::TLocation>;
-        kmer_locations.push_back(std::make_pair<priset::TKmerID, TLocationVec>(1, TLocationVec{loc1_kmer1, loc2_kmer1}));
-        kmer_locations.push_back(std::make_pair<priset::TKmerID, TLocationVec>(2, TLocationVec{loc1_kmer2, loc2_kmer2}));
+        kmer_locations.push_back(TKmerLocation{1, TLocationVec{loc1_kmer1, loc2_kmer1}});
+        kmer_locations.push_back(TKmerLocation{2, TLocationVec{loc1_kmer2, loc2_kmer2}});
 
         kmer_map[1] = priset::TKmer{1, "AAAA", 12.0};
         kmer_map[2] = priset::TKmer{2, "ACCC", 13.0};

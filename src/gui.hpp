@@ -3,7 +3,7 @@
 #include <fstream>
 #include <regex>
 #include <string>
-#include <system>
+//#include <system>
 #include <unordered_map>
 
 #include "io_cfg_type.hpp"
@@ -22,6 +22,9 @@ namespace priset::gui
 // string substitution map to generate valid R-script for frontend
 struct TRScriptHelper
 {
+    io_cfg_type * io_cfg;
+
+    TRScriptHelper(io_cfg_type & io_cfg_) : io_cfg{io_cfg_} {}
     using TValueMap = typename std::unordered_map<std::string, std::string>;
 
     TValueMap value_map{
@@ -32,9 +35,9 @@ struct TRScriptHelper
 };
 
 // Compiles Shiny app and starts browser on success.
-void compile_app(priset::io_cfg_type & io_cfg)
+bool compile_app(priset::io_cfg_type & io_cfg)
 {
-    char const * s = "Rscript " + io_cfg.get_script_file().string() + "\0";
+    char const * cmd = "Rscript " + io_cfg.get_script_file().string() + "\0";
     //execl("Rscript", &io_cfg.get_script_file().string()[0u], NULL);
     std::string result = exec(cmd);
     std::cout << result << std::endl;
@@ -51,7 +54,9 @@ void compile_app(priset::io_cfg_type & io_cfg)
     else
     {
         std::cout << "WARNING: Could not extract app URL from " << result << std::endl;
+        return false;
     }
+    return true;
 }
 
 // Generates app script from template.
