@@ -20,7 +20,7 @@ struct setup
 {
     // TODO: make this runnable with arbitrarily located build folders
     fs::path const lib_dir = "../PriSet/src/tests/library";
-    fs::path const work_dir = "../PriSet/src/tests/work";
+    fs::path const work_dir = "../PriSeT/src/tests/work";
     priset::io_cfg_type io_cfg;
     priset::primer_cfg_type primer_cfg;
     priset::TKmerLocations kmer_locations;
@@ -55,7 +55,7 @@ struct setup
 void gui_test()
 {
     setup up{};
-    if (priset::gui::generate_app(up.io_cfg) && priset::gui::compile_app(up.io_cfg))
+    if (priset::gui::generate_app(up.io_cfg)) // && priset::gui::compile_app(up.io_cfg))
         std::cout << "success" << std::endl;
     else
         std::cout << "failed to generate and compile app" << std::endl;
@@ -78,7 +78,7 @@ void create_table_test()
     setup s{};
 
     priset::TKmerPairs pairs{};
-    create_table(s.io_cfg, s.kmer_locations, s.kmer_map, pairs);
+    create_table(s.io_cfg, s.kmer_locations, pairs);
 }
 
 int main()

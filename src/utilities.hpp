@@ -140,8 +140,8 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
         seqan::append(str, kmer_str);
         std::cout << "assign to 1st position of kmer_locs: " << std::endl;
         // insert into kmer map
-//        kmer_map[(*kmer_it).first] = TKmer{(*kmer_it).first, str, chemistry::get_Tm(primer_cfg, str)};
-        kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), str, chemistry::get_Tm(primer_cfg, str)};
+//        kmer_map[(*kmer_it).first] = TKmer{(*kmer_it).first, str, get_Tm(primer_cfg, str)};
+        kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), str, get_Tm(primer_cfg, str)};
 
         // forward next kmer iterator and abort if no more kmers to resolve
         std::cout << "increment kmer iterator: " << std::endl;
@@ -191,19 +191,18 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
     std::cout << "create_accID2acc_map\n";
     std::ifstream id_file(io_cfg.get_id_file());
     std::vector<std::string> tokens;
+    std::string line;
+    // skip header
+    getline(id_file, line);
     while (id_file)
     {
-        std::string line;
         if (!getline(id_file, line)) break;
-        if (line[0] != '#')
-        {
-            split(line, tokens);
-            if (tokens.size() != 2)
-                std::cout << "ERROR: unknown id,acc format in " << io_cfg.get_id_file() << std::endl, exit(0);
-            TAccID accID = std::stoi(tokens[0]);
-            accID2acc[accID] = tokens[1];
-            acc2accID[tokens[1]] = accID;
-        }
+        split(line, tokens);
+        if (tokens.size() != 2)
+            std::cout << "ERROR: unknown id,acc format in " << io_cfg.get_id_file() << std::endl, exit(0);
+        TAccID accID = std::stoi(tokens[0]);
+        accID2acc[accID] = tokens[1];
+        acc2accID[tokens[1]] = accID;
     }
     std::cout << "... done\n";
 }
@@ -215,20 +214,20 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
     std::ifstream acc_file(io_cfg.get_acc_file());
     std::vector<std::string> tokens;
     // taxid: (ctr_match, ctr_total), ctrs for accessions
+    std::string line;
+    // skip header
+    getline(acc_file, line);
     while (acc_file)
     {
-        std::string line;
         if (!getline(acc_file, line)) break;
-        if (line[0] != '#')
+
+        split(line, tokens);
+        TTaxid taxid = std::stoi(tokens[0]);
+        taxid_set.insert(taxid);
+        for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
         {
-            split(line, tokens);
-            TTaxid taxid = std::stoi(tokens[0]);
-            taxid_set.insert(taxid);
-            for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
-            {
-                TAcc acc = tokens[token_idx];
-                accID2taxID[acc2accID.at(acc)] = taxid;
-            }
+            TAcc acc = tokens[token_idx];
+            accID2taxID[acc2accID.at(acc)] = taxid;
         }
     }
     std::cout << "... done\n";
@@ -240,17 +239,16 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
     std::cout << "create_tax_map\n";
     std::ifstream tax_file(io_cfg.get_tax_file());
     size_t pos;
+    std::string line;
+    // skip header line
+    getline(tax_file, line);
     while (tax_file)
     {
-        std::string line;
         if (!getline(tax_file, line)) break;
-        if (line[0] != '#')
-        {
-            pos = line.find(",");
-            if (pos == std::string::npos)
-                continue;
-            tax_map[std::stoi(line.substr(0, pos))] = std::stoi(line.substr(pos + 1, std::string::npos));
-        }
+        pos = line.find(",");
+        if (pos == std::string::npos)
+            continue;
+        tax_map[std::stoi(line.substr(0, pos))] = std::stoi(line.substr(pos + 1, std::string::npos));
     }
     std::cout << "... done\n";
 }
@@ -344,7 +342,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 // write results in csv format
 // columns: taxid, fwd, rev, matches, coverage, ID_list
 // TODO: write out kmer IDs and DNA sequences
-void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map, TKmerPairs const & kmer_pairs)
+void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs)  // TKmerMap const & kmer_map,
 {
     // TODO: check if unordered_map instead of map
     // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
@@ -406,7 +404,7 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     // write result table header
     std::ofstream table;
     table.open(io_cfg.get_result_file());
-    table << "#taxid, fwd, rev, matches, coverage, ID_list\n";
+    table << "taxid, fwd, rev, matches, coverage, ID_list\n";
     table.close();
 
     // collect single kmer matches

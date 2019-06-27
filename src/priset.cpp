@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     priset::combine(primer_cfg, kmer_locations, kmer_map, pairs);
     // test chemical constraints of pairs and filter
     //priset::post_filter_main(primer_cfg, kmer_locations, pairs);
-    priset::create_table(io_cfg, kmer_locations, kmer_map, pairs);
+    priset::create_table(io_cfg, kmer_locations, pairs);
     // create app script
     priset::generate_app(io_cfg/*, candidates*/);
 

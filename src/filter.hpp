@@ -85,10 +85,10 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
         if (kmer.Tm >= Tm_min && kmer.Tm <= Tm_max)
         {
             // filter by CG content
-            if (chemistry::filter_CG<primer_cfg_type>(primer_cfg, kmer.seq))
+            if (filter_CG(primer_cfg, kmer.seq))
             {
                 // Filter if Gibb's free energy is below -6 kcal/mol
-                if (chemistry::filter_self_dimerization(kmer.seq))
+                if (filter_self_dimerization(kmer.seq))
                     mask.set(i);
             }
         }
@@ -107,14 +107,14 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
 }
 
 // check cross-dimerization.
-void chemical_filter_pairs(primer_cfg_type const & primer_cfg, TKmerPairs & kmer_pairs, TKmerMap & kmer_map)
+    void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & kmer_pairs, TKmerMap & kmer_map)
 {
     assert(kmer_pairs.size() < (1 << 12));
     std::bitset<1 << 12> mask{};
     uint16_t i = 0;
     for (auto kmer_pair : kmer_pairs)
     {
-        if (chemistry::filter_cross_dimerization(kmer_map[kmer_pair.get_kmer_ID1()], kmer_map[kmer_pair.get_kmer_ID2()]))
+        if (filter_cross_dimerization(kmer_map[kmer_pair.get_kmer_ID1()], kmer_map[kmer_pair.get_kmer_ID2()]))
             mask.set(i);
         ++i;
     }
@@ -137,10 +137,10 @@ void chemical_filter_pairs(primer_cfg_type const & primer_cfg, TKmerPairs & kmer
 }
 
 // post-filter candidates fulfilling chemical constraints by their relative frequency
-void post_frequency_filter(TKmerLocations kmer_locations, TSeqNo occurrence_freq)
+/*void post_frequency_filter(TKmerLocations kmer_locations, TSeqNo occurrence_freq)
 {
 
-}
+}*/
 
 // filter k-mers by frequency and chemical properties
 template<typename TSequenceNames, typename TSequenceLengths>
@@ -181,7 +181,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
  */
 void combine(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TKmerPairs & kmer_pairs)
 {
-    primer_cfg_type::size_interval_type transcript_range = primer_cfg.get_transcript_range();
+    //primer_cfg_type::size_interval_type transcript_range = primer_cfg.get_transcript_range();
     using it_loc_type = TKmerLocations::value_type::const_iterator;
     it_loc_type it1_start, it1_aux, it2_start, it2_aux;
     for (auto it1 = kmer_locations.begin(); it1 != kmer_locations.end()-1; ++it1)

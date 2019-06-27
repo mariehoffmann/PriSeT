@@ -49,12 +49,22 @@ bool generate_app(priset::io_cfg_type & io_cfg)
 {
     // copy first template into newly created `app` folder in working directory
     fs::path const app_template = io_cfg.get_app_template();
+    std::cout << "app_template: " << app_template << std::endl;
+    assert(fs::exists(app_template) == true);
     fs::path const script = io_cfg.get_script_file();
+    std::cout << "script path = " << script << std::endl;
     fs::create_directory(script.parent_path());
     std::ifstream src(app_template.string(), std::ios::in);
     std::ofstream dst(script.string(), std::ios::out);
 
-    std::string code((std::istreambuf_iterator<char>(src)), (std::istreambuf_iterator<char>()));
+    std::string code;
+
+    src.seekg(0, std::ios::end);
+    code.reserve(src.tellg());
+    src.seekg(0, std::ios::beg);
+
+    code.assign((std::istreambuf_iterator<char>(src)), std::istreambuf_iterator<char>());
+
     // replace tags
     std::unordered_map<std::string, std::string> value_map
     {    {"<tax_file>", io_cfg.get_tax_file().string()},
@@ -67,6 +77,7 @@ bool generate_app(priset::io_cfg_type & io_cfg)
     }
     dst << code;
 
+    std::cout << "code = " << code << std::endl;
     std::cout << "R script copied to: \n" << script << std::endl;
     return true;
 }

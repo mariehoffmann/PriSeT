@@ -12,7 +12,7 @@
 
 #include <seqan/basic.h>
 
-#include "chemistry.hpp"
+//#include "chemistry.hpp"
 #include "types.hpp"
 
 namespace priset

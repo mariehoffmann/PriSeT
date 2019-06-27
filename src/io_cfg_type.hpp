@@ -50,7 +50,7 @@ private:
     std::string ext_tax = ".tax";
     std::string ext_id = ".id";
     // Path to R shiny app template
-    fs::path app_template = "../gui/app_template.R";
+    fs::path app_template = "../PriSeT/src/app_template.R";
     // Path to generated copy of R script to be run in terminal.
     fs::path script_file;
     // Path to store result tables to load in Shiny.
@@ -129,7 +129,7 @@ public:
         }
         result_file = result_path / "results.csv";
         primer_info_file = result_path / "primer_info.csv";
-        script_file = get_work_dir() / "app" / "app_template.R";
+        script_file = get_work_dir() / "app" / "app.R";
 
     };
 
