@@ -77,13 +77,42 @@ int fm_index(io_cfg_type & io_cfg)
  * fasta_header_type        container type for storing fasta header lines
  * fasta_length_type        container type for storing fasta entry lengths (for txt.concat)
  */
+
+int fm_map2(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation)
+{
+    std::cout << "/Users/troja/priset/335928/work/index == ? " << io_cfg.get_index_dir() << std::endl;
+    std::cout << "/Users/troja/priset/335928/work/mapping == ? " << io_cfg.get_mapping_dir() << std::endl;
+    std::string s1 = io_cfg.get_index_dir().string();
+    std::string s2 = io_cfg.get_mapping_dir().string();
+    std::cout << "s1 = " << s1 << std::endl;
+    std::cout << "s2 = " << s2 << std::endl;
+
+    //char const * argv[12] = {"map", "-I", io_cfg.get_index_dir().c_str(), "-O", io_cfg.get_mapping_dir().c_str(), "-K", "18", "-E", "0", "--raw", "-fl", NULL};
+    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "8", "-E", "1", "--raw", "-fl", NULL};
+    /*
+    argv[0] = map
+    argv[1] = -I
+    argv[2] = /Users/troja/priset/335928/work/index
+    argv[3] = -O
+    argv[4] = /Users/troja/priset/335928/work/mapping
+    argv[5] = -K
+    argv[6] = 18
+    argv[7] = -E
+    argv[8] = 0
+    argv[9] = --raw
+    argv[10] = -fl
+        */
+    mappabilityMain(11, argv);
+    return 0;
+}
+
 template<typename TsequenceNames, typename TsequenceLengths>
-int fm_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
+int fm_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation) //, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
 {
     // omit file I/O
     using key_type = typename TLocations::key_type;
     using TSeqNo = typename seqan::Value<key_type, 1>::Type;
-    using size_interval_type = typename primer_cfg_type::size_interval_type;
+    //using size_interval_type = typename primer_cfg_type::size_interval_type;
     // seqan::Alloc - for direct memory mapping use seqan::MMap<> instad of seqan::Alloc<>, relevant for benchmarking,
     // since loading index of human genome from disk to main memory may take several minutes
     TFMIndexConfig::SAMPLING = 10;
@@ -108,27 +137,30 @@ int fm_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & loca
     std::cout << "fastaFile = " << fastaFile << std::endl;
 
     // set search parameters (see genmap/src/common.hpp), set in mappabilityMain
-    uint16_t K = primer_cfg.template get_primer_length_range<size_interval_type>().first;
+    uint16_t K = primer_cfg.get_primer_length_range().first;
     std::cout << "K set to " << K;
     // TODO: when allowing errors, overlap size is different, see formular in mappability.hpp
+    //     SearchParams for binary call: searchParams{ length = 18, overlap = 6, threads = 8, revCompl = 0, excludePseudo = 0}
     uint16_t overlap = std::ceil(0.3 * float(K));
-    uint8_t threads = 1; // TODO: set to omp_get_max_threads();
-    bool revCompl = false;
-    bool excludePseudo = false;
+    uint8_t threads = 8; // TODO: set to omp_get_max_threads();
+    bool revCompl = 0;
+    bool excludePseudo = 0;
     SearchParams searchParams = SearchParams{K, overlap, threads, revCompl, excludePseudo};
 
-    bool mmap = false;
-    bool indels = false;
-    bool wigFile = false; // group files into mergable flags, i.e., BED | WIG, etc.
-    bool bedFile = false;
-    bool rawFile = true;
-    bool txtFile = true;
-    bool csvFile = true;
+    //for binary call: opt{mmap = 0, indels = 0, wigFile = 0, bedFile = 0, rawFile = 1, txtFile = 0, csvFile = 0, outputType = 1, directory = 0, verbose = 0, indexPath = /Users/troja/priset/335928/work/index/index, outputPath = /Users/troja/priset/335928/work/mapping_bin/, alphabet = dna5, seqNoWidth = 16, maxSeqLengthWidth = 32, totalLengthWidth = 32, errors = 0, sampling = 10}
+
+    bool mmap = 0;
+    bool indels = 0;
+    bool wigFile = 0; // group files into mergable flags, i.e., BED | WIG, etc.
+    bool bedFile = 0;
+    bool rawFile = 1;
+    bool txtFile = 0;
+    bool csvFile = 0;
     OutputType outputType = OutputType::mappability;
-    bool directory = false;
-    bool verbose = false;
+    bool directory = 0;
+    bool verbose = 0;
     CharString indexPath = seqan::CharString(std::string(io_cfg.get_index_base_path()));
-    CharString outputPath = ".";
+    CharString outputPath = "."; // verify or set
     CharString alphabet = "dna5";
     uint32_t seqNoWidth = 16;
     uint32_t maxSeqLengthWidth = 32;
@@ -142,6 +174,7 @@ int fm_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & loca
 
     // open index file directory
     std::cout << "io_cfg.index_dir : " << io_cfg.get_index_dir() << std::endl;
+
 
     run1<TLocations, seqan::Dna5>(locations, opt, searchParams);
 

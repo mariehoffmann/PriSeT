@@ -149,7 +149,8 @@ typedef std::vector<TKmerLocation > TKmerLocations;
 struct TKmerPair
 {
     // The container type for storing a pair location, i.e. sequence ID, and start positions of fwd and rev primer.
-    using TKmerPairLocations = typename std::vector<std::tuple<TSeqNo, TSeqPos, TSeqPos> >;
+    using TKmerPairLocation = typename std::tuple<TSeqNo, TSeqPos, TSeqPos>;
+    using TKmerPairLocations = typename std::vector< TKmerPairLocation >;
     using const_iterator = TKmerPairLocations::const_iterator;
     using size_type = TKmerPairLocations::size_type;
 private:
@@ -168,11 +169,12 @@ public:
     TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_) :
         kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_} {}
 
-    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_, TKmerPairLocations & pair_locations_) :
+    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_, TKmerPairLocation & pair_location_) :
         kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_}
     {
-        pair_locations.resize(pair_locations_.size());
-        std::copy(pair_locations_.begin(), pair_locations.end(), pair_locations.begin());
+        pair_locations.push_back(pair_location_);
+        // .resize(pair_locations_.size());
+        //std::copy(pair_locations_.begin(), pair_locations.end(), pair_locations.begin());
     }
 
     TKmerID get_kmer_ID1() const

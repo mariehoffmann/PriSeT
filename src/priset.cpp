@@ -14,10 +14,10 @@
 
 #include <seqan/basic.h>
 
-#include "display.hpp"
 #include "errors.hpp"
 #include "filter.hpp"
 #include "fm.hpp"
+#include "gui.hpp"
 #include "io_cfg_type.hpp"
 #include "primer_cfg_type.hpp"
 #include "taxonomy.hpp"
@@ -25,9 +25,9 @@
 #include "utilities.hpp"
 
 /*
- * usage        g++ priset.cpp -Wno-write-strings -std=c++17 -lstdc++fs -Wall -Wextra -o priset
+ * usage        g++ ../PriSeT/src/priset.cpp -Wno-write-strings -std=c++17 -lstdc++fs -Wall -Wextra -o priset
  *              ./priset <lib_dir> <work_dir>
- * e.g.         ./src/priset /Users/troja/priset/library /Users/troja/priset/work
+ * e.g.         ./priset ~/priset/library ~/priset/work
  *
  * src_dir      path to folder containing fasta (*.fa) and taxonomy file (*.tax)
  * work_dir     path to store indices, mappings, annotations, and other results
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, directoryInformation, sequenceNames, sequenceLengths);
+    priset::fm_map2(io_cfg, primer_cfg, locations, directoryInformation); //, sequenceNames, sequenceLengths);
     priset::print_locations(locations);
 
     // filter k-mers by frequency and chemical properties
@@ -71,8 +71,8 @@ int main(int argc, char** argv)
     // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     priset::TKmerLocations kmer_locations;
     // dictionary to resolve kmer IDs and their sequences
-    prisest::TKmerMap kmer_map;
-    priset::pre_filter_main<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, directoryInformation, sequenceNames, sequenceLengths);
+    priset::TKmerMap kmer_map;
+    priset::pre_filter_main<priset::TSequenceNames, priset::TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, directoryInformation); //, sequenceNames, sequenceLengths);
     // TODO: delete locations
     priset::TKmerPairs pairs;
     priset::combine(primer_cfg, kmer_locations, kmer_map, pairs);
@@ -80,7 +80,8 @@ int main(int argc, char** argv)
     //priset::post_filter_main(primer_cfg, kmer_locations, pairs);
     priset::create_table(io_cfg, kmer_locations, pairs);
     // create app script
-    priset::generate_app(io_cfg/*, candidates*/);
+    if (! priset::gui::generate_app(io_cfg) && priset::gui::compile_app(io_cfg))
+        std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";
 
     return 0;
 }

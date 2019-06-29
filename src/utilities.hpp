@@ -24,6 +24,7 @@ namespace priset
 
 // Execute in terminal and collect command return value.
 std::string exec(char const * cmd) {
+    std::cout << "Enter util.exec with cmd = " << cmd << std::endl;
     std::array<char, 128> buffer;
     std::string result;
     std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
@@ -31,6 +32,7 @@ std::string exec(char const * cmd) {
         throw std::runtime_error("ERROR: popen() failed!");
     while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
         result += buffer.data();
+    std::cout << "util.exec, result = " << result << std::endl;
     return result;
 }
 
@@ -92,12 +94,38 @@ void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
 // forward declaration
 struct primer_cfg_type;
 
-// Retrieve DNA sequence from txt.concat given a set of locations
+// Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
+void lookup_sequences2(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
+{
+    // load concatenated corpus
+    seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
+    typedef seqan::Iterator<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>>>::Type TStringSetIterator;
+
+    fs::path text_path = io_cfg.get_index_txt_path();
+    std::cout << "text_path: " << text_path << std::endl;
+    seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
+
+    TSeqNo kmer_ID;
+    TSeqPos kmer_pos;
+    auto kmer_length = primer_cfg.get_kmer_length();
+    for (TKmerLocations::iterator kmer_it = kmer_locations.begin(); kmer_it != kmer_locations.end(); ++kmer_it)
+    {
+        kmer_ID = kmer_it->accession_ID_at(0);
+        kmer_pos = kmer_it->kmer_pos_at(0);
+        seqan::DnaString seq = seqan::valueById(text, kmer_ID);
+        auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, kmer_length);
+
+        std::cout << kmer_str << std::endl;
+        kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), kmer_str, get_Tm(primer_cfg, kmer_str)};
+
+    }
+}
+
 // lookup_sequences<primer_cfg_type>(kmer_locations, io_cfg, primer_cfg, directoryInformation);
 // locations: [(ID, kmer_locations)]
-template<typename primer_cfg_type>
 void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TDirectoryInformation const & directoryInformation)
 {
+    std::cout << "Enter lookup_sequences ...\n";
     std::string fastaFile = std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
     TSeqNo startPos = 0;    // accession separation offset
     TSeqPos offset;         // kmer offset within accession
@@ -113,6 +141,7 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
     TSeqNo next_accession = kmer_it->accession_ID_at(0); //seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]);
     while (kmer_it != kmer_locations.end())
     {
+        std::cout << "while loop start ...\n";
         auto row = retrieveDirectoryInformationLine(directoryInformation[accession_ctr]);
         // forward id counter and accumulate text offset
         while (accession_ctr != next_accession && accession_ctr < length(directoryInformation))
@@ -201,9 +230,14 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
         if (tokens.size() != 2)
             std::cout << "ERROR: unknown id,acc format in " << io_cfg.get_id_file() << std::endl, exit(0);
         TAccID accID = std::stoi(tokens[0]);
-        accID2acc[accID] = tokens[1];
-        acc2accID[tokens[1]] = accID;
+        for (size_t i = 1; i < tokens.size(); ++i)
+        {
+            accID2acc[accID] = tokens[i];
+            acc2accID[tokens[i]] = accID;
+            std::cout << "filled both dictionaries with " << accID << " <-> " << tokens[i] << std::endl;
+        }
     }
+    //exit(0);
     std::cout << "... done\n";
 }
 
@@ -212,6 +246,7 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 {
     std::cout << "create_accID2taxID\n";
     std::ifstream acc_file(io_cfg.get_acc_file());
+    std::cout << "loade acc_file: " << io_cfg.get_acc_file() << std::endl;
     std::vector<std::string> tokens;
     // taxid: (ctr_match, ctr_total), ctrs for accessions
     std::string line;
@@ -223,10 +258,14 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 
         split(line, tokens);
         TTaxid taxid = std::stoi(tokens[0]);
+        std::cout << "taxid = " << taxid << std::endl;
         taxid_set.insert(taxid);
         for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
         {
             TAcc acc = tokens[token_idx];
+            std::cout << "acc = " << acc << std::endl;
+            if (acc2accID.find(acc) == acc2accID.end())
+                std::cout << "ERROR: accession " << acc << " not in acc2accID dictionary!" << std::endl, exit(0);
             accID2taxID[acc2accID.at(acc)] = taxid;
         }
     }
@@ -257,6 +296,8 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
 template<typename TKmerContainer>
 void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::pair<TTaxid, uint16_t>> const & leaves, std::unordered_map<TTaxid, TTaxid> const & tax_map, std::unordered_map<TAccID, TTaxid> const & accID2taxID, std::unordered_map<TAccID, TAcc> const & accID2acc, io_cfg_type const & io_cfg)
 {
+    if (!kmer_container.size())
+        return;
     // type for upstream stats collection: (match_ctr, covered_taxids)
     using TUpstreamValue = std::pair<uint16_t, uint16_t>;
     // for each taxid, primer_fwd, primer_rev (as string) combination store counters for matches and coverage

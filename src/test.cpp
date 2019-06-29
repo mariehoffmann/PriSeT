@@ -6,6 +6,11 @@
 #include <unistd.h>
 #include <vector>
 
+#include <seqan/basic.h>
+#include <seqan/file.h>
+#include <seqan/sequence.h>
+#include <seqan/stream.h>
+
 #include "filter.hpp"
 #include "gui.hpp"
 #include "primer_cfg_type.hpp"
@@ -19,8 +24,8 @@ namespace fs = std::experimental::filesystem;
 struct setup
 {
     // TODO: make this runnable with arbitrarily located build folders
-    fs::path const lib_dir = "../PriSet/src/tests/library";
-    fs::path const work_dir = "../PriSeT/src/tests/work";
+    fs::path const lib_dir =  fs::canonical("../PriSeT/src/tests/library");
+    fs::path const work_dir = fs::canonical("../PriSeT/src/tests/work");
     priset::io_cfg_type io_cfg;
     priset::primer_cfg_type primer_cfg;
     priset::TKmerLocations kmer_locations;
@@ -55,7 +60,7 @@ struct setup
 void gui_test()
 {
     setup up{};
-    if (priset::gui::generate_app(up.io_cfg)) // && priset::gui::compile_app(up.io_cfg))
+    if (priset::gui::generate_app(up.io_cfg) && priset::gui::compile_app(up.io_cfg))
         std::cout << "success" << std::endl;
     else
         std::cout << "failed to generate and compile app" << std::endl;
@@ -72,16 +77,29 @@ void combine_test()
 
 void create_table_test()
 {
-    fs::path const lib_dir = "../PriSet/src//tests/library";
-    std::cout << "lib_dir = " << lib_dir << " exists: " << fs::exists(lib_dir) << std::endl;
-    std::cout << fs::canonical(lib_dir) << std::endl;
     setup s{};
-
     priset::TKmerPairs pairs{};
     create_table(s.io_cfg, s.kmer_locations, pairs);
 }
 
+void lookup_sequences_test()
+{
+    seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
+    fs::path text_path = "/Users/troja/priset/335928/work/index/index.txt"; //io_cfg.get_index_txt_path();
+    std::cout << "text_path: " << text_path << std::endl;
+    seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
+
+    std::cout << seqan::valueById(text, 0) << std::endl;
+    typedef seqan::Iterator<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>>>::Type TStringSetIterator;
+    for (TStringSetIterator it = seqan::begin(text); it != seqan::end(text); ++it)
+        std::cout << *it << '\n';
+
+}
+
 int main()
 {
-    gui_test();
+    //combine_test();
+    create_table_test();
+    //gui_test();
+    //lookup_sequences_test();
 }

@@ -8,6 +8,7 @@
 
 #include <cstring>
 #include <experimental/filesystem>
+//#include <fstream>
 #include <iostream>
 #include <regex>
 
@@ -51,6 +52,8 @@ private:
     std::string ext_id = ".id";
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
+    // R script for launching shiny app.
+    fs::path script_runner;
     // Path to generated copy of R script to be run in terminal.
     fs::path script_file;
     // Path to store result tables to load in Shiny.
@@ -59,17 +62,19 @@ private:
     fs::path primer_info_file;
 
 public:
-    // give full path, no ~/!
+    // Give full path, no ~/ or ../!
     io_cfg_type(fs::path const & lib_dir_, fs::path const & work_dir_) :
-        lib_dir{lib_dir_},
-        work_dir{work_dir_},
-        index_dir{work_dir_},
-        mapping_dir{work_dir_},
+        lib_dir{fs::canonical(lib_dir_)},
+        work_dir{fs::canonical(work_dir_)},
+        index_dir{fs::canonical(work_dir_)},
+        mapping_dir{fs::canonical(work_dir_)},
         genmap_bin{fs::current_path()}
     {
         genmap_bin /= "submodules/genmap/bin/genmap";
         // parse library directory and assign paths to the .acc, .fasta, and .tax files
         std::cout << "lib_dir = " << lib_dir << std::endl;
+//        std::cout << "current path: " << fs::current_path() << std::endl;
+
         if (!fs::exists(lib_dir))
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
         for (auto & p : fs::directory_iterator(lib_dir))
@@ -95,7 +100,7 @@ public:
         std::cout << "STATUS\tSet taxonomy file: \t" << tax_file << std::endl;
         if (!id_file.has_filename())
             std::cout << "ERROR: Unable to locate id file in: " << lib_dir << std::endl, exit(-1);
-        std::cout << "STATUS\tSet id file: \t" << tax_file << std::endl;
+        std::cout << "STATUS\tSet id file: \t" << id_file << std::endl;
 
         // create working directory if not existing after clearing
         if (!fs::exists(work_dir))
@@ -117,6 +122,7 @@ public:
         }
         // set output directory for FM index mapping
         mapping_dir /= fs::path("/mapping");
+        std::cout << "set mapping_dir = " << mapping_dir << std::endl;
 
         // create table output directory
         fs::path result_path = work_dir / "table";
@@ -130,7 +136,15 @@ public:
         result_file = result_path / "results.csv";
         primer_info_file = result_path / "primer_info.csv";
         script_file = get_work_dir() / "app" / "app.R";
+        script_runner = get_work_dir() / "app" / "app_run.R";
 
+        if (!fs::exists(script_runner))
+        {
+            std::ofstream ofs;
+            ofs.open(script_runner);
+            ofs << "library(shiny)\nrunApp(" << script_file << ")\n";
+            ofs.close();
+        }
     };
 
     // Return accession file with absolute path as filesystem::path object.
@@ -180,6 +194,12 @@ public:
         return index_dir / "index.ids";
     }
 
+    // return path to concatenation of text corpus stored in two files index.txt.concat and index.txt.limits
+    fs::path get_index_txt_path() const noexcept
+    {
+        return index_dir / "index.txt";
+    }
+
     fs::path get_mapping_dir() const noexcept
     {
         return mapping_dir;
@@ -201,6 +221,12 @@ public:
     fs::path get_script_file() const noexcept
     {
         return script_file;
+    }
+
+    // Return path to R script starter file.
+    fs::path get_script_runner() const noexcept
+    {
+        return script_runner;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.

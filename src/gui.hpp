@@ -3,8 +3,11 @@
 #include <fstream>
 #include <regex>
 #include <string>
+#include  <sys/types.h>
 //#include <system>
+#include <unistd.h>
 #include <unordered_map>
+
 
 #include "io_cfg_type.hpp"
 #include "types.hpp"
@@ -22,24 +25,34 @@ namespace priset::gui
 // Compiles Shiny app and starts browser on success.
 bool compile_app(priset::io_cfg_type & io_cfg)
 {
+    std::cout << "Enter compile app\n";
+    //std::string script_file = "/Users/troja/git/PriSeT_git/PriSeT/src/tests/work/app/app.R";
     char const * cmd = std::string("Rscript " + io_cfg.get_script_file().string() + "\0").c_str();
+//    std::cout << "script file = " <<  script_file << std::endl;
+    std::cout << "cmd = " << cmd << std::endl;
+    //exit(0);
+    //char const * cmd2 = std::string("Rscript " + io_cfg.get_script_runner().string() + "\0").c_str();
     //execl("Rscript", &io_cfg.get_script_file().string()[0u], NULL);
-    std::string result = exec(cmd);
-    std::cout << result << std::endl;
-    std::basic_regex const url_rx("Listening on (http\\:\\/\\/[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\:[0-9]+)");
-    std::smatch url_match;
-    if (std::regex_search(result, url_match, url_rx))
-    {
-        std::cout << "Match found: " << url_match[0].str() << std::endl;
-        if (IS_DARWIN)
-            execl("open", "-a", "firefox", &url_match[0].str()[0u]); //http://127.0.0.1:3144
-        else
-            std::cout << "Start app manually in browser: " << url_match[0].str() << std::endl;
-    }
-    else
-    {
-        std::cout << "WARNING: Could not extract app URL from " << result << std::endl;
-        return false;
+    //exit(0);
+    pid_t pid;
+
+    switch(pid = fork()) {
+        case -1:   /* error for fork() */
+            break;
+        case 0:   /* child process */
+            {
+                std::cout << "Compile script ...\n";
+                exec(cmd);
+                break;
+            }
+        default:   /* parent process */
+            {
+                //sleep(2);
+                //std::cout << "Launch script ...\n";
+                //pid_t pid2 = fork();
+                //if (!pid2) exec(cmd2);
+                break;
+            }
     }
     return true;
 }
@@ -77,7 +90,7 @@ bool generate_app(priset::io_cfg_type & io_cfg)
     }
     dst << code;
 
-    std::cout << "code = " << code << std::endl;
+    //std::cout << "code = " << code << std::endl;
     std::cout << "R script copied to: \n" << script << std::endl;
     return true;
 }
