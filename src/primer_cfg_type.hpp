@@ -179,6 +179,12 @@ struct primer_cfg_type
         return CG_content_range.second;
     }
 
+    // Get primer error number.
+    size_type get_error() const noexcept
+    {
+        return error;
+    }
+
 private:
 
     // Root taxonomic identifier below which references are sampled.
@@ -190,8 +196,11 @@ private:
     // Default primer melting temperature formular (see chemistry.hpp for details)
     TMeltMethod melt_method{TMeltMethod::WALLACE};
 
-    // Primer length range
-    size_interval_type primer_length_range{8, 24};
+    // Primer length range.
+    size_interval_type primer_length_range{7, 24};
+
+    // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
+    size_type error{1};
 
     // Transcript length range.
     size_interval_type transcript_range{30, 700};

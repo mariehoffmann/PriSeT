@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map2(io_cfg, primer_cfg, locations, directoryInformation); //, sequenceNames, sequenceLengths);
+    priset::fm_map(io_cfg, primer_cfg, locations, directoryInformation); //, sequenceNames, sequenceLengths);
     priset::print_locations(locations);
 
     // filter k-mers by frequency and chemical properties

@@ -78,7 +78,7 @@ int fm_index(io_cfg_type & io_cfg)
  * fasta_length_type        container type for storing fasta entry lengths (for txt.concat)
  */
 
-int fm_map2(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation)
+int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation)
 {
     std::cout << "/Users/troja/priset/335928/work/index == ? " << io_cfg.get_index_dir() << std::endl;
     std::cout << "/Users/troja/priset/335928/work/mapping == ? " << io_cfg.get_mapping_dir() << std::endl;
@@ -88,7 +88,7 @@ int fm_map2(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & loc
     std::cout << "s2 = " << s2 << std::endl;
 
     //char const * argv[12] = {"map", "-I", io_cfg.get_index_dir().c_str(), "-O", io_cfg.get_mapping_dir().c_str(), "-K", "18", "-E", "0", "--raw", "-fl", NULL};
-    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "8", "-E", "1", "--raw", "-fl", NULL};
+    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "8", "-E", std::to_string(primer_cfg.get_error()).c_str(), "--raw", "-fl", NULL};
     /*
     argv[0] = map
     argv[1] = -I
@@ -103,128 +103,6 @@ int fm_map2(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & loc
     argv[10] = -fl
         */
     mappabilityMain(11, argv);
-    return 0;
-}
-
-template<typename TsequenceNames, typename TsequenceLengths>
-int fm_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation) //, TsequenceNames & sequenceNames, TsequenceLengths & sequenceLengths)
-{
-    // omit file I/O
-    using key_type = typename TLocations::key_type;
-    using TSeqNo = typename seqan::Value<key_type, 1>::Type;
-    //using size_interval_type = typename primer_cfg_type::size_interval_type;
-    // seqan::Alloc - for direct memory mapping use seqan::MMap<> instad of seqan::Alloc<>, relevant for benchmarking,
-    // since loading index of human genome from disk to main memory may take several minutes
-    TFMIndexConfig::SAMPLING = 10;
-    // load index
-    TIndex index;
-
-    // load index
-    if (!genmap::detail::open(index, seqan::toCString(std::string(io_cfg.get_index_base_path())), seqan::OPEN_RDONLY))
-        std::cout << "Error in loading index to index obj.\n", exit(0);
-
-    // set directory information
-    if (!seqan::open(directoryInformation, seqan::toCString(std::string(io_cfg.get_index_base_path_ids())), seqan::OPEN_RDONLY))
-        std::cout << "Error in loading index.ids to directoryInformation obj.\n", exit(0);
-    seqan::appendValue(directoryInformation, "dummy.entry;0;chromosomename"); // dummy entry enforces that the mappability is
-    uint16_t ctr = 0; // continue here: what is stored in dirInfo
-    for (auto it = begin(directoryInformation); it != end(directoryInformation); ++it, ++ctr)
-        std::cout << ctr << ": " << (*it) << std::endl;
-
-    // remains empty when excludePseudo == false (store fileIDs for counting matches once per file!)
-    std::vector<TSeqNo> mappingSeqIdFile(length(directoryInformation) - 1);
-    std::string fastaFile = std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
-    std::cout << "fastaFile = " << fastaFile << std::endl;
-
-    // set search parameters (see genmap/src/common.hpp), set in mappabilityMain
-    uint16_t K = primer_cfg.get_primer_length_range().first;
-    std::cout << "K set to " << K;
-    // TODO: when allowing errors, overlap size is different, see formular in mappability.hpp
-    //     SearchParams for binary call: searchParams{ length = 18, overlap = 6, threads = 8, revCompl = 0, excludePseudo = 0}
-    uint16_t overlap = std::ceil(0.3 * float(K));
-    uint8_t threads = 8; // TODO: set to omp_get_max_threads();
-    bool revCompl = 0;
-    bool excludePseudo = 0;
-    SearchParams searchParams = SearchParams{K, overlap, threads, revCompl, excludePseudo};
-
-    //for binary call: opt{mmap = 0, indels = 0, wigFile = 0, bedFile = 0, rawFile = 1, txtFile = 0, csvFile = 0, outputType = 1, directory = 0, verbose = 0, indexPath = /Users/troja/priset/335928/work/index/index, outputPath = /Users/troja/priset/335928/work/mapping_bin/, alphabet = dna5, seqNoWidth = 16, maxSeqLengthWidth = 32, totalLengthWidth = 32, errors = 0, sampling = 10}
-
-    bool mmap = 0;
-    bool indels = 0;
-    bool wigFile = 0; // group files into mergable flags, i.e., BED | WIG, etc.
-    bool bedFile = 0;
-    bool rawFile = 1;
-    bool txtFile = 0;
-    bool csvFile = 0;
-    OutputType outputType = OutputType::mappability;
-    bool directory = 0;
-    bool verbose = 0;
-    CharString indexPath = seqan::CharString(std::string(io_cfg.get_index_base_path()));
-    CharString outputPath = "."; // verify or set
-    CharString alphabet = "dna5";
-    uint32_t seqNoWidth = 16;
-    uint32_t maxSeqLengthWidth = 32;
-    uint32_t totalLengthWidth = 32;
-    unsigned errors = 0;
-    unsigned sampling = 10;
-
-    Options opt{mmap, indels, wigFile, bedFile, rawFile, txtFile, csvFile, outputType, directory, verbose, indexPath, outputPath, alphabet, seqNoWidth, maxSeqLengthWidth, totalLengthWidth, errors, sampling};
-    // flag for indicating that index is built on entire directory
-    //bool directoryFlag = false;
-
-    // open index file directory
-    std::cout << "io_cfg.index_dir : " << io_cfg.get_index_dir() << std::endl;
-
-
-    run1<TLocations, seqan::Dna5>(locations, opt, searchParams);
-
-
-    /*
-    for (uint64_t i = 0; i < seqan::length(directoryInformation); ++i)  // line 218
-    {
-        auto const row = retrieveDirectoryInformationLine(directoryInformation[i]);
-        std::cout << "row = " << std::get<0>(row) << ", " << std::get<1>(row) << std::endl;
-        if (std::get<0>(row) != fastaFile)
-        {
-            std::cout << std::get<0>(row) << " != fastaFile\n";
-            // fastaInfix is now 'text' in mappability.hpp!
-            auto const & fastaInfix = seqan::infixWithLength(text.concat, startPos, fastaFileLength);
-            std::cout << "fastaInfix = " << fastaInfix << ", fastaFileLength = " << fastaFileLength << std::endl;
-            double start = get_wall_time();
-            // run<TDistance, value_type, csvComputation, TSeqNo, TSeqPos>(index, fastaInfix, opt, searchParams, fastaFile, sequenceNames, sequenceLengths, directoryInformation, mappingSeqIdFile);
-            // TODO: continue here with text -> fastaInfix (see renaming in caller cascade in mappability.hpp)
-            std::vector<TValue> c(length(fastaInfix), 0); // line 143, filled by computeMappability, purpose?
-
-            // set <errors=0, csvComputation=false>()
-            //run<seqan::HammingDistance, uint16_t, true, TSeqNo, TSeqPos>(index, fastaInfix, opt, searchParams, fastaFile, chromosomeNames, chromosomeLengths, directoryInformation, mappingSeqIdFile);
-
-            //computeMappability<0, false>(index, fastaInfix, c, searchParams, directoryFlag, sequenceLengths, locations, mappingSeqIdFile);
-            std::cout << "Mappability computed in " << (round((get_wall_time() - start) * 100.0) / 100.0) << " seconds\n";
-
-            startPos += fastaFileLength;
-            fastaFile = std::get<0>(row);
-            fastaFileLength = 0;
-            for (uint32_t i = 0; i < length(sequenceNames); ++i)
-            {
-                unsigned id = positionToId(sequenceNames, i);
-                std::cout << "chromosomeName = " << valueById(sequenceNames, id);
-                id = positionToId(sequenceLengths, i);
-                std::cout << ", chromosomeLength = " << valueById(sequenceLengths, id);
-
-            }
-
-            clear(sequenceNames);
-            clear(sequenceLengths);
-        }
-        std::cout << "append len = " << std::get<1>(row) << " to fastaFileLength\n";
-        // accumulate fasta entry lengths
-        fastaFileLength += std::get<1>(row);
-        std::cout << "fastaFileLength acc = " << fastaFileLength << std::endl;
-        std::cout << "append chromosomeName = " << std::get<2>(row) << ", chromLength = " << std::get<1>(row) << std::endl;
-        appendValue(sequenceNames, std::get<2>(row));
-        appendValue(sequenceLengths, std::get<1>(row));
-    }*/
-
     return 0;
 }
 
