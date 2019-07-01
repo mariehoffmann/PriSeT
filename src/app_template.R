@@ -36,12 +36,10 @@ tax$clade_size <- group_ctrs
 tax
 
 # Load result columns taxid,fwd,rev,matches,coverage,ID_list -------------------
-results <- read.csv(result_file)
+results <- read.csv(result_file, header = TRUE, sep = ",", row.names = NULL, col.names = c("taxid","fwd","rev","matches","coverage","ID_list"))
 
 # Load and build (in results listed) primers legend ----------------------------
 primer_info <- read.csv(primer_file)
-names(primer_info) <- c("kmer_ID", "kmer_sequence", "Tm")
-head(primer_info)
 
 # set of unique IDs 2nd column are fwdIDs
 primer_fwd <- sort(unique(results$fwd))

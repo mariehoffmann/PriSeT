@@ -24,6 +24,8 @@
 #include "types.hpp"
 #include "utilities.hpp"
 
+#define DEBUG 1
+
 /*
  * usage        g++ ../PriSeT/src/priset.cpp -Wno-write-strings -std=c++17 -lstdc++fs -Wall -Wextra -o priset
  *              ./priset <lib_dir> <work_dir>
@@ -78,7 +80,7 @@ int main(int argc, char** argv)
     priset::combine(primer_cfg, kmer_locations, kmer_map, pairs);
     // test chemical constraints of pairs and filter
     //priset::post_filter_main(primer_cfg, kmer_locations, pairs);
-    priset::create_table(io_cfg, kmer_locations, pairs);
+    priset::create_table(io_cfg, kmer_locations, pairs, kmer_map);
     // create app script
     if (! priset::gui::generate_app(io_cfg) && priset::gui::compile_app(io_cfg))
         std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";

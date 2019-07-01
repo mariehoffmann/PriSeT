@@ -24,7 +24,7 @@ namespace priset
 
 // Execute in terminal and collect command return value.
 std::string exec(char const * cmd) {
-    std::cout << "Enter util.exec with cmd = " << cmd << std::endl;
+    std::cout << "Enter util.exec with cmd = " << std::string(cmd) << std::endl;
     std::array<char, 128> buffer;
     std::string result;
     std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
@@ -246,7 +246,7 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 {
     std::cout << "create_accID2taxID\n";
     std::ifstream acc_file(io_cfg.get_acc_file());
-    std::cout << "loade acc_file: " << io_cfg.get_acc_file() << std::endl;
+    std::cout << "load acc_file: " << io_cfg.get_acc_file() << std::endl;
     std::vector<std::string> tokens;
     // taxid: (ctr_match, ctr_total), ctrs for accessions
     std::string line;
@@ -264,8 +264,9 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
         {
             TAcc acc = tokens[token_idx];
             std::cout << "acc = " << acc << std::endl;
+            // TODO: observation - there are accessions (without version suffix) that do not have fasta entries in DB
             if (acc2accID.find(acc) == acc2accID.end())
-                std::cout << "ERROR: accession " << acc << " not in acc2accID dictionary!" << std::endl, exit(0);
+                continue; //std::cout << "ERROR: accession " << acc << " not in acc2accID dictionary!" << std::endl, exit(0);
             accID2taxID[acc2accID.at(acc)] = taxid;
         }
     }
@@ -380,10 +381,30 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
     table.close();
 }
 
-// write results in csv format
-// columns: taxid, fwd, rev, matches, coverage, ID_list
-// TODO: write out kmer IDs and DNA sequences
-void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs)  // TKmerMap const & kmer_map,
+
+// Result output helper for writing primer infos.
+void write_primer_info_file(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map)
+{
+    std::ofstream primer_table;
+    primer_table.open(io_cfg.get_primer_info_file());
+    primer_table << "kmer_ID,kmer_sequence,Tm\n";
+
+    for (TKmerLocation kmer_location : kmer_locations)
+    {
+        TKmerID kmer_ID = kmer_location.get_kmer_ID();
+        if (kmer_map.find(kmer_ID) == kmer_map.end())
+            std::cout << "ERROR: kmer_ID = " << kmer_ID << " not found in kmer map!\n", exit(0);
+        primer_table << kmer_ID << "," << kmer_map.at(kmer_ID).seq << "," << kmer_map.at(kmer_ID).Tm << "\n";
+    }
+    primer_table.close();
+    std::cout << "STATUS: primer_info.csv written to\t" << io_cfg.get_primer_info_file() << std::endl;
+}
+
+/*
+    Write result table with columns: taxid, fwd, rev, matches, coverage, ID_list and
+    primer info file with columns kmer_id (1-based), sequence and melting temperature.
+*/
+void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
 {
     // TODO: check if unordered_map instead of map
     // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
@@ -445,7 +466,8 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     // write result table header
     std::ofstream table;
     table.open(io_cfg.get_result_file());
-    table << "taxid, fwd, rev, matches, coverage, ID_list\n";
+    // taxid, fwd primer ID, rev primer ID, number of matches, coverage (ctr of nodes with accessions), accession list (comma separated string)
+    table << "taxid,fwd,rev,matches,coverage,accession_list\n";
     table.close();
 
     // collect single kmer matches
@@ -453,6 +475,9 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
 
     // collect kmer pair matches for bottom nodes
     accumulation_loop<TKmerPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
+
+    // write primer info file
+    write_primer_info_file(io_cfg, kmer_locations, kmer_map);
 
 }
 

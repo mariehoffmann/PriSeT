@@ -191,7 +191,7 @@ private:
     TMeltMethod melt_method{TMeltMethod::WALLACE};
 
     // Primer length range
-    size_interval_type primer_length_range{18, 24};
+    size_interval_type primer_length_range{8, 24};
 
     // Transcript length range.
     size_interval_type transcript_range{30, 700};

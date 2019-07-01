@@ -1,3 +1,3 @@
-ID,sequence,Tm
+kmer_ID,kmer_sequence,Tm
 1,AAAA,43.4
 2,ACCC,39.0

@@ -26,14 +26,8 @@ namespace priset::gui
 bool compile_app(priset::io_cfg_type & io_cfg)
 {
     std::cout << "Enter compile app\n";
-    //std::string script_file = "/Users/troja/git/PriSeT_git/PriSeT/src/tests/work/app/app.R";
-    char const * cmd = std::string("Rscript " + io_cfg.get_script_file().string() + "\0").c_str();
-//    std::cout << "script file = " <<  script_file << std::endl;
-    std::cout << "cmd = " << cmd << std::endl;
-    //exit(0);
-    //char const * cmd2 = std::string("Rscript " + io_cfg.get_script_runner().string() + "\0").c_str();
-    //execl("Rscript", &io_cfg.get_script_file().string()[0u], NULL);
-    //exit(0);
+    char const * cmd = ("Rscript " + io_cfg.get_script_file().string() + "\0").c_str();
+    std::cout << "cmd = " << std::string(cmd) << std::endl;
     pid_t pid;
 
     switch(pid = fork()) {
@@ -47,7 +41,7 @@ bool compile_app(priset::io_cfg_type & io_cfg)
             }
         default:   /* parent process */
             {
-                //sleep(2);
+                sleep(2);
                 //std::cout << "Launch script ...\n";
                 //pid_t pid2 = fork();
                 //if (!pid2) exec(cmd2);
