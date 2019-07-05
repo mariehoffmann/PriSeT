@@ -27,11 +27,10 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
     // = seqan::Pair<TSeqNo, TSeqPos>
     using TLocationKey = typename TLocations::key_type;
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
-    std::cout << "LOGGING: number of kmers before pre frequency filtering = " << length(locations) << std::endl;
+    std::cout << "LOGGING: #kmers before pre frequency filtering = " << length(locations) << std::endl;
 
     if (!length(locations))
         return;
-    std::cout << "unique k-mers:\n";
     //TSeqNo seqno;
     TSeqPos seqpos;
     // current location row
@@ -55,7 +54,7 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
         // invariant: min_occ is always ≥ 2
         for (seqan::Pair<TSeqNo, TSeqPos> pair : it->second.first)
         {
-            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
+            //std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
             row.push_back(pair);
         }
         std::cout << std::endl;
@@ -64,7 +63,7 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
         row.clear();
     }
     lookup_sequences2(kmer_locations, kmer_map, io_cfg, primer_cfg);
-    std::cout << "LOGGING: # KMERS after frequency filtering: " << kmer_locations.size() << std::endl;
+    std::cout << "LOGGING: #kmers after frequency filtering: " << kmer_locations.size() << std::endl;
 }
 
 /*
@@ -109,7 +108,7 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
 }
 
 // check cross-dimerization.
-    void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & kmer_pairs, TKmerMap & kmer_map)
+void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & kmer_pairs, TKmerMap & kmer_map)
 {
     assert(kmer_pairs.size() < (1 << 12));
     std::bitset<1 << 12> mask{};
@@ -164,6 +163,8 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     std::cout << "STATS: Number of taxids with one or more accessions:\t" << min_occ << std::endl;
     // scale to be lower frequency bound for filters
     min_occ = std::max<TSeqNo>(2, TSeqNo(float(min_occ) * primer_cfg.get_occurence_freq()));
+    // continue here
+    min_occ = 1;
     std::cout << "MESSAGE: Cut-off frequency:\t" << min_occ << std::endl;
     // template<typename primer_cfg_type, typename TSeqSize, typename TSequenceNames, typename TSequenceLengths>
     // frequency filter and sequence fetching

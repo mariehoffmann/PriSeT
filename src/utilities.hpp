@@ -99,7 +99,7 @@ void lookup_sequences2(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_
 {
     // load concatenated corpus
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
-    typedef seqan::Iterator<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>>>::Type TStringSetIterator;
+    //typedef seqan::Iterator<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>>>::Type TStringSetIterator;
 
     fs::path text_path = io_cfg.get_index_txt_path();
     std::cout << "text_path: " << text_path << std::endl;
@@ -217,7 +217,7 @@ void split(std::string const & line, std::vector<std::string> & tokens, std::str
 // create_table helper to build accession ID to accession number map
 void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, std::unordered_map<TAcc, TAccID> & acc2accID, io_cfg_type const & io_cfg)
 {
-    std::cout << "create_accID2acc_map\n";
+    //std::cout << "create_accID2acc_map\n";
     std::ifstream id_file(io_cfg.get_id_file());
     std::vector<std::string> tokens;
     std::string line;
@@ -234,10 +234,9 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
         {
             accID2acc[accID] = tokens[i];
             acc2accID[tokens[i]] = accID;
-            std::cout << "filled both dictionaries with " << accID << " <-> " << tokens[i] << std::endl;
+            //std::cout << "filled both dictionaries with " << accID << " <-> " << tokens[i] << std::endl;
         }
     }
-    //exit(0);
     std::cout << "... done\n";
 }
 
@@ -258,12 +257,12 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 
         split(line, tokens);
         TTaxid taxid = std::stoi(tokens[0]);
-        std::cout << "taxid = " << taxid << std::endl;
+        //std::cout << "taxid = " << taxid << std::endl;
         taxid_set.insert(taxid);
         for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
         {
             TAcc acc = tokens[token_idx];
-            std::cout << "acc = " << acc << std::endl;
+            //std::cout << "acc = " << acc << std::endl;
             // TODO: observation - there are accessions (without version suffix) that do not have fasta entries in DB
             if (acc2accID.find(acc) == acc2accID.end())
                 continue; //std::cout << "ERROR: accession " << acc << " not in acc2accID dictionary!" << std::endl, exit(0);
@@ -342,7 +341,6 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
             // accumulate stats for upstream until root
             TTaxid taxid_aux = taxid;
 //            auto p_it{tax_map.find(taxid_aux)};
-            std::cout << "ct6\n";
             while (tax_map.find(taxid_aux) != tax_map.end())
             {
                 // proceed with taxonomic parent
@@ -406,6 +404,7 @@ void write_primer_info_file(io_cfg_type const & io_cfg, TKmerLocations const & k
 */
 void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
 {
+    std::cout << "STATUS: will write " << kmer_locations.size() << " single primer results and " << kmer_pairs.size() << " primer pair results\n";
     // TODO: check if unordered_map instead of map
     // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
     std::unordered_map<TAccID, TAcc> accID2acc;
@@ -421,7 +420,6 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     std::unordered_map<TTaxid, TTaxid> tax_map;
     create_tax_map(tax_map, io_cfg);
 
-    std::cout << "ct1\n";
     // collect single kmer matches for bottom nodes
     std::unordered_map<TKmerID, std::vector<TSeqNo> > kmer2loc; // relates kmer IDs and location IDs
     for (auto it = kmer_locations.begin(); it != kmer_locations.end(); ++it)
@@ -432,13 +430,11 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
             seq_IDs.push_back(it->accession_ID_at(i)); // seqan::getValueI1<TSeqNo, TSeqPos>(loc));
         kmer2loc[kmer_ID] = seq_IDs;
     }
-    std::cout << "ct2\n";
     // 0-based height, correct level info iff a taxonomic node is in the predecessor lineage of another one
     std::unordered_map<TTaxid, uint16_t> leaves; //<taxid, height_from_bottom>
 
     for (auto const & taxid : taxid_set)
         leaves[taxid] = 0;
-    std::cout << "ct3\n";
     for (auto leaf_it = leaves.begin(); leaf_it != leaves.end(); ++leaf_it)
     {
         uint16_t level = leaf_it->second;
@@ -456,13 +452,11 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
         }
     }
 
-    std::cout << "ct4\n";
     // taxids sorted by level to have correct upstreams stats
     std::vector<std::pair<TTaxid, uint16_t>> leaves_srt_by_level(leaves.size());
     std::copy(leaves.begin(), leaves.end(), leaves_srt_by_level.begin());
     std::sort(leaves_srt_by_level.begin(), leaves_srt_by_level.end(), [](auto const & l1, auto const & l2){ return l1.second < l2.second; });
 
-    std::cout << "ct8\n";
     // write result table header
     std::ofstream table;
     table.open(io_cfg.get_result_file());
@@ -478,7 +472,6 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
 
     // write primer info file
     write_primer_info_file(io_cfg, kmer_locations, kmer_map);
-
 }
 
 }  // namespace priset

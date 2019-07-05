@@ -50,9 +50,10 @@ namespace priset
 /*
  * Create FM index with `genmap` binary and store in io_cfg.genmap_idx_dir
  */
-template<typename io_cfg_type>
-int fm_index(io_cfg_type & io_cfg)
+int fm_index(io_cfg_type const & io_cfg)
 {
+    if (io_cfg.get_skip_idx())
+        return;
     pid_t pid;
     if ((pid = fork()) == -1)
         std::cout << "ERROR: " << FORK_ERROR << std::endl, exit(0);
@@ -74,10 +75,7 @@ int fm_index(io_cfg_type & io_cfg)
  * primer_cfg_type          primer configurator type
  * TLocations               type for storing locations
  * TDirectoryInformation    directory information type
- * fasta_header_type        container type for storing fasta header lines
- * fasta_length_type        container type for storing fasta entry lengths (for txt.concat)
  */
-
 int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation)
 {
     std::cout << "/Users/troja/priset/335928/work/index == ? " << io_cfg.get_index_dir() << std::endl;
@@ -88,7 +86,10 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLoca
     std::cout << "s2 = " << s2 << std::endl;
 
     //char const * argv[12] = {"map", "-I", io_cfg.get_index_dir().c_str(), "-O", io_cfg.get_mapping_dir().c_str(), "-K", "18", "-E", "0", "--raw", "-fl", NULL};
-    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "8", "-E", std::to_string(primer_cfg.get_error()).c_str(), "--raw", "-fl", NULL};
+//    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "8", "-E", std::to_string(primer_cfg.get_error()).c_str(), "--raw", "-fl", NULL};
+    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "7", "-E", std::to_string(2).c_str(), "--raw", "-fl", NULL};
+
+
     /*
     argv[0] = map
     argv[1] = -I

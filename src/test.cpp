@@ -11,6 +11,7 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
+#include "argument_parser.hpp"
 #include "filter.hpp"
 #include "gui.hpp"
 #include "primer_cfg_type.hpp"
@@ -24,21 +25,30 @@ namespace fs = std::experimental::filesystem;
 struct setup
 {
     // TODO: make this runnable with arbitrarily located build folders
-    fs::path const lib_dir =  fs::canonical("../PriSeT/src/tests/library");
-    fs::path const work_dir = fs::canonical("../PriSeT/src/tests/work");
-    priset::io_cfg_type io_cfg;
-    priset::primer_cfg_type primer_cfg;
+    std::string lib_dir = (fs::canonical("../PriSeT/src/tests/library")).string();
+    std::string work_dir = (fs::canonical("../PriSeT/src/tests/work")).string();
+    priset::io_cfg_type io_cfg{};
+    priset::primer_cfg_type primer_cfg{};
     priset::TKmerLocations kmer_locations;
     priset::TKmerMap kmer_map;
 
-    setup() : io_cfg{lib_dir, work_dir}, primer_cfg{}
+    setup()
     {
-        // init primer configurator
+        // basic init
+        priset::options opt;
+        int argc = 5;
+        char * argv[5] = {"priset", "-l", &lib_dir[0], "-w", &work_dir[0]};
+        for (auto i = 0; i < argc; ++i)
+            std::cout << "arg[" << i << "] = " << argv[i] << std::endl;
+
+        opt.parse_arguments(argc, argv, io_cfg, primer_cfg);
+
+        // change primer and transcript length ranges
         // k1: [(1,2), (1,75)], i.e. kmer1 occurs in  sequence 1 at position 2 and 75
         // k2: [(1,5), (1,80)], i.e. kmer2 occurs in sequence 2 at positions 20 and 80
         // -k1[2]-k2[20]-------------k1[75]/k2[80]
-        primer_cfg.set_primer_length_range(priset::primer_cfg_type::size_interval_type{4, 8});
-        primer_cfg.set_transcript_range(priset::primer_cfg_type::size_interval_type{50,800});
+        primer_cfg.set_primer_length_range(4, 8);
+        primer_cfg.set_transcript_range(50, 800);
 
         priset::TLocation loc1_kmer1{1, 2};
         priset::TLocation loc2_kmer1{1, 75};
@@ -54,7 +64,6 @@ struct setup
         kmer_map[1] = priset::TKmer{1, "AAAA", 12.0};
         kmer_map[2] = priset::TKmer{2, "ACCC", 13.0};
     }
-
 };
 
 void gui_test()
@@ -79,7 +88,7 @@ void create_table_test()
 {
     setup s{};
     priset::TKmerPairs pairs{};
-    create_table(s.io_cfg, s.kmer_locations, pairs);
+    create_table(s.io_cfg, s.kmer_locations, pairs, s.kmer_map);
 }
 
 void lookup_sequences_test()
@@ -99,7 +108,7 @@ void lookup_sequences_test()
 int main()
 {
     //combine_test();
-    create_table_test();
-    //gui_test();
+    //create_table_test();
+    gui_test();
     //lookup_sequences_test();
 }
