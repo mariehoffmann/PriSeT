@@ -53,7 +53,7 @@ namespace priset
 int fm_index(io_cfg_type const & io_cfg)
 {
     if (io_cfg.get_skip_idx())
-        return;
+        return 0;
     pid_t pid;
     if ((pid = fork()) == -1)
         std::cout << "ERROR: " << FORK_ERROR << std::endl, exit(0);
@@ -76,7 +76,7 @@ int fm_index(io_cfg_type const & io_cfg)
  * TLocations               type for storing locations
  * TDirectoryInformation    directory information type
  */
-int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations & locations, TDirectoryInformation & directoryInformation)
+int fm_map(io_cfg_type const & io_cfg, TLocations & locations)
 {
     std::cout << "/Users/troja/priset/335928/work/index == ? " << io_cfg.get_index_dir() << std::endl;
     std::cout << "/Users/troja/priset/335928/work/mapping == ? " << io_cfg.get_mapping_dir() << std::endl;
@@ -103,7 +103,7 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLoca
     argv[9] = --raw
     argv[10] = -fl
         */
-    mappabilityMain(11, argv);
+    mappabilityMain<TLocations>(11, argv, locations);
     return 0;
 }
 

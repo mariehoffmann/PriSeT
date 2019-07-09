@@ -144,7 +144,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
 }*/
 
 // filter k-mers by frequency and chemical properties
-template<typename TSequenceNames, typename TSequenceLengths>
+//template<typename TSequenceNames, typename TSequenceLengths>
 void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TDirectoryInformation const & directoryInformation) //, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;

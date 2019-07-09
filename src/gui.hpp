@@ -11,6 +11,7 @@
 
 #include "io_cfg_type.hpp"
 #include "types.hpp"
+#include "utilities.hpp"
 
 #define IS_DARWIN 0
 
@@ -26,8 +27,11 @@ namespace priset::gui
 bool compile_app(priset::io_cfg_type & io_cfg)
 {
     std::cout << "Enter compile app\n";
-    char const * cmd = ("Rscript " + io_cfg.get_script_file().string() + "\0").c_str();
+    std::string cmd_str = "Rscript " + io_cfg.get_script_file().string() + "\0";
+    std::cout << "cmd_str = " << cmd_str << std::endl;
+    char const * cmd = cmd_str.c_str();
     std::cout << "cmd = " << std::string(cmd) << std::endl;
+    //exit(0);
     pid_t pid;
 
     switch(pid = fork()) {

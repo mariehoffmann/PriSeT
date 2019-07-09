@@ -46,12 +46,8 @@ private:
     bool flag_lib{0}, flag_work{0}, flag_skip_idx{0};
     // Flags for initializing primer configurator.
     bool flag_E{0}, flag_K{0};
-
-public:
-
-    //constexpr options() = default;
-
-    void parse_arguments(int argc, char * argv[], io_cfg_type & io_cfg, primer_cfg_type & primer_cfg)
+    //
+    void parse_arguments(int argc, char * argv[], primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
     {
         int opt;
 
@@ -92,5 +88,14 @@ public:
         flag_K ? primer_cfg.set_primer_length_range(K) : (void) (NULL);
         flag_E ? primer_cfg.set_error(E) : (void) (NULL);
     }
+
+public:
+
+    options() = default;
+    options(int argc, char * argv[], primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
+    {
+        parse_arguments(argc, argv, primer_cfg, io_cfg);
+    }
+
 };
 }  // namespace priset

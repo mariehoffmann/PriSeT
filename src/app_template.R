@@ -47,7 +47,6 @@ names(primer_fwd) <- sprintf("primer %d", primer_fwd)
 
 primer_rev <- sort(unique(results$rev))
 stopifnot(primer_rev[0] != 0)
-length(primer_rev[-1])
 names(primer_rev) <- c("NA", sprintf("primer %d", primer_rev[-1]))
 
 # Update data subset selection on GUI change -----------------------------------
@@ -57,11 +56,12 @@ update <- function(root_, coverage_, fwd_, rev_)
     print("tax: ")
     print(tax)
     # TODO: make (or not coverage reactive)
-    # direct descendants of root
+    # direct descendants of root L1
     desc <- tax$taxid[tax$p_taxid == root_]
     print("input root: ")
     print(root_)
     print(desc)
+    # L2
     clade <- subset(tax, tax$p_taxid %in% desc, select=c(p_taxid, taxid))
     # add clade sizes of p_taxid
     clade_size_p <- tax$clade_size[tax$taxid == clade$p_taxid]

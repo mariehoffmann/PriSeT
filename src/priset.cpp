@@ -14,6 +14,7 @@
 
 #include <seqan/basic.h>
 
+#include "argument_parser.hpp"
 #include "errors.hpp"
 #include "filter.hpp"
 #include "fm.hpp"
@@ -44,8 +45,7 @@ int main(int argc, char** argv)
     priset::primer_cfg_type primer_cfg{};
 
     // parse options and init io and primer configurators
-    options opt(arggc, argv, primer_cfg, io_cfg);
-    opt.parse_arguments();
+    priset::options opt(argc, argv, primer_cfg, io_cfg);
 
     // build taxonomy in RAM
     priset::taxonomy tax{io_cfg.get_tax_file()};
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
     priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map(io_cfg, primer_cfg, locations, directoryInformation); //, sequenceNames, sequenceLengths);
+    priset::fm_map(io_cfg, locations); //, sequenceNames, sequenceLengths);
     priset::print_locations(locations);
 
     // filter k-mers by frequency and chemical properties

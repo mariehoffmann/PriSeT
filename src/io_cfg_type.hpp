@@ -46,6 +46,8 @@ public:
     void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const skip_idx_)
     {
         lib_dir = fs::canonical(lib_dir_);
+        if (!fs::exists(work_dir_))
+            fs::create_directory(work_dir_);
         work_dir = fs::canonical(work_dir_);
         skip_idx = skip_idx_;
         index_dir = work_dir;
