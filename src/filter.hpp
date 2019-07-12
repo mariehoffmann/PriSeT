@@ -22,12 +22,12 @@ namespace priset
 // 2. fetch sequence and check chemical constraints that need to hold for a single primer
 // frequency_filter<primer_cfg_type, TSeqNo, TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, min_occ, directoryInformation, sequenceNames, sequenceLengths);
 template<typename TSequenceNames, typename TSequenceLengths>
-void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo  const min_occ) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
+void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo  const delta) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     // = seqan::Pair<TSeqNo, TSeqPos>
     using TLocationKey = typename TLocations::key_type;
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
-    std::cout << "LOGGING: #kmers before pre frequency filtering = " << length(locations) << std::endl;
+    std::cout << "LOGGING: |kmers| before pre frequency filtering = " << length(locations) << std::endl;
 
     if (!length(locations))
         return;
@@ -46,24 +46,22 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
     {
         seqpos = seqan::getValueI2<TSeqNo, TSeqPos>(it->first);
         // not enough k-mer occurences => continue
-        if ((it->second).first.size() < min_occ)
+        if ((it->second).first.size() < delta)
             continue;
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         if (it->second.first.size() && seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqpos)
             continue;
-        // invariant: min_occ is always ≥ 2
+        // invariant: delta is always ≥ 2
         for (seqan::Pair<TSeqNo, TSeqPos> pair : it->second.first)
         {
             //std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
             row.push_back(pair);
         }
-        std::cout << std::endl;
         // store locations,ID updated later
         kmer_locations.push_back(TKmerLocation{ID++, row}); //std::make_pair(ID++, row));
         row.clear();
     }
     lookup_sequences2(kmer_locations, kmer_map, io_cfg, primer_cfg);
-    std::cout << "LOGGING: #kmers after frequency filtering: " << kmer_locations.size() << std::endl;
 }
 
 /*
@@ -72,8 +70,8 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
  */
 void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerMap & kmer_map)
 {
-    assert(kmer_locations.size() < (1 << 18));
-    auto mask = std::bitset<1 << 18>{};
+    assert(kmer_locations.size() < (1 << 24));
+    auto mask = std::bitset<1 << 24>{};
     //std::bitset<1 << 18> aux_filter{};
     // Filter by melting temperature
     float Tm_min = primer_cfg.get_min_Tm();
@@ -104,14 +102,13 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
             kmer_locations.erase(kmer_locations.begin() + i); // erase associated locations
         }
     }
-    std::cout << "LOGGING: # KMERS after chemical_filter_single: " << kmer_locations.size() << std::endl;
 }
 
 // check cross-dimerization.
 void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & kmer_pairs, TKmerMap & kmer_map)
 {
-    assert(kmer_pairs.size() < (1 << 12));
-    std::bitset<1 << 12> mask{};
+    assert(kmer_pairs.size() < (1 << 24));
+    std::bitset<1 << 24> mask{};
     uint16_t i = 0;
     for (auto kmer_pair : kmer_pairs)
     {
@@ -134,7 +131,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
     // delete kmers from map that remained unpaired
     for (auto ID : unpaired)
         kmer_map.erase(ID);
-    std::cout << "LOGGING: # KMER PAIRS after chemical filtering: " << kmer_pairs.size() << std::endl;
+    std::cout << "LOGGING: |kmer pairs| after chemical filtering: " << kmer_pairs.size() << std::endl;
 }
 
 // post-filter candidates fulfilling chemical constraints by their relative frequency
@@ -145,32 +142,16 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
 
 // filter k-mers by frequency and chemical properties
 //template<typename TSequenceNames, typename TSequenceLengths>
-void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TDirectoryInformation const & directoryInformation) //, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
+void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
-    // get number of taxids with at least one accession assigned to it
-    std::string acc_file_name = io_cfg.get_acc_file();
-    std::string line;
-    TSeqNo min_occ = 0;
-    std::ifstream in;
-    in.open(acc_file_name);
-    while(!in.eof()) {
-	       getline(in, line);
-	       ++min_occ;
-    }
-    in.close();
-    min_occ = (min_occ) ? min_occ - 1 : 0;
-    std::cout << "STATS: Number of taxids with one or more accessions:\t" << min_occ << std::endl;
+
     // scale to be lower frequency bound for filters
-    min_occ = std::max<TSeqNo>(2, TSeqNo(float(min_occ) * primer_cfg.get_occurence_freq()));
+    TSeqNo delta = std::max<TSeqNo>(2, TSeqNo(float(io_cfg.get_library_size()) * primer_cfg.get_occurence_freq()));
     // continue here
-    min_occ = 1;
-    std::cout << "MESSAGE: Cut-off frequency:\t" << min_occ << std::endl;
-    // template<typename primer_cfg_type, typename TSeqSize, typename TSequenceNames, typename TSequenceLengths>
+    std::cout << "INFO: Cut-off frequency = " << delta << std::endl;
     // frequency filter and sequence fetching
-    frequency_filter<TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, min_occ); //, directoryInformation, sequenceNames, sequenceLengths);
-    print_kmer_locations(kmer_locations, kmer_map);
-    chemical_filter_single(primer_cfg, kmer_locations, kmer_map);
+    frequency_filter<TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, delta); chemical_filter_single(primer_cfg, kmer_locations, kmer_map);
 //    chemical_filter_pairs();
     //post_frequency_filter(kmer_locations, primer_cfg.get_occurence_freq());
 
@@ -179,7 +160,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
 // combine helper, forward window until both iterators point to same reference ID or end
 void fast_forward(TKmerLocation::TLocationVec const & locations1, TKmerLocations::value_type::const_iterator & it1_loc_start, TKmerLocation::TLocationVec const & locations2, TKmerLocations::value_type::const_iterator & it2_loc_start)
 {
-    std::cout << "enter fast_forward ..." << std::endl;
+    //std::cout << "enter fast_forward ..." << std::endl;
     while (it1_loc_start != locations1.end() && it2_loc_start != locations2.end() &&
             seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_start))
     {
@@ -189,7 +170,7 @@ void fast_forward(TKmerLocation::TLocationVec const & locations1, TKmerLocations
         while (it2_loc_start != locations2.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_start))
             ++it2_loc_start;
     }
-    std::cout << "... leaving ff" << std::endl;
+    //std::cout << "... leaving ff" << std::endl;
 }
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
@@ -207,14 +188,12 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
     {
         for (auto it2 = it1+1; it2 != kmer_locations.end(); ++it2)
         {
-            std::cout << "i1\n";
             // iterator to start position of current location for k-mer 1
             it1_loc_start = (*it1).locations.begin();
             // iterator to start position of current location for k-mer 2
             it2_loc_start = (*it2).locations.begin();
             // forward iterators to correspond to refer to same sequence ID or end
             fast_forward((*it1).locations, it1_loc_start, (*it2).locations, it2_loc_start);
-            std::cout << "i2\n";
             // no common reference sequences => forward kmer iterators
             if (it1_loc_start == (*it1).locations.end() || it2_loc_start == (*it2).locations.end())
                 continue;
@@ -230,7 +209,6 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
             {
 //                assert((seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_aux) == seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_aux)));
                 // valid combination?
-                std::cout << "h4\n";
                 auto pos_kmer1 = seqan::getValueI2<TSeqNo, TSeqPos>(*it1_loc_aux);
                 if (it2_loc_aux != (*it2).locations.end())
                 {
@@ -242,29 +220,25 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
                         TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).get_kmer_ID() : (*it2).get_kmer_ID();
                         TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).get_kmer_ID() : (*it1).get_kmer_ID();
                         auto pair_location = std::make_tuple(seq_ID, std::min<TSeqPos>(pos_kmer1, pos_kmer2), std::max<TSeqPos>(pos_kmer1, pos_kmer2));
-                        std::cout << "(kmer_fwd_new, kmer_rev_new) = (" << kmer_fwd_new << ", " << kmer_rev_new << ") at [(refID = " << std::get<0>(pair_location) << " at positions: " << std::get<1>(pair_location) << ", " << std::get<2>(pair_location) << ")]\n";
+            //            std::cout << "(kmer_fwd_new, kmer_rev_new) = (" << kmer_fwd_new << ", " << kmer_rev_new << ") at [(refID = " << std::get<0>(pair_location) << " at positions: " << std::get<1>(pair_location) << ", " << std::get<2>(pair_location) << ")]\n";
                         // extend location vector if pair combinations already in result
                         if (kmer_pairs.size() && kmer_pairs.back().get_kmer_ID1() == kmer_fwd_new && kmer_pairs.back().get_kmer_ID2() == kmer_rev_new)
                         {
-                            std::cout << "j1\n";
                             kmer_pairs[kmer_pairs.size()-1].pair_locations.push_back(pair_location);
                         }
                         else
                         {
-                            std::cout << "j1\n";
                             //TKmerPair::TKmerPairLocations first_pair{pair_location};
                             TKmerPair pair{kmer_fwd_new, kmer_rev_new, abs(kmer_map.at(kmer_fwd_new).Tm - kmer_map.at(kmer_rev_new).Tm), pair_location};
                             kmer_pairs.push_back(pair);
                         }
-                        std::cout << "h1\n";
                     }
                     ++it2_loc_aux;
                 }
-                std::cout << "h2\n";
                 // all combinations tested for second k-mer
                 if (it2_loc_aux == (*it2).locations.end())
                 {
-                    std::cout << "LOGGING: forward it1 and reset it2\n";
+                    //std::cout << "LOGGING: forward it1 and reset it2\n";
                     // reset to start of current sequence if next k-mer of it1 refers to same sequence, else forward it2
                     if (++it1_loc_aux == (*it1).locations.end())
                         break;
@@ -278,11 +252,9 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
                         it2_loc_aux = it2_loc_start;
                     }
                 }
-                std::cout << "h3\n";
             }
         }
     }
-    std::cout << "LOGGING: # KMER PAIRS combined from " << kmer_locations.size() << " kmers: " << kmer_pairs.size() << std::endl;
 }
 
 /*void post_filter_main(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerPairs & pairs)

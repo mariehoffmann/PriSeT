@@ -182,7 +182,7 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
 inline bool filter_self_dimerization(seqan::String<priset::dna> const & sequence)
 {
     float dG = gibbs_free_energy(sequence, sequence);
-    std::cout << "minimal free energy for self-dimerization of s = " << sequence << " is " << dG << std::endl;
+    //std::cout << "minimal free energy for self-dimerization of s = " << sequence << " is " << dG << std::endl;
     return (dG < -10) ? false : true;
 }
 
@@ -192,7 +192,7 @@ inline bool filter_self_dimerization(seqan::String<priset::dna> const & sequence
 inline bool filter_cross_dimerization(TKmer const & kmer1, TKmer const & kmer2)
 {
     float dG = gibbs_free_energy(kmer1.seq, kmer2.seq);
-    std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
+    //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
     return (dG < -10) ? false : true;
 }
 

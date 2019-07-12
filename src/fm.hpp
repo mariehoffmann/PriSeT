@@ -52,11 +52,17 @@ namespace priset
  */
 int fm_index(io_cfg_type const & io_cfg)
 {
+
+    std::cout << "io_cfg.get_skip_idx() = " << io_cfg.get_skip_idx() << std::endl;
     if (io_cfg.get_skip_idx())
+    {
+        std::cout << "MESSAGE: skip index recomputation" << std::endl;
         return 0;
+    }
+    std::cout << "MESSAGE: start index recomputation" << std::endl;
     pid_t pid;
     if ((pid = fork()) == -1)
-        std::cout << "ERROR: " << FORK_ERROR << std::endl, exit(0);
+        return FORK_ERROR;
     if (pid == 0) {
         execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u],
             "-I", &io_cfg.get_index_dir().string()[0u], NULL);
@@ -76,33 +82,15 @@ int fm_index(io_cfg_type const & io_cfg)
  * TLocations               type for storing locations
  * TDirectoryInformation    directory information type
  */
-int fm_map(io_cfg_type const & io_cfg, TLocations & locations)
+int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations & locations)
 {
-    std::cout << "/Users/troja/priset/335928/work/index == ? " << io_cfg.get_index_dir() << std::endl;
-    std::cout << "/Users/troja/priset/335928/work/mapping == ? " << io_cfg.get_mapping_dir() << std::endl;
+    std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
+    std::cout << "INFO: K = " << primer_cfg.get_primer_length_range().first << std::endl;
     std::string s1 = io_cfg.get_index_dir().string();
     std::string s2 = io_cfg.get_mapping_dir().string();
-    std::cout << "s1 = " << s1 << std::endl;
-    std::cout << "s2 = " << s2 << std::endl;
+    // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
+    char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", std::to_string(primer_cfg.get_primer_length_range().first).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csv", "-fl"};
 
-    //char const * argv[12] = {"map", "-I", io_cfg.get_index_dir().c_str(), "-O", io_cfg.get_mapping_dir().c_str(), "-K", "18", "-E", "0", "--raw", "-fl", NULL};
-//    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "8", "-E", std::to_string(primer_cfg.get_error()).c_str(), "--raw", "-fl", NULL};
-    char const * argv[12] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", "7", "-E", std::to_string(2).c_str(), "--raw", "-fl", NULL};
-
-
-    /*
-    argv[0] = map
-    argv[1] = -I
-    argv[2] = /Users/troja/priset/335928/work/index
-    argv[3] = -O
-    argv[4] = /Users/troja/priset/335928/work/mapping
-    argv[5] = -K
-    argv[6] = 18
-    argv[7] = -E
-    argv[8] = 0
-    argv[9] = --raw
-    argv[10] = -fl
-        */
     mappabilityMain<TLocations>(11, argv, locations);
     return 0;
 }

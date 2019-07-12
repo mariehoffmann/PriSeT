@@ -42,7 +42,7 @@ void print_locations(TLocations & locations)
     using TSeqNo = typename seqan::Value<key_type, 1>::Type;
     using TSeqPos = typename seqan::Value<key_type, 2>::Type;
     //using value1_type = typename seqan::Value<typename TLocations::value_type, 1>::Type;
-    std::cout << "(SeqNo, SeqPos): [(SeqNo, SeqPos)], [(SeqNo, SeqPos)]\n";
+    std::cout << "Locations (SeqNo, SeqPos): [(SeqNo, SeqPos)], [(SeqNo, SeqPos)]:\n";
     for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(it->first) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(it->first) << "): [";
@@ -115,7 +115,7 @@ void lookup_sequences2(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_
         seqan::DnaString seq = seqan::valueById(text, kmer_ID);
         auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, kmer_length);
 
-        std::cout << kmer_str << std::endl;
+        //std::cout << kmer_str << std::endl;
         kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), kmer_str, get_Tm(primer_cfg, kmer_str)};
 
     }
@@ -141,7 +141,7 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
     TSeqNo next_accession = kmer_it->accession_ID_at(0); //seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]);
     while (kmer_it != kmer_locations.end())
     {
-        std::cout << "while loop start ...\n";
+        //std::cout << "while loop start ...\n";
         auto row = retrieveDirectoryInformationLine(directoryInformation[accession_ctr]);
         // forward id counter and accumulate text offset
         while (accession_ctr != next_accession && accession_ctr < length(directoryInformation))
@@ -155,33 +155,31 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
         assert(accession_ctr == next_accession);
 
         auto chromosomeNames = std::get<2>(row);
-        std::cout << "accession_ctr = " << accession_ctr << ", corresponding to " << chromosomeNames << std::endl;
-        std::cout << "next kmer id = " << next_accession << std::endl;
+        //std::cout << "accession_ctr = " << accession_ctr << ", corresponding to " << chromosomeNames << std::endl;
+        //std::cout << "next kmer id = " << next_accession << std::endl;
         // sequence internal offset
         //offset = seqan::getValueI2<TSeqNo, TSeqPos>(kmer_it->second[0]);
         offset = kmer_it->kmer_pos_at(0);
-        std::cout << "Access text.concat at " << startPos + offset << " to " << (startPos + offset + kmer_length) << ", text.concat.length = " << length(text.concat) << std::endl;
+        //std::cout << "Access text.concat at " << startPos + offset << " to " << (startPos + offset + kmer_length) << ", text.concat.length = " << length(text.concat) << std::endl;
         auto const & kmer_str = seqan::infixWithLength(text.concat, startPos + offset, kmer_length);
-        std::cout << "loc = (" << kmer_it->accession_ID_at(0) << ", " << offset << ") has kmer sequence = " << kmer_str << std::endl;
+        //std::cout << "loc = (" << kmer_it->accession_ID_at(0) << ", " << offset << ") has kmer sequence = " << kmer_str << std::endl;
         // copy kmer into first position of locations vector
         seqan::String<priset::dna> str;
-        std::cout << "append kmer sequence to str" << std::endl;
+        //std::cout << "append kmer sequence to str" << std::endl;
         seqan::append(str, kmer_str);
-        std::cout << "assign to 1st position of kmer_locs: " << std::endl;
+        //std::cout << "assign to 1st position of kmer_locs: " << std::endl;
         // insert into kmer map
 //        kmer_map[(*kmer_it).first] = TKmer{(*kmer_it).first, str, get_Tm(primer_cfg, str)};
         kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), str, get_Tm(primer_cfg, str)};
 
         // forward next kmer iterator and abort if no more kmers to resolve
-        std::cout << "increment kmer iterator: " << std::endl;
         ++kmer_it;
-        std::cout << "query for end: " << std::endl;
         if (kmer_it == kmer_locations.end())
         {
             std::cout << "kmer_locations end reached\n";
             break;
         }
-        std::cout << "get next kmer id: " << std::endl;
+        //std::cout << "get next kmer id: " << std::endl;
         assert(kmer_it->container_size() > 0);
         next_accession = kmer_it->accession_ID_at(0); //seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]);
     }
@@ -366,13 +364,13 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 
     // flush leave node results
     for (TResult result : results){
-        std::cout << result.to_string() << std::endl;
+        //std::cout << result.to_string() << std::endl;
         table << result.to_string();
     }
     // flush inner node results
     for (auto const & [key, value] : upstream_map)
     {
-        std::cout << key << "," << value.first << "," << value.second << "\n";
+        //std::cout << key << "," << value.first << "," << value.second << "\n";
         table << key << "," << value.first << "," << value.second << "\n";
     }
 

@@ -1,5 +1,6 @@
 # Log files
 wget-log*
+.ipynb_checkpoints
 
 # cmake
 Makefile

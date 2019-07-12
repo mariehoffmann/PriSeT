@@ -52,8 +52,12 @@ int main(int argc, char** argv)
     //tax.print_taxonomy();
 
     // create FM index if SKIP_IDX not in argument list
-    priset::fm_index(io_cfg);
-
+    int ret_code;
+    if ((ret_code = priset::fm_index(io_cfg)))
+    {
+        std::cout << "ERROR: " << ret_code << std::endl;
+        exit(-1);
+    }
     // dictionary for storing FM mapping results
     priset::TLocations locations;
 
@@ -67,8 +71,9 @@ int main(int argc, char** argv)
     priset::TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
-    priset::fm_map(io_cfg, locations); //, sequenceNames, sequenceLengths);
-    priset::print_locations(locations);
+    priset::fm_map(io_cfg, primer_cfg, locations);
+    // Do not modify or delete STATS lines, since they are captured for statistical analysis
+    std::cout << "INFO: kmers init = " << locations.size() << std::endl;
 
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches
@@ -76,12 +81,16 @@ int main(int argc, char** argv)
     priset::TKmerLocations kmer_locations;
     // dictionary to resolve kmer IDs and their sequences
     priset::TKmerMap kmer_map;
-    priset::pre_filter_main(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, directoryInformation); //, sequenceNames, sequenceLengths);
+    priset::pre_filter_main(io_cfg, primer_cfg, locations, kmer_locations, kmer_map);
+    std::cout << "INFO: kmers filtered = " << kmer_locations.size() << std::endl;
     // TODO: delete locations
     priset::TKmerPairs pairs;
     priset::combine(primer_cfg, kmer_locations, kmer_map, pairs);
+    std::cout << "INFO: pairs combined = " << pairs.size() << std::endl;
+
     // test chemical constraints of pairs and filter
     //priset::post_filter_main(primer_cfg, kmer_locations, pairs);
+    std::cout << "INFO: pairs filtered = " << pairs.size() << std::endl;
     priset::create_table(io_cfg, kmer_locations, pairs, kmer_map);
     // create app script
     if (! priset::gui::generate_app(io_cfg) && priset::gui::compile_app(io_cfg))

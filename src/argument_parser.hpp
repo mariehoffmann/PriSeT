@@ -43,7 +43,7 @@ private:
     primer_cfg_type::size_type E{0};
 
     // Flags for initializing io configurator.
-    bool flag_lib{0}, flag_work{0}, flag_skip_idx{0};
+    bool flag_lib{0}, flag_work{0};
     // Flags for initializing primer configurator.
     bool flag_E{0}, flag_K{0};
     //
@@ -66,7 +66,7 @@ private:
                     work_dir.assign(std::string(optarg));
                     break;
                 case 's':
-                    flag_skip_idx = 1;
+                    skip_idx = 1;
                     break;
                 case 'E':
                     flag_E = 1;

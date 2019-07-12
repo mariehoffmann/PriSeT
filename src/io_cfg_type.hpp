@@ -46,8 +46,14 @@ public:
     void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const skip_idx_)
     {
         lib_dir = fs::canonical(lib_dir_);
+        std::cout << "fs::exists(work_dir_) = " << fs::exists(work_dir_) << ", fs::exists(work_dir_.parent_path() = " << fs::exists(work_dir_.parent_path()) << std::endl;
         if (!fs::exists(work_dir_))
+        {
+            if (!fs::exists(work_dir_.parent_path()))
+                fs::create_directory(work_dir_.parent_path());
             fs::create_directory(work_dir_);
+        }
+
         work_dir = fs::canonical(work_dir_);
         skip_idx = skip_idx_;
         index_dir = work_dir;
@@ -68,7 +74,16 @@ public:
             else if (p.path().extension().compare(ext_tax) == 0)
                 tax_file = p;
             else if (p.path().extension().compare(ext_id) == 0)
+            {
                 id_file = p;
+                // set library size
+                FILE * infile = fopen(id_file.string().c_str(), "r");
+                int c;
+                while (EOF != (c = getc(infile)))
+                    if (c == '\n')
+                        ++library_size;
+                std::cout << "INFO: library size = " << library_size << std::endl;
+            }
         }
         if (!acc_file.has_filename())
             std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
@@ -94,7 +109,7 @@ public:
 
         // set output directory for FM index, will be created by genmap
         index_dir /= fs::path("/index");
-        if (!skip_idx && fs::exists(index_dir))
+        if (skip_idx && fs::exists(index_dir))
         {
             char cmd[50];
             sprintf(cmd, "rm -r %s", index_dir.c_str());
@@ -147,6 +162,11 @@ public:
     fs::path get_id_file() const noexcept
     {
         return id_file;
+    }
+
+    uint64_t get_library_size() const noexcept
+    {
+        return library_size;
     }
 
     // Return template file for shiny app.
@@ -259,6 +279,8 @@ private:
     std::string ext_acc = ".acc";
     std::string ext_tax = ".tax";
     std::string ext_id = ".id";
+    // Library size in terms of number of accessions (= fasta entries)
+    uint64_t library_size{0};
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
     // R script for launching shiny app.
