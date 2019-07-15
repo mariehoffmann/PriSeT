@@ -106,7 +106,7 @@ bool filter_CG(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> co
     return (CG >= primer_cfg.get_min_CG_content() && CG <= primer_cfg.get_max_CG_content());
 }
 
-//!\brief Check if not more than 3 out of the 5 last bases at the 3' end are CG.
+//  Check if not more than 3 out of the 5 last bases at the 3' end are CG.
 //  DNA sense/'+': 5' to 3', antisense/'-': 3' to 5'
 // Returns false if constraint is violated.
 inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::String<priset::dna> const & sequence, char const sense)
@@ -134,6 +134,50 @@ inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::Strin
         // check its melting temperature
     return true;
 }*/
+
+/*
+ * Filter di-nucleotide repeats, like ATATATAT, and runs, i.e. series of same nucleotides.
+ * For both the maximum is 4 consecutive di-nucleotides, and 4bp, respectively.
+ */
+bool filter_repeats_runs(TSeq & seq)
+{
+    if (seqan::length(seq) > 4)
+    {
+        uint8_t repeat_even = 1;
+        uint8_t repeat_odd = 1;
+        //uint8_t & repeat;
+        TSeq ifx_even = seqan::infixWithLength(seq, 0, 2); // even start positions
+        TSeq ifx_odd = seqan::infixWithLength(seq, 1, 2); // odd start positions
+        //TSeq & ifx;
+        TSeq aux;
+        for (uint8_t i = 3; i < seqan::length(seq); ++i)
+        {
+            aux = seqan::infixWithLength(seq, i - 1, 2);
+            TSeq & ifx = (i % 2) ? ifx_even : ifx_odd;
+            uint8_t & repeat = (i % 2) ? repeat_even : repeat_odd;
+            if (aux[0] == ifx[0] && aux[1] == ifx[1])
+            {
+                ++repeat;
+                if (repeat >= 4)
+                    return false;
+            }
+            else
+            {
+                repeat = 1;
+                ifx = aux;
+            }
+        }
+
+        seqan::Finder<TSeq> finder(seq);
+        for (char c : std::vector<char>{'A', 'C', 'G', 'T'})
+        {
+            seqan::Pattern<TSeq, Horspool> pattern(std::string(5, c));
+            if (seqan::find(finder, pattern))
+                return false;
+        }
+    }
+    return true;
+}
 
 /* Helper function for computing the convolution of two sequences. For each overlap
  *position the Gibb's free energy is computed and the minimum returned;
@@ -179,21 +223,19 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_self_dimerization(seqan::String<priset::dna> const & sequence)
+inline bool filter_cross_dimerization(TSeq const & seq1, TSeq const & seq2)
 {
-    float dG = gibbs_free_energy(sequence, sequence);
-    //std::cout << "minimal free energy for self-dimerization of s = " << sequence << " is " << dG << std::endl;
+    float dG = gibbs_free_energy(seq1, seq2);
+    //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
     return (dG < -10) ? false : true;
 }
 
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_cross_dimerization(TKmer const & kmer1, TKmer const & kmer2)
+inline bool filter_self_dimerization(TSeq const & seq)
 {
-    float dG = gibbs_free_energy(kmer1.seq, kmer2.seq);
-    //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
-    return (dG < -10) ? false : true;
+    return filter_cross_dimerization(seq, seq);
 }
 
 /*
