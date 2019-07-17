@@ -33,6 +33,9 @@ private:
     // Parsed working directory.
     std::string work_dir;
 
+    // Compute index only, do not compute mappability.
+    bool idx_only{0};
+
     // Parsed flag indicating if index re-computation shall be omitted.
     bool skip_idx{0};
 
@@ -51,8 +54,8 @@ private:
     {
         int opt;
 
-        // l (lib_dir), w (work_dir), s (skip_idx), E (error), K (kmer length), colon indicates argument
-        while ((opt = getopt(argc, argv, "l:w:sE:K:")) != -1)
+        // l (lib_dir), w (work_dir), i (index only), s (skip_idx), E (error), K (kmer length), colon indicates argument
+        while ((opt = getopt(argc, argv, "l:w:isE:K:")) != -1)
         {
             std::cout << "opt = " << opt << std::endl;
             switch (opt)
@@ -65,6 +68,9 @@ private:
                     flag_work = 1;
                     work_dir.assign(std::string(optarg));
                     break;
+                case 'i':
+                    idx_only = 1;
+                    break
                 case 's':
                     skip_idx = 1;
                     break;
