@@ -115,7 +115,8 @@ public:
             std::cerr << "ERROR: Index computation flag is set to 0, but index_dir (" << index_dir << ") does not exists!" << std::endl;
             exit(-1);
         }
-        if (!skip_idx_flag)
+        
+        if (!skip_idx_flag && fs::exists(index_dir))
         {
             char cmd[50];
             sprintf(cmd, "rm -r %s", index_dir.c_str());

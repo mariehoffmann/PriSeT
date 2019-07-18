@@ -57,8 +57,7 @@ int fm_index(io_cfg_type const & io_cfg)
     if ((pid = fork()) == -1)
         return FORK_ERROR;
     if (pid == 0) {
-        execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u], "-I", &io_cfg.get_index_dir().string()[0u],
-        "-A skew", NULL);
+        execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u], "-I", &io_cfg.get_index_dir().string()[0u], NULL);
         std::cout << "ERROR: " << EXECV_ERROR << std::endl, exit(0);
     }
     else

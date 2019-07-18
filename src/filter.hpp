@@ -77,6 +77,7 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
     TKmer kmer;
     for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
     {
+        // TODO: optimize - drop kmer when computing Tm in sequence lookup fct
         kmer = kmer_map.at(kmer_locations[i].get_kmer_ID1());
         // filter by melting temperature
         if (kmer.Tm >= Tm_min && kmer.Tm <= Tm_max)

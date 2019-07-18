@@ -21,6 +21,32 @@ On MacOS
 sudo port install postgresql11 postgresql11-server
 ```
 
+### R
+If not installed on your system yet, install `R` via your standard package manager. However, for MacOS I recommend not to install via `port`, but download the binaries from [CRAN](https://cran.r-project.org/bin/macosx), because I ran into installation errors when when trying to install `igraph` and others in an interactive `R` session. If you install the package from `cran.r-project.org`, open the `R.app`, go to the package installer (under `Packages & Data`), search for the below listed packages and click the install button.
+If you use R in terminal, start an inter session, install the required `R` packages `shiny` and `DT` for table output, and `treemap` and `d3treeR` for an interactive tree map plot.
+```shell
+$ R
+> install.packages("shiny")
+> install.packages("DT")
+> install.packages("igraph")
+> install.packages("treemap")
+```
+To make the treemap interactive you need `d3treeR` hosted on github. To download it in an interactive session, follow these steps:
+```R
+> install.packages("devtools")
+> library(devtools)
+> install_github("d3treeR/d3treeR")
+```
+
+```shell
+wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.15.tar.gz
+tar -zxvf libiconv-1.15.tar.gz
+cd libiconv-1.15
+./configure --prefix=/usr/local
+make
+make install
+```
+
 ### Taxonomic Tree and Library
 In order to explore the potential primer sequences hierarchically w.r.t. an existing taxonomy, the taxonomic node identifier (taxid) needs to be related to reference sequences.
 You can use the tool [tactac](https://github.com/mariehoffmann/tactac) to create
@@ -52,14 +78,15 @@ git clone --recurse-submodules https://github.com/mariehoffmann/PriSeT.git
     * Taxid to accessions map `root_<taxid>.acc`
     * Library with reference sequences `root_<taxid>.fasta`
 
- In the working directory the FM index and mappings are stored.
- ```shell
- ./priset <lib_dir> <work_dir>
+ Assume `lib_dir` and `work_dir` as your library and working directories. The latter one will store the FM index, mappings, the shiny app as R script and the input table for the shiny app.
+```shell
+ ./priset <lib_dir> <work_dir> [--skip-idx]
  ```
 
 
  ## References
+   [1] Pockrandt, C., Alzamel, M., Iliopoulos, C. S., Reinert, K.. GenMap: Fast and Exact Computation of Genome Mappability. bioRxiv, presented on RECOMB-Seq, 2019.
 
-   [1] Federhen, S. (2012). The NCBI Taxonomy database. Nucleic Acids Research, 40(D1), D136–D143. http://doi.org/10.1093/nar/gkr1178
+   [2] Federhen, S. (2012). The NCBI Taxonomy database. Nucleic Acids Research, 40(D1), D136–D143. http://doi.org/10.1093/nar/gkr1178
 
-   [2] PCR primer design constraints: www.premierbiosoft.com/tech_notes/PCR_Primer_Design.html
+   [3] PCR primer design constraints: www.premierbiosoft.com/tech_notes/PCR_Primer_Design.html

@@ -87,7 +87,7 @@ struct TKmer
 
 // The map to resolve kmer IDs and their structs.
 // TODO: ID redundant, see application to possibly remove from struct
-typedef std::map<TKmerID, TKmer> TKmerMap;
+typedef std::unordered_map<TKmerID, TKmer> TKmerMap;
 
 // todo: TKmerLocation and TKmerPair inherit from same base struct.
 // vector type of k-mers and their locations
