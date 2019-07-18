@@ -52,20 +52,13 @@ namespace priset
  */
 int fm_index(io_cfg_type const & io_cfg)
 {
-
-    std::cout << "io_cfg.get_skip_idx() = " << io_cfg.get_skip_idx() << std::endl;
-    if (io_cfg.get_skip_idx())
-    {
-        std::cout << "MESSAGE: skip index recomputation" << std::endl;
-        return 0;
-    }
     std::cout << "MESSAGE: start index recomputation" << std::endl;
     pid_t pid;
     if ((pid = fork()) == -1)
         return FORK_ERROR;
     if (pid == 0) {
-        execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u],
-            "-I", &io_cfg.get_index_dir().string()[0u], NULL);
+        execl(io_cfg.get_genmap_binary().c_str(), "genmap", "index", "-F", &io_cfg.get_fasta_file().string()[0u], "-I", &io_cfg.get_index_dir().string()[0u],
+        "-A skew", NULL);
         std::cout << "ERROR: " << EXECV_ERROR << std::endl, exit(0);
     }
     else

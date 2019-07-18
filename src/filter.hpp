@@ -22,13 +22,11 @@ namespace priset
 // 2. fetch sequence and check chemical constraints that need to hold for a single primer
 // frequency_filter<primer_cfg_type, TSeqNo, TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, min_occ, directoryInformation, sequenceNames, sequenceLengths);
 template<typename TSequenceNames, typename TSequenceLengths>
-void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo  const delta) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
+void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo const cutoff) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     // = seqan::Pair<TSeqNo, TSeqPos>
     using TLocationKey = typename TLocations::key_type;
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
-    std::cout << "LOGGING: |kmers| before pre frequency filtering = " << length(locations) << std::endl;
-
     if (!length(locations))
         return;
     //TSeqNo seqno;
@@ -46,12 +44,12 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
     {
         seqpos = seqan::getValueI2<TSeqNo, TSeqPos>(it->first);
         // not enough k-mer occurences => continue
-        if ((it->second).first.size() < delta)
+        if ((it->second).first.size() < cutoff)
             continue;
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         if (it->second.first.size() && seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqpos)
             continue;
-        // invariant: delta is always ≥ 2
+        // invariant: cutoff is always ≥ 2
         for (seqan::Pair<TSeqNo, TSeqPos> pair : it->second.first)
         {
             //std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
@@ -88,7 +86,10 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
             {
                 // Filter if Gibb's free energy is below -6 kcal/mol
                 if (filter_self_dimerization(kmer.seq))
-                    mask.set(i);
+                {
+                    if (filter_repeats_runs(kmer.seq))
+                        mask.set(i);
+                }
             }
         }
     }
@@ -112,7 +113,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
     uint16_t i = 0;
     for (auto kmer_pair : kmer_pairs)
     {
-        if (filter_cross_dimerization(kmer_map[kmer_pair.get_kmer_ID1()], kmer_map[kmer_pair.get_kmer_ID2()]))
+        if (filter_cross_dimerization(kmer_map[kmer_pair.get_kmer_ID1()].seq, kmer_map[kmer_pair.get_kmer_ID2()].seq))
             mask.set(i);
         ++i;
     }
@@ -131,7 +132,6 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
     // delete kmers from map that remained unpaired
     for (auto ID : unpaired)
         kmer_map.erase(ID);
-    std::cout << "LOGGING: |kmer pairs| after chemical filtering: " << kmer_pairs.size() << std::endl;
 }
 
 // post-filter candidates fulfilling chemical constraints by their relative frequency
@@ -147,14 +147,14 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
 
     // scale to be lower frequency bound for filters
-    TSeqNo delta = std::max<TSeqNo>(2, TSeqNo(float(io_cfg.get_library_size()) * primer_cfg.get_occurence_freq()));
+    TSeqNo cutoff = 10; //std::max<TSeqNo>(2, TSeqNo(float(io_cfg.get_library_size()) * primer_cfg.get_occurence_freq()));
     // continue here
-    std::cout << "INFO: Cut-off frequency = " << delta << std::endl;
+    std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching
-    frequency_filter<TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, delta); chemical_filter_single(primer_cfg, kmer_locations, kmer_map);
-//    chemical_filter_pairs();
-    //post_frequency_filter(kmer_locations, primer_cfg.get_occurence_freq());
-
+    frequency_filter<TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, cutoff);
+    std::cout << "INFO: kmers after frequency cutoff = " << kmer_locations.size() << std::endl;
+    chemical_filter_single(primer_cfg, kmer_locations, kmer_map);
+    std::cout << "INFO: kmers after chemical filtering = " << kmer_locations.size() << std::endl;
 }
 
 // combine helper, forward window until both iterators point to same reference ID or end
@@ -173,6 +173,11 @@ void fast_forward(TKmerLocation::TLocationVec const & locations1, TKmerLocations
     //std::cout << "... leaving ff" << std::endl;
 }
 
+/*
+ * Helper for combine.
+ *
+ */
+
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
  * Chemical suitability will be tested by a different function. First position indicates,
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
@@ -184,10 +189,17 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
     using it_loc_type = TKmerLocations::value_type::const_iterator;
     it_loc_type it1_loc_start, it1_loc_aux;
     it_loc_type it2_loc_start, it2_loc_aux;
+    TKmer kmer1, kmer2;
     for (auto it1 = kmer_locations.begin(); it1 != kmer_locations.end() && it1 != kmer_locations.end()-1; ++it1)
     {
         for (auto it2 = it1+1; it2 != kmer_locations.end(); ++it2)
         {
+            kmer1 = kmer_map[(*it1).get_kmer_ID()];
+            kmer2 = kmer_map[(*it2).get_kmer_ID()];
+
+            // continue with next combination if kmer sequences do not pass cross-dimerization filter
+            if (!filter_cross_dimerization(kmer1.seq, kmer2.seq))
+                continue;
             // iterator to start position of current location for k-mer 1
             it1_loc_start = (*it1).locations.begin();
             // iterator to start position of current location for k-mer 2

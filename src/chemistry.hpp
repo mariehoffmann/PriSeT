@@ -181,6 +181,7 @@ bool filter_repeats_runs(TSeq & seq)
 
 /* Helper function for computing the convolution of two sequences. For each overlap
  *position the Gibb's free energy is computed and the minimum returned;
+ * TODO: see "Improved thermodynamic parameters and helix initiation factor to predict stability of DNA duplexes" Sugimoto et al. 1996
  */
 float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<priset::dna> const & t)
 {

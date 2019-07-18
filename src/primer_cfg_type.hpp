@@ -154,7 +154,7 @@ public:
     // Set primer length range.
     void set_primer_length_range(size_type primer_length_min, size_type primer_length_max = 24)
     {
-        assert(primer_length_min <= primer_length_max);
+        //assert(primer_length_min <= primer_length_max);
         primer_length_range = size_interval_type{primer_length_min, primer_length_max};
     }
 

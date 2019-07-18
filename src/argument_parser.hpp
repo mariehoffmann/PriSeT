@@ -70,7 +70,7 @@ private:
                     break;
                 case 'i':
                     idx_only = 1;
-                    break
+                    break;
                 case 's':
                     skip_idx = 1;
                     break;
@@ -90,7 +90,7 @@ private:
         if (!(flag_lib && flag_work))
             fprintf(stderr, &usage_string[0], argv[0]), exit(EXIT_FAILURE);
         // init io configurator
-        io_cfg.assign(lib_dir, work_dir, skip_idx);
+        io_cfg.assign(lib_dir, work_dir, idx_only, skip_idx);
         flag_K ? primer_cfg.set_primer_length_range(K) : (void) (NULL);
         flag_E ? primer_cfg.set_error(E) : (void) (NULL);
     }

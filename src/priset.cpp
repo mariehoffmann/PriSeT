@@ -31,7 +31,7 @@
 /*
  * usage        g++ ../PriSeT/src/priset.cpp -Wno-write-strings -std=c++17 -lstdc++fs -Wall -Wextra -o priset
  *              ./priset <lib_dir> <work_dir>
- * e.g.         ./priset ~/priset/library ~/priset/work
+ * e.g.         ./priset -l ~/priset/library -w ~/priset/work
  *
  * src_dir      path to folder containing fasta (*.fa) and taxonomy file (*.tax)
  * work_dir     path to store indices, mappings, annotations, and other results
@@ -53,11 +53,22 @@ int main(int argc, char** argv)
 
     // create FM index if SKIP_IDX not in argument list
     int ret_code;
-    if ((ret_code = priset::fm_index(io_cfg)))
+    if (io_cfg.skip_idx())
+    {
+        std::cout << "MESSAGE: skip index recomputation" << std::endl;
+    }
+    else if ((ret_code = priset::fm_index(io_cfg)))
     {
         std::cout << "ERROR: " << ret_code << std::endl;
         exit(-1);
     }
+    // quit here for index computation without subsequent mappability
+    if (io_cfg.idx_only())
+    {
+        std::cout << "MESSAGE: index recomputation only" << std::endl;
+        return 0;
+    }
+
     // dictionary for storing FM mapping results
     priset::TLocations locations;
 
@@ -82,7 +93,7 @@ int main(int argc, char** argv)
     // dictionary to resolve kmer IDs and their sequences
     priset::TKmerMap kmer_map;
     priset::pre_filter_main(io_cfg, primer_cfg, locations, kmer_locations, kmer_map);
-    std::cout << "INFO: kmers filtered = " << kmer_locations.size() << std::endl;
+
     // TODO: delete locations
     priset::TKmerPairs pairs;
     priset::combine(primer_cfg, kmer_locations, kmer_map, pairs);

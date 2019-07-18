@@ -43,7 +43,7 @@ public:
     io_cfg_type & operator=(io_cfg_type && rhs) = default;
 
     // Set library and working directory paths.
-    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const skip_idx_)
+    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const idx_only_flag_, bool const skip_idx_flag_)
     {
         lib_dir = fs::canonical(lib_dir_);
         std::cout << "fs::exists(work_dir_) = " << fs::exists(work_dir_) << ", fs::exists(work_dir_.parent_path() = " << fs::exists(work_dir_.parent_path()) << std::endl;
@@ -55,7 +55,8 @@ public:
         }
 
         work_dir = fs::canonical(work_dir_);
-        skip_idx = skip_idx_;
+        idx_only_flag = idx_only_flag_;
+        skip_idx_flag = skip_idx_flag_;
         index_dir = work_dir;
         mapping_dir = work_dir;
         genmap_bin = fs::current_path() / "submodules/genmap/bin/genmap";
@@ -109,7 +110,12 @@ public:
 
         // set output directory for FM index, will be created by genmap
         index_dir /= fs::path("/index");
-        if (skip_idx && fs::exists(index_dir))
+        if (skip_idx_flag && !fs::exists(index_dir))
+        {
+            std::cerr << "ERROR: Index computation flag is set to 0, but index_dir (" << index_dir << ") does not exists!" << std::endl;
+            exit(-1);
+        }
+        if (!skip_idx_flag)
         {
             char cmd[50];
             sprintf(cmd, "rm -r %s", index_dir.c_str());
@@ -148,9 +154,15 @@ public:
     ~io_cfg_type() = default;
 
     // Return skip_idx flag.
-    bool get_skip_idx() const noexcept
+    bool idx_only() const noexcept
     {
-        return skip_idx;
+        return idx_only_flag;
+    }
+
+    // Return skip_idx flag.
+    bool skip_idx() const noexcept
+    {
+        return skip_idx_flag;
     }
 
     // Return accession file with absolute path as filesystem::path object.
@@ -258,8 +270,9 @@ private:
     // Working base directory for storing FM indices, mappings and results.
     fs::path work_dir;
     // Flag for indicating if index computation shall be skipped (because it already exists).
-    bool skip_idx;
-
+    bool skip_idx_flag{0};
+    // Flag for indicating to do index computation exclusively.
+    bool idx_only_flag{0};
     // Taxid to accession map in csv format (set by PriSeT).
     fs::path acc_file{};
     // Sequence library file in fasta format (set by PriSeT).

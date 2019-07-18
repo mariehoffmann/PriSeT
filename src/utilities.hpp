@@ -360,7 +360,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 
     // create output stream to result table and append
     std::ofstream table;
-    table.open(io_cfg.get_result_file(), std::ios_base::ate);
+    table.open(io_cfg.get_result_file(), std::ios_base::app);
 
     // flush leave node results
     for (TResult result : results){
@@ -459,6 +459,7 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     std::ofstream table;
     table.open(io_cfg.get_result_file());
     // taxid, fwd primer ID, rev primer ID, number of matches, coverage (ctr of nodes with accessions), accession list (comma separated string)
+    std::cout << "write header line\n";
     table << "taxid,fwd,rev,matches,coverage,accession_list\n";
     table.close();
 
@@ -467,6 +468,7 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
 
     // collect kmer pair matches for bottom nodes
     accumulation_loop<TKmerPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
+    std::cout << "STATUS: table.csv written to\t" << io_cfg.get_result_file() << std::endl;
 
     // write primer info file
     write_primer_info_file(io_cfg, kmer_locations, kmer_map);
