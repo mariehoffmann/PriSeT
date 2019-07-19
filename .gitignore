@@ -2,6 +2,15 @@
 wget-log*
 .ipynb_checkpoints
 
+# Python notebook
+*.ipynb
+
+# ignore work directory
+tests/*
+benchmarks/bin*
+benchmarks/build*
+benchmarks/googlebenchmark
+
 # cmake
 Makefile
 CMakeCache.txt

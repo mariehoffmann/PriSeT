@@ -4,10 +4,20 @@ library(shiny)
 library(treemap)
 library(d3treeR)
 
-##############################  Tree built ####################################
+
+# File names to be replaced by gui helper --------------------------------------
+
+primer_file = "/Users/troja/git/PriSeT_git/PriSeT/src/tests/work/table/primer_info.csv"
+tax_file = "/Users/troja/git/PriSeT_git/PriSeT/src/tests/library/root_123.tax"
+result_file = "/Users/troja/git/PriSeT_git/PriSeT/src/tests/work/table/results.csv"
+## for debugging:
+#primer_file = "../PriSeT/src/tests/work/table/primer_info.csv"
+#tax_file = "../PriSet/src/tests/library/root_123.tax"
+#result_file = "../PriSeT/src/tests/work/table/results.csv"
+
+# Load taxonomy file ------------------------------------
 # load taxonomy from /library/*.tax io_cfg.tax_file()
-tax = read.csv("../PriSet/src/tests/library/root_123.tax")
-#tax = read.csv("<tax_file>")
+tax = read.csv(tax_file)
 
 # initial root node
 root <- tax$p_taxid[1]
@@ -25,15 +35,11 @@ group_ctrs
 tax$clade_size <- group_ctrs
 tax
 
-#taxid,fwd,rev,matches,coverage,ID_list
-results <- read.csv("../PriSeT/src/tests/work/table/results.csv")
-#results <- read.csv("<result_file>")
+# Load result columns taxid,fwd,rev,matches,coverage,ID_list -------------------
+results <- read.csv(result_file, header = TRUE, sep = ",", row.names = NULL, col.names = c("taxid","fwd","rev","matches","coverage","ID_list"))
 
-#------------------------ primer legend ------------------------------
-primer_info <- read.csv("../PriSeT/src/tests/work/table/primer_info.csv")
-#primer_info <- read.csv("<primer_info>")
-names(primer_info) <- c("kmer_ID", "kmer_sequence", "Tm")
-head(primer_info)
+# Load and build (in results listed) primers legend ----------------------------
+primer_info <- read.csv(primer_file)
 
 # set of unique IDs 2nd column are fwdIDs
 primer_fwd <- sort(unique(results$fwd))
@@ -43,9 +49,8 @@ primer_rev <- sort(unique(results$rev))
 stopifnot(primer_rev[0] != 0)
 length(primer_rev[-1])
 names(primer_rev) <- c("NA", sprintf("primer %d", primer_rev[-1]))
-#------------------------ end primer legend -------------------------
 
-#------------------------ as function ------------------------------
+# Update data subset selection on GUI change -----------------------------------
 update <- function(root_, coverage_, fwd_, rev_)
 {
     print("Enter update ...")
@@ -75,7 +80,7 @@ update <- function(root_, coverage_, fwd_, rev_)
     print(data_sub)
 
     # join clade and selected matching stats based on clade$taxid_L1 == data_sub$taxid
-    data_sub_c <- merge(clade, data_sub, by.clade = c("taxid_L1"), by.data_sub = c("taxid"))[,c("taxid_L1", "taxid_L2", "clade_size_L1", "matches", "coverage")]
+    data_sub_c <- merge(clade, data_sub, by.clade = c("taxid_L2"), by.data_sub = c("taxid"))[,c("taxid_L1", "taxid_L2", "clade_size_L1", "matches", "coverage")]
     print(data_sub_c)
 
     data_sub_c$heat <- data_sub_c$matches / data_sub_c$coverage
@@ -86,7 +91,6 @@ update <- function(root_, coverage_, fwd_, rev_)
     names(data_sub_c) <- c("taxid_L1", "taxid_L2", "clade_size_L1", "heat")
     return(data_sub_c)
 }
-#------------------------ end as function ------------------------------
 
 # UI Layout --------------------------------------------------------------------
 ui <- fluidPage(titlePanel("PriSeT"),

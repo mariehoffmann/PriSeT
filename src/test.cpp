@@ -35,13 +35,12 @@ struct setup
     setup()
     {
         // basic init
-        priset::options opt;
         int argc = 5;
         char * argv[5] = {"priset", "-l", &lib_dir[0], "-w", &work_dir[0]};
         for (auto i = 0; i < argc; ++i)
             std::cout << "arg[" << i << "] = " << argv[i] << std::endl;
 
-        opt.parse_arguments(argc, argv, io_cfg, primer_cfg);
+        priset::options opt(argc, argv, primer_cfg, io_cfg);
 
         // change primer and transcript length ranges
         // k1: [(1,2), (1,75)], i.e. kmer1 occurs in  sequence 1 at position 2 and 75
@@ -102,13 +101,32 @@ void lookup_sequences_test()
     typedef seqan::Iterator<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>>>::Type TStringSetIterator;
     for (TStringSetIterator it = seqan::begin(text); it != seqan::end(text); ++it)
         std::cout << *it << '\n';
+}
 
+void dimerization_test()
+{
+
+}
+
+void filter_repeats_runs_test()
+{
+    priset::TSeq seq = "GATATATATG";
+    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seq = "GATATATAGATGG";
+    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seq = "GGGATATATAT";
+    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seq = "GATATATTTTTGG";
+    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seq = "GATATAAAAA";
+    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
 }
 
 int main()
 {
     //combine_test();
     //create_table_test();
-    gui_test();
+    //gui_test();
     //lookup_sequences_test();
+    filter_repeats_runs_test();
 }
