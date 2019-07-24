@@ -10,6 +10,21 @@ tests/*
 benchmarks/bin*
 benchmarks/build*
 benchmarks/googlebenchmark
+index.zip
+**/index
+**/tmp
+
+# exclude working directory content, but not index.zip!
+**/123/app
+**/123/table
+**/123/index/
+**/123/mapping
+**/3041/app
+**/3041/table
+**/3041/index/
+**/3041/mapping
+!index.zip
+
 
 # cmake
 Makefile

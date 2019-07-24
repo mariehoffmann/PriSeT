@@ -18,6 +18,15 @@
 namespace priset
 {
 
+enum TIMEIT {
+    MAP, // mappability computation
+    TRANSFORM, //
+    FILTER1, // chemical filter
+    COMBINER, // kmer combiner
+    FILTER2, // match chemical properties
+    SIZE
+};
+
 //!\brief Enums for computational methods for primer melting temperature.
 enum class TMeltMethod
 {

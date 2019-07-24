@@ -50,7 +50,7 @@ private:
     // Flags for initializing primer configurator.
     bool flag_E{0}, flag_K{0};
     //
-    void parse_arguments(int argc, char * argv[], primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
+    void parse_arguments(int argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
     {
         int opt;
 
@@ -67,6 +67,7 @@ private:
                 case 'w':
                     flag_work = 1;
                     work_dir.assign(std::string(optarg));
+                    std::cout << "work_dir in argument parser: " << work_dir << std::endl;
                     break;
                 case 'i':
                     idx_only = 1;
@@ -98,7 +99,7 @@ private:
 public:
 
     options() = default;
-    options(int argc, char * argv[], primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
+    options(int argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
     {
         parse_arguments(argc, argv, primer_cfg, io_cfg);
     }

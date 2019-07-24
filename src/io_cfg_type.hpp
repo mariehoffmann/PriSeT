@@ -46,6 +46,10 @@ public:
     void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const idx_only_flag_, bool const skip_idx_flag_)
     {
         lib_dir = fs::canonical(lib_dir_);
+        work_dir = fs::canonical(work_dir_);
+        std::cout << "work_dir_ = " << work_dir_ << std::endl;
+        std::cout << "work_dir = " << work_dir << std::endl;
+
         std::cout << "fs::exists(work_dir_) = " << fs::exists(work_dir_) << ", fs::exists(work_dir_.parent_path() = " << fs::exists(work_dir_.parent_path()) << std::endl;
         if (!fs::exists(work_dir_))
         {
@@ -54,7 +58,6 @@ public:
             fs::create_directory(work_dir_);
         }
 
-        work_dir = fs::canonical(work_dir_);
         idx_only_flag = idx_only_flag_;
         skip_idx_flag = skip_idx_flag_;
         index_dir = work_dir;
@@ -115,7 +118,7 @@ public:
             std::cerr << "ERROR: Index computation flag is set to 0, but index_dir (" << index_dir << ") does not exists!" << std::endl;
             exit(-1);
         }
-        
+
         if (!skip_idx_flag && fs::exists(index_dir))
         {
             char cmd[50];
