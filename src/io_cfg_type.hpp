@@ -47,10 +47,7 @@ public:
     {
         lib_dir = fs::canonical(lib_dir_);
         work_dir = fs::canonical(work_dir_);
-        std::cout << "work_dir_ = " << work_dir_ << std::endl;
-        std::cout << "work_dir = " << work_dir << std::endl;
 
-        std::cout << "fs::exists(work_dir_) = " << fs::exists(work_dir_) << ", fs::exists(work_dir_.parent_path() = " << fs::exists(work_dir_.parent_path()) << std::endl;
         if (!fs::exists(work_dir_))
         {
             if (!fs::exists(work_dir_.parent_path()))

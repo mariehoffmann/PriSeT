@@ -22,9 +22,9 @@ struct setup
     //std::cout << "lib_dir = " << lib_dir << std::endl;
     std::string work_dir = fs::canonical("../PriSeT/src/tests/work/3041").string();
 
-    fs::path idx_dir = work_dir + "index";
-    fs::path idx_zip = work_dir + "index.zip";
-    fs::path tmp_dir = work_dir + "tmp";
+    fs::path idx_dir = work_dir + "/index";
+    fs::path idx_zip = work_dir + "/index.zip";
+    fs::path tmp_dir = work_dir + "/tmp";
 
     setup()
     {
@@ -53,27 +53,25 @@ struct setup
 void timeit()
 {
     setup su{};
-    uint8_t const K1 = 16;
-    uint8_t const K2 = 16;
-    std::array<std::array<size_t, priset::TIMEIT::SIZE>, K2 - K1 + 1> runtimes;
-    uint8_t const argc = 8;
-    for (auto k = K1; k <= K2; ++k)
-    {
-        std::cout << "workdir as string: " << su.work_dir << std::endl;
-        char * const argv[argc] = {"priset", "-l", &su.lib_dir[0], "-w", &su.work_dir[0], "-K", &std::to_string(k)[0], "-s"};
+    unsigned const K = 25;
 
-        std::cout << "MESSAGE: start run with K = " << k << std::endl;
+    std::array<size_t, priset::TIMEIT::SIZE> runtimes;
 
-        priset_main(argc, argv, &runtimes[k - K1]);
-        std::cout << "MESSAGE: ... done." << k << std::endl;
-    }
+    unsigned const argc = 8;
 
-    std::cout << "K\tMAP\tTRANSFORM\tFILTER1\tCOMBINER\tFILTER2\t|\tSUM" << std::string(40, '-') << "\n";
-    for (auto k = K1; k <= K2; ++k)
-        std::cout << k << '\t' << runtimes[k-K1][priset::TIMEIT::MAP] << '\t' <<
-            '\t' << runtimes[k-K1][priset::TIMEIT::TRANSFORM] << '\t' << runtimes[k-K1][priset::TIMEIT::FILTER1] <<
-            '\t' << runtimes[k-K1][priset::TIMEIT::COMBINER] << '\t' << runtimes[k-K1][priset::TIMEIT::FILTER2] <<
-            "\t|\t" << std::accumulate(std::cbegin(runtimes[k-K1]), std::cend(runtimes[k-K1]), 0) << '\n';
+    char * const argv[argc] = {"priset", "-l", &su.lib_dir[0], "-w", &su.work_dir[0], "-K", &std::to_string(K)[0], "-s"};
+    for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
+    std::cout << std::endl;
+    std::cout << "MESSAGE: start run with K = " << unsigned(K) << std::endl;
+
+    priset_main(argc, argv, &runtimes);
+    std::cout << "MESSAGE: ... done." << K << std::endl;
+
+    std::cout << "K\tMAP\t\tTRANSFORM\tFILTER1\tCOMBINER\tFILTER2\t|\tSUM (" << static_cast<char>(230) << "s)\n" << std::string(100, '_') << "\n";
+    std::cout << K << "\t" << runtimes[priset::TIMEIT::MAP] << "\t" <<
+            '\t' << runtimes[priset::TIMEIT::TRANSFORM] << '\t' << runtimes[priset::TIMEIT::FILTER1] <<
+            '\t' << runtimes[priset::TIMEIT::COMBINER] << '\t' << runtimes[priset::TIMEIT::FILTER2] <<
+            "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
 }
 
 

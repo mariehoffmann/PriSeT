@@ -37,9 +37,6 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     bool timeit_flag(runtimes);
     // Store start and finish times for optional runtime measurements
     std::chrono::time_point<std::chrono::system_clock> start, finish;
-    if (timeit_flag)  // init timeit array
-        for (auto i = 0; i < priset::TIMEIT::SIZE; ++i)
-            runtimes->at(i) = 0;
 
     // set path prefixes for library files
     priset::io_cfg_type io_cfg{};
@@ -93,7 +90,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
         finish = std::chrono::high_resolution_clock::now();
         // duration obj
         //auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
-        runtimes->at(priset::TIMEIT::MAP) = std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(priset::TIMEIT::MAP) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     // Do not modify or delete STATS lines, since they are captured for statistical analysis
@@ -111,7 +108,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(priset::TIMEIT::FILTER1) = std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(priset::TIMEIT::FILTER1) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     // TODO: delete locations
@@ -122,7 +119,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(priset::TIMEIT::COMBINER) = std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(priset::TIMEIT::COMBINER) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: pairs combined = " << pairs.size() << std::endl;
@@ -135,7 +132,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(priset::TIMEIT::FILTER2) = std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(priset::TIMEIT::FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: pairs filtered = " << pairs.size() << std::endl;

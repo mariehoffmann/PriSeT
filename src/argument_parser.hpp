@@ -50,14 +50,15 @@ private:
     // Flags for initializing primer configurator.
     bool flag_E{0}, flag_K{0};
     //
-    void parse_arguments(int argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
+    void parse_arguments(unsigned argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
     {
         int opt;
+        for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
+        std::cout << std::endl;
 
         // l (lib_dir), w (work_dir), i (index only), s (skip_idx), E (error), K (kmer length), colon indicates argument
         while ((opt = getopt(argc, argv, "l:w:isE:K:")) != -1)
         {
-            std::cout << "opt = " << opt << std::endl;
             switch (opt)
             {
                 case 'l':
@@ -67,7 +68,6 @@ private:
                 case 'w':
                     flag_work = 1;
                     work_dir.assign(std::string(optarg));
-                    std::cout << "work_dir in argument parser: " << work_dir << std::endl;
                     break;
                 case 'i':
                     idx_only = 1;
@@ -89,7 +89,9 @@ private:
              }
         }
         if (!(flag_lib && flag_work))
+        {
             fprintf(stderr, &usage_string[0], argv[0]), exit(EXIT_FAILURE);
+        }
         // init io configurator
         io_cfg.assign(lib_dir, work_dir, idx_only, skip_idx);
         flag_K ? primer_cfg.set_primer_length_range(K) : (void) (NULL);
