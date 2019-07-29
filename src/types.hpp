@@ -40,6 +40,8 @@ typedef seqan::Dna5 dna;
 // type declarations
 using TSeqNo = uint64_t;
 using TSeqPos = uint64_t;
+// Kmer length type. A negative indicates reverse direction given associated position.
+using TKmerLength = int8_t;
 using TBWTLen = uint64_t;
 using TFMIndexConfig = TGemMapFastFMIndexConfig<TBWTLen>;
 typedef String<seqan::Dna, seqan::Alloc<>> TString;
@@ -56,6 +58,14 @@ typedef seqan::Pair<priset::TSeqNo, priset::TSeqPos> TLocation;
 typedef std::map<TLocation,
          std::pair<std::vector<TLocation >,
                    std::vector<TLocation > > > TLocations;
+
+// A k-mer location augmented by the information about K.
+typedef std::tuple<priset::TSeqNo, priset::TSeqPos, priset::TKmerLength> TKLocation;
+
+// The map of k-mer locations augmented by K information to preserve key uniqueness.
+typedef std::map<TKLocation,
+        std::pair<std::vector<TLocation >,
+                  std::vector<TLocation > > > TKLocations;
 
 //
 using TDirectoryInformation = typename seqan::StringSet<seqan::CharString, seqan::Owner<seqan::ConcatDirect<> > > ;
@@ -104,13 +114,15 @@ struct TKmerLocation
 {
 private:
     TKmerID kmer_ID{0};
+    TKmerLength K{0};
 
 public:
     using TLocationVec = typename std::vector<TLocation>;
 
     TLocationVec locations{}; // TODO: make private and provide public const_iterator for it
 
-    TKmerLocation(TKmerID kmer_ID_, TLocationVec & locations_) : kmer_ID{kmer_ID_}
+    TKmerLocation(TKmerID kmer_ID_, TKmerLength K_, TLocationVec & locations_) :
+    kmer_ID{kmer_ID_}, K{K_}
     {
         locations.resize(locations_.size());
         std::copy(locations_.begin(), locations_.end(), locations.begin());
@@ -132,6 +144,11 @@ public:
     TKmerID get_kmer_ID2() const noexcept
     {
         return 0;
+    }
+
+    TKmerLength get_K() const noexcept
+    {
+        return K;
     }
 
     size_type container_size() const noexcept

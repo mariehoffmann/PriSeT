@@ -20,46 +20,35 @@ namespace priset
 // pre-filter and sequence fetch
 // 1. filter candidates by number of occurences only independent of their chemical suitability
 // 2. fetch sequence and check chemical constraints that need to hold for a single primer
-// frequency_filter<primer_cfg_type, TSeqNo, TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, min_occ, directoryInformation, sequenceNames, sequenceLengths);
-template<typename TSequenceNames, typename TSequenceLengths>
-void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo const cutoff) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
+void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo const cutoff) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
-    // = seqan::Pair<TSeqNo, TSeqPos>
-    using TLocationKey = typename TLocations::key_type;
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     if (!length(locations))
         return;
-    //TSeqNo seqno;
     TSeqPos seqpos;
-    // current location row
-    std::vector<TLocationKey> row;
-    // unique k-mers for retrieving sequences
-    std::vector<seqan::Pair<TSeqNo, TSeqPos>> lookup();
-    //TSeqPos seqpos_prev = 0;
-    typename TLocations::const_iterator aux  = locations.end();
-    --aux;
-
-    TKmerID ID = 1;
-    for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    TKmerID ID_start = 1;
+    std::vector<TLocation> fwd;
+    for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        seqpos = seqan::getValueI2<TSeqNo, TSeqPos>(it->first);
         // not enough k-mer occurences => continue
         if ((it->second).first.size() < cutoff)
             continue;
+        seqpos = std::get<1>(it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         if (it->second.first.size() && seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqpos)
             continue;
         // invariant: cutoff is always ≥ 2
-        for (seqan::Pair<TSeqNo, TSeqPos> pair : it->second.first)
+        for (TLocation pair : it->second.first)
         {
             //std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
-            row.push_back(pair);
+            fwd.push_back(pair);
         }
         // store locations,ID updated later
-        kmer_locations.push_back(TKmerLocation{ID++, row}); //std::make_pair(ID++, row));
-        row.clear();
+        kmer_locations.push_back(TKmerLocation{ID_start++, std::get<2>(it->first), fwd});
+        // TODO: same for reverse?
+        fwd.clear();
     }
-    lookup_sequences2(kmer_locations, kmer_map, io_cfg, primer_cfg);
+    lookup_sequences(kmer_locations, kmer_map, io_cfg, primer_cfg);
 }
 
 /*
@@ -142,8 +131,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
 }*/
 
 // filter k-mers by frequency and chemical properties
-//template<typename TSequenceNames, typename TSequenceLengths>
-void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
+void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
 
@@ -152,7 +140,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     // continue here
     std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching
-    frequency_filter<TSequenceNames, TSequenceLengths>(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, cutoff);
+    frequency_filter(io_cfg, primer_cfg, locations, kmer_locations, kmer_map, cutoff);
     std::cout << "INFO: kmers after frequency cutoff = " << kmer_locations.size() << std::endl;
     chemical_filter_single(primer_cfg, kmer_locations, kmer_map);
     std::cout << "INFO: kmers after chemical filtering = " << kmer_locations.size() << std::endl;
@@ -191,10 +179,13 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
     it_loc_type it1_loc_start, it1_loc_aux;
     it_loc_type it2_loc_start, it2_loc_aux;
     TKmer kmer1, kmer2;
+    TKmerLength K1, K2;
     for (auto it1 = kmer_locations.begin(); it1 != kmer_locations.end() && it1 != kmer_locations.end()-1; ++it1)
     {
+        K1 = (*it1).get_K();
         for (auto it2 = it1+1; it2 != kmer_locations.end(); ++it2)
         {
+            K2 = (*it2).get_K();
             kmer1 = kmer_map[(*it1).get_kmer_ID()];
             kmer2 = kmer_map[(*it2).get_kmer_ID()];
 
@@ -226,14 +217,13 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
                 if (it2_loc_aux != (*it2).locations.end())
                 {
                     auto pos_kmer2 = seqan::getValueI2<TSeqNo, TSeqPos>(*it2_loc_aux);
-                    auto pos_delta = (pos_kmer1 < pos_kmer2) ? pos_kmer2 - pos_kmer1 : pos_kmer1 - pos_kmer2;
-                    pos_delta -= primer_cfg.get_kmer_length();
+                    auto pos_delta = (pos_kmer1 < pos_kmer2) ? pos_kmer2 - pos_kmer1 - K1: pos_kmer1 - pos_kmer2 - K2;
                     if (pos_delta >= primer_cfg.get_transcript_range().first && pos_delta <= primer_cfg.get_transcript_range().second)
                     {
                         TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).get_kmer_ID() : (*it2).get_kmer_ID();
                         TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).get_kmer_ID() : (*it1).get_kmer_ID();
                         auto pair_location = std::make_tuple(seq_ID, std::min<TSeqPos>(pos_kmer1, pos_kmer2), std::max<TSeqPos>(pos_kmer1, pos_kmer2));
-            //            std::cout << "(kmer_fwd_new, kmer_rev_new) = (" << kmer_fwd_new << ", " << kmer_rev_new << ") at [(refID = " << std::get<0>(pair_location) << " at positions: " << std::get<1>(pair_location) << ", " << std::get<2>(pair_location) << ")]\n";
+
                         // extend location vector if pair combinations already in result
                         if (kmer_pairs.size() && kmer_pairs.back().get_kmer_ID1() == kmer_fwd_new && kmer_pairs.back().get_kmer_ID2() == kmer_rev_new)
                         {

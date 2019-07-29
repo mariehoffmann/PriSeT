@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -74,16 +75,31 @@ int fm_index(io_cfg_type const & io_cfg)
  * TLocations               type for storing locations
  * TDirectoryInformation    directory information type
  */
-int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TLocations & locations)
+int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations)
 {
-    std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
-    std::cout << "INFO: K = " << primer_cfg.get_primer_length_range().first << std::endl;
-    std::string s1 = io_cfg.get_index_dir().string();
-    std::string s2 = io_cfg.get_mapping_dir().string();
-    // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
-    char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", std::to_string(primer_cfg.get_primer_length_range().first).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csv", "-fl"};
+    std::string const s1 = io_cfg.get_index_dir().string();
+    std::string const s2 = io_cfg.get_mapping_dir().string();
+    locations.clear();
+    TLocations loc_per_K;
+    using TKLocationsKey = typename TKLocations::key_type;
+    using TKLocationsValue = typename TKLocations::mapped_type;
+    for (auto K = primer_cfg.get_primer_length_range().first; K <= primer_cfg.get_primer_length_range().second; ++K)
+    {
+        std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
+        std::cout << "INFO: K = " << K << std::endl;
+        // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
+        char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", std::to_string(K).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csv", "-fl"};
 
-    mappabilityMain<TLocations>(11, argv, locations);
+        mappabilityMain<TLocations>(11, argv, loc_per_K);
+        TKLocations::iterator it_hint = locations.begin();
+        // inserting map pair using hint
+        for (auto it = loc_per_K.begin(); it != loc_per_K.end(); ++it)
+        {  // it is pair(key, value) with key = TLocation, value = std::pair<std::vector<TLocations>, std::vector<TLocations>>
+            TKLocation const key = std::make_tuple(seqan::getValueI1<TSeqNo, TSeqPos>(it->first), seqan::getValueI2<TSeqNo, TSeqPos>(it->first), K);
+            TKLocationsValue const value = it->second;
+            it_hint = locations.insert(it_hint, std::pair<TKLocationsKey, TKLocationsValue>(key, value));
+        }
+    }
     return 0;
 }
 

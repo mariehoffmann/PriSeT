@@ -47,7 +47,7 @@ private:
     TMeltMethod melt_method{TMeltMethod::WALLACE};
 
     // Primer length range.
-    size_interval_type primer_length_range{16, 24};
+    size_interval_type primer_length_range{16, 25};
 
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
     size_type E{0};
@@ -163,12 +163,6 @@ public:
     constexpr size_interval_type get_primer_length_range() const noexcept
     {
         return primer_length_range;
-    }
-
-    // Get kmer length, which is the lower bound of the primer length range
-    constexpr size_type get_kmer_length() const noexcept
-    {
-        return primer_length_range.first;
     }
 
     // Set method for computing primer melting temperature.

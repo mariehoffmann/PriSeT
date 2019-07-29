@@ -70,7 +70,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     }
 
     // dictionary for storing FM mapping results
-    priset::TLocations locations;
+    priset::TKLocations locations;
 
     // directory info needed for genmap's fasta file parser
     priset::TDirectoryInformation directoryInformation;

@@ -95,93 +95,25 @@ void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
 struct primer_cfg_type;
 
 // Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
-void lookup_sequences2(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
+void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
 {
-    // load concatenated corpus
+    // load corpus
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
-    //typedef seqan::Iterator<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>>>::Type TStringSetIterator;
-
     fs::path text_path = io_cfg.get_index_txt_path();
     std::cout << "text_path: " << text_path << std::endl;
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
 
     TSeqNo kmer_ID;
     TSeqPos kmer_pos;
-    auto kmer_length = primer_cfg.get_kmer_length();
+    TKmerLength K;
     for (TKmerLocations::iterator kmer_it = kmer_locations.begin(); kmer_it != kmer_locations.end(); ++kmer_it)
     {
         kmer_ID = kmer_it->accession_ID_at(0);
         kmer_pos = kmer_it->kmer_pos_at(0);
+        K = kmer_it->get_K();
         seqan::DnaString seq = seqan::valueById(text, kmer_ID);
-        auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, kmer_length);
-
-        //std::cout << kmer_str << std::endl;
+        auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, K);
         kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), kmer_str, get_Tm(primer_cfg, kmer_str)};
-
-    }
-}
-
-// lookup_sequences<primer_cfg_type>(kmer_locations, io_cfg, primer_cfg, directoryInformation);
-// locations: [(ID, kmer_locations)]
-void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TDirectoryInformation const & directoryInformation)
-{
-    std::cout << "Enter lookup_sequences ...\n";
-    std::string fastaFile = std::get<0>(retrieveDirectoryInformationLine(directoryInformation[0]));
-    TSeqNo startPos = 0;    // accession separation offset
-    TSeqPos offset;         // kmer offset within accession
-    TSeqPos kmer_length = primer_cfg.get_kmer_length();
-    TKmerLocations::iterator kmer_it = kmer_locations.begin();
-    // index to load in order to extract strings
-    TIndex index;
-    if (!genmap::detail::open(index, seqan::toCString(std::string(io_cfg.get_index_base_path())), seqan::OPEN_RDONLY))
-        std::cout << "Error in loading index to index obj.\n", exit(0);
-    auto const & text = seqan::indexText(index);
-    uint64_t accession_ctr = 0; // fasta header counter
-    // zero-based accession counter
-    TSeqNo next_accession = kmer_it->accession_ID_at(0); //seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]);
-    while (kmer_it != kmer_locations.end())
-    {
-        //std::cout << "while loop start ...\n";
-        auto row = retrieveDirectoryInformationLine(directoryInformation[accession_ctr]);
-        // forward id counter and accumulate text offset
-        while (accession_ctr != next_accession && accession_ctr < length(directoryInformation))
-        {
-            ++accession_ctr;
-            row = retrieveDirectoryInformationLine(directoryInformation[accession_ctr]);
-            startPos += std::get<1>(row); // add sequence length
-        }
-        if (std::get<0>(row) != fastaFile)
-            break;
-        assert(accession_ctr == next_accession);
-
-        auto chromosomeNames = std::get<2>(row);
-        //std::cout << "accession_ctr = " << accession_ctr << ", corresponding to " << chromosomeNames << std::endl;
-        //std::cout << "next kmer id = " << next_accession << std::endl;
-        // sequence internal offset
-        //offset = seqan::getValueI2<TSeqNo, TSeqPos>(kmer_it->second[0]);
-        offset = kmer_it->kmer_pos_at(0);
-        //std::cout << "Access text.concat at " << startPos + offset << " to " << (startPos + offset + kmer_length) << ", text.concat.length = " << length(text.concat) << std::endl;
-        auto const & kmer_str = seqan::infixWithLength(text.concat, startPos + offset, kmer_length);
-        //std::cout << "loc = (" << kmer_it->accession_ID_at(0) << ", " << offset << ") has kmer sequence = " << kmer_str << std::endl;
-        // copy kmer into first position of locations vector
-        seqan::String<priset::dna> str;
-        //std::cout << "append kmer sequence to str" << std::endl;
-        seqan::append(str, kmer_str);
-        //std::cout << "assign to 1st position of kmer_locs: " << std::endl;
-        // insert into kmer map
-//        kmer_map[(*kmer_it).first] = TKmer{(*kmer_it).first, str, get_Tm(primer_cfg, str)};
-        kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), str, get_Tm(primer_cfg, str)};
-
-        // forward next kmer iterator and abort if no more kmers to resolve
-        ++kmer_it;
-        if (kmer_it == kmer_locations.end())
-        {
-            std::cout << "kmer_locations end reached\n";
-            break;
-        }
-        //std::cout << "get next kmer id: " << std::endl;
-        assert(kmer_it->container_size() > 0);
-        next_accession = kmer_it->accession_ID_at(0); //seqan::getValueI1<TSeqNo, TSeqPos>(kmer_it->second[0]);
     }
 }
 

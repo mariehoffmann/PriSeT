@@ -53,22 +53,18 @@ struct setup
 void timeit()
 {
     setup su{};
-    unsigned const K = 25;
-
     std::array<size_t, priset::TIMEIT::SIZE> runtimes;
 
-    unsigned const argc = 8;
-
-    char * const argv[argc] = {"priset", "-l", &su.lib_dir[0], "-w", &su.work_dir[0], "-K", &std::to_string(K)[0], "-s"};
+    unsigned const argc = 6;
+    char * const argv[argc] = {"priset", "-l", &su.lib_dir[0], "-w", &su.work_dir[0], "-s"};
     for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
     std::cout << std::endl;
-    std::cout << "MESSAGE: start run with K = " << unsigned(K) << std::endl;
 
     priset_main(argc, argv, &runtimes);
-    std::cout << "MESSAGE: ... done." << K << std::endl;
+    std::cout << "MESSAGE: ... done." << std::endl;
 
-    std::cout << "K\tMAP\t\tTRANSFORM\tFILTER1\tCOMBINER\tFILTER2\t|\tSUM (" << static_cast<char>(230) << "s)\n" << std::string(100, '_') << "\n";
-    std::cout << K << "\t" << runtimes[priset::TIMEIT::MAP] << "\t" <<
+    std::cout << "K\tMAP\t\tTRANSFORM\tFILTER1\tCOMBINER\tFILTER2\t|\tSUM [μs]\n" << std::string(100, '_') << "\n";
+    std::cout << "[" << 16 << ":" << 25 << "]\t" << runtimes[priset::TIMEIT::MAP] << "\t" <<
             '\t' << runtimes[priset::TIMEIT::TRANSFORM] << '\t' << runtimes[priset::TIMEIT::FILTER1] <<
             '\t' << runtimes[priset::TIMEIT::COMBINER] << '\t' << runtimes[priset::TIMEIT::FILTER2] <<
             "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
