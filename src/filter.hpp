@@ -23,14 +23,15 @@ namespace priset
 void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo const cutoff) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
-    if (!length(locations))
-        return;
+    assert(length(locations));
+
     TSeqPos seqpos;
     TKmerID ID_start = 1;
     std::vector<TLocation> fwd;
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // not enough k-mer occurences => continue
+        // Note: getOccurrences and resetLimits in genmap lead to less kmers occurences than countOccurrences
         if ((it->second).first.size() < cutoff)
             continue;
         seqpos = std::get<1>(it->first);
@@ -40,7 +41,6 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
         // invariant: cutoff is always ≥ 2
         for (TLocation pair : it->second.first)
         {
-            //std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
             fwd.push_back(pair);
         }
         // store locations,ID updated later
@@ -48,6 +48,7 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
         // TODO: same for reverse?
         fwd.clear();
     }
+    // TODO: lookup and transform
     lookup_sequences(kmer_locations, kmer_map, io_cfg, primer_cfg);
 }
 
@@ -136,7 +137,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
 
     // scale to be lower frequency bound for filters
-    TSeqNo cutoff = 10; //std::max<TSeqNo>(2, TSeqNo(float(io_cfg.get_library_size()) * primer_cfg.get_occurence_freq()));
+    TSeqNo cutoff = primer_cfg.cutoff;
     // continue here
     std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching

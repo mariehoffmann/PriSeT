@@ -30,6 +30,8 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
+#define GENMAP_DEBUG 0
+
 #include "../submodules/genmap/src/common.hpp"
 #include "../submodules/genmap/src/genmap_helper.hpp"
 #include "../submodules/genmap/src/indexing.hpp"
@@ -90,7 +92,7 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLoc
         // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
         char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", std::to_string(K).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csv", "-fl"};
 
-        mappabilityMain<TLocations>(11, argv, loc_per_K);
+        mappabilityMain<TLocations, primer_cfg.cutoff>(11, argv, loc_per_K);
         TKLocations::iterator it_hint = locations.begin();
         // inserting map pair using hint
         for (auto it = loc_per_K.begin(); it != loc_per_K.end(); ++it)

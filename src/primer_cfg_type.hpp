@@ -36,12 +36,13 @@ public:
     // The index type to identify kmer sequences.
     using kmer_ID_type = unsigned short int;
 
+    // Frequency cutoff, i.e. all kmer occurences below will be dropped.
+    static constexpr uint64_t const cutoff{10};
+
+
 private:
     // Root taxonomic identifier below which references are sampled.
     TTaxid root_taxid{1};
-
-    // Lower bound for the frequency of primer sequence occurrence relative to the number of taxa with at least one existing reference sequence.
-    float const occurrence_freq{0.01};
 
     // Default primer melting temperature formular (see chemistry.hpp for details)
     TMeltMethod melt_method{TMeltMethod::WALLACE};
@@ -108,11 +109,6 @@ public:
     constexpr taxid_type get_root_taxid() const noexcept
     {
         return root_taxid;
-    }
-
-    constexpr float get_occurence_freq() const noexcept
-    {
-        return occurrence_freq;
     }
 
     // Set melting temperature range.

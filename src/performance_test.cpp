@@ -14,7 +14,7 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/src/performance_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -o performance_test
+// g++ ../PriSeT/src/performance_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -o performance_test
 
 struct setup
 {
