@@ -94,6 +94,31 @@ void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
 // forward declaration
 struct primer_cfg_type;
 
+// compress to 64 bit integer. 4^i x [0:3] where 0 = 'A', ..., 3 = 'G' as little endian, i.e.,
+// first character add smalled partial code. E.g., ACGT is encoded as 0*1 + 1*4 + 2*16 + 3*64.
+// Non-zero encoded character is added for differentiating prefix..[A]^k from prefix..[A]^m.
+uint64_t dna_encoder(priset::TSeq const & seq)
+{
+    uint64_t code = 0;
+    for (uint16_t i = 0; i < seqan::length(seq); ++i)
+        code += uint16_t(seq[i]) * (1 << (i << 1));
+    return code + (1 << (seqan::length(seq) << 1));
+}
+
+// Decode 64 bit integer.
+priset::TSeq dna_decoder(uint64_t code)
+{
+    assert(code > 0);
+    std::array<std::string, 4> decodes = {"A", "C", "G", "T"};
+    priset::TSeq d = "";
+    while (code != 1)
+    {
+        d += decodes[3 & code];
+        code >>= 2;
+    }
+    return d;
+}
+
 // Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
 void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
 {
@@ -113,6 +138,7 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
         K = kmer_it->get_K();
         seqan::DnaString seq = seqan::valueById(text, kmer_ID);
         auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, K);
+        uint64_t kmer_code = dna_encoder(kmer_str);
         kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), kmer_str, get_Tm(primer_cfg, kmer_str)};
     }
 }
