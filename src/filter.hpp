@@ -20,7 +20,7 @@ namespace priset
 // pre-filter and sequence fetch
 // 1. filter candidates by number of occurences only independent of their chemical suitability
 // 2. fetch sequence and check chemical constraints that need to hold for a single primer
-void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo const cutoff) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
+void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map, TSeqNo const cutoff) //, TDirectoryInformation const & directoryInformation, TSequenceNames & sequenceNames, TSequenceLengths & sequenceLengths)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -50,6 +50,7 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, primer_cfg_type const 
     }
     // TODO: lookup and transform
     lookup_sequences(kmer_locations, kmer_map, io_cfg, primer_cfg);
+    locations.clear();
 }
 
 /*
@@ -132,7 +133,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
 }*/
 
 // filter k-mers by frequency and chemical properties
-void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations const & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map)
+void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TKmerLocations & kmer_locations, TKmerMap & kmer_map)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
 

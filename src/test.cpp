@@ -57,8 +57,8 @@ struct setup
         // init locations
         priset::TKmerLocation::TLocationVec loc_vec1{{loc1_kmer1, loc2_kmer1}};
         priset::TKmerLocation::TLocationVec loc_vec2{{loc1_kmer2, loc2_kmer2}};
-        kmer_locations.push_back(priset::TKmerLocation(1, loc_vec1));
-        kmer_locations.push_back(priset::TKmerLocation(2, loc_vec2));
+        //kmer_locations.push_back(priset::TKmerLocation(1, loc_vec1));
+        //kmer_locations.push_back(priset::TKmerLocation(2, loc_vec2));
 
         kmer_map[1] = priset::TKmer{1, "AAAA", 12.0};
         kmer_map[2] = priset::TKmer{2, "ACCC", 13.0};
@@ -122,11 +122,47 @@ void filter_repeats_runs_test()
     std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
 }
 
+uint64_t dna_encoder(priset::TSeq const & seq)
+{
+    uint64_t code = 0;
+    for (uint16_t i = 0; i < seqan::length(seq); ++i)
+    {
+        std::cout << "seq[i] = " << seq[i] << " as uint16_t: " << uint16_t(seq[i]) << std::endl;
+        //std::cout << "factor is " << ((1 << (i << 1))) << std::endl;
+        std::cout << "add " << uint16_t(seq[i]) * (1 << (i << 1)) << std::endl;
+        code += uint16_t(seq[i]) * (1 << (i << 1));
+    }
+    std::cout << " add final C: " << (1 << (seqan::length(seq) << 1)) << std::endl;
+    return code + (1 << (seqan::length(seq) << 1));
+}
+
+priset::TSeq dna_decoder(uint64_t code)
+{
+    assert(code > 0);
+    std::array<std::string, 4> decodes = {"A", "C", "G", "T"};
+    priset::TSeq d = "";
+    while (code != 1)
+    {
+        d += decodes[3 & code];
+        code >>= 2;
+    }
+    return d;
+}
+
+void test_encoder()
+{
+    priset::TSeq seq = "AAAAAA"; // as int 228 + 256 = 484
+    uint64_t code = dna_encoder(seq);
+    std::cout <<  "seq to int: " << code << std::endl;
+    std::cout <<  "back to dna: " << dna_decoder(code) << std::endl;
+}
+
 int main()
 {
     //combine_test();
     //create_table_test();
     //gui_test();
     //lookup_sequences_test();
-    filter_repeats_runs_test();
+    //filter_repeats_runs_test();
+    test_encoder();
 }

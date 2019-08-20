@@ -139,6 +139,7 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
         seqan::DnaString seq = seqan::valueById(text, kmer_ID);
         auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, K);
         uint64_t kmer_code = dna_encoder(kmer_str);
+        // TODO: continue here
         kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), kmer_str, get_Tm(primer_cfg, kmer_str)};
     }
 }
