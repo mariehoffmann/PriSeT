@@ -63,6 +63,7 @@ typedef std::map<TLocation,
 typedef std::tuple<priset::TSeqNo, priset::TSeqPos, priset::TKmerLength> TKLocation;
 
 // The map of k-mer locations augmented by K information to preserve key uniqueness.
+// Contains mappings for all values of K in range (see primer_cfg_type.hpp).
 typedef std::map<TKLocation,
         std::pair<std::vector<TLocation >,
                   std::vector<TLocation > > > TKLocations;
@@ -76,7 +77,7 @@ using TSequenceNames = typename seqan::StringSet<seqan::CharString, seqan::Owner
 // container for fasta sequence lengths
 using TSequenceLengths = typename seqan::StringSet<uint32_t>;
 
-// The type for kmer identifiers, 1-based.
+// The type for kmer identifiers encoding kmer sequences up to a length of 30 bp.
 typedef uint64_t TKmerID;
 
 // The type for taxonomic identifiers.
@@ -97,23 +98,18 @@ struct TKmer
     // Unique numerical identifier. Default 0 means unset.
     TKmerID ID{static_cast<TKmerID>(0)};
 
-    // alphabet sequence of k-mer
-    TSeq seq{};
-
     // Melting temperature of k-mer sequence.
     float Tm{0};
 };
-
-// The map to resolve kmer IDs and their structs.
-// TODO: ID redundant, see application to possibly remove from struct
-typedef std::unordered_map<TKmerID, TKmer> TKmerMap;
 
 // todo: TKmerLocation and TKmerPair inherit from same base struct.
 // vector type of k-mers and their locations
 struct TKmerLocation
 {
 private:
+    // The unique kmer identifier encoding dna4 sequence up to 30 bp.
     TKmerID kmer_ID{0};
+    // TODO: delete K
     TKmerLength K{0};
 
 public:
@@ -130,6 +126,11 @@ public:
 
     using size_type = TLocationVec::size_type;
     using const_iterator = TLocationVec::const_iterator;
+
+    void set_kmer_ID(TKmerID kmer_ID_) noexcept
+    {
+        kmer_ID = kmer_ID_;
+    }
 
     TKmerID get_kmer_ID() const noexcept
     {

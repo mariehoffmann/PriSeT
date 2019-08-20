@@ -100,11 +100,9 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     // TODO: result structure for references and k-mer pairs: candidates/matches
     // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     priset::TKmerLocations kmer_locations;
-    // dictionary to resolve kmer IDs and their sequences
-    priset::TKmerMap kmer_map;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
-    priset::pre_filter_main(io_cfg, primer_cfg, locations, kmer_locations, kmer_map);
+    priset::pre_filter_main(io_cfg, primer_cfg, locations, kmer_locations);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
@@ -115,7 +113,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     priset::TKmerPairs pairs;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
-    priset::combine(primer_cfg, kmer_locations, kmer_map, pairs);
+    priset::combine(primer_cfg, kmer_locations, pairs);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
@@ -138,7 +136,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     std::cout << "INFO: pairs filtered = " << pairs.size() << std::endl;
     if (!timeit_flag)
     {
-        priset::create_table(io_cfg, kmer_locations, pairs, kmer_map);
+        priset::create_table(io_cfg, primer_cfg, kmer_locations, pairs);
         // create app script
         if (! priset::gui::generate_app(io_cfg) && priset::gui::compile_app(io_cfg))
             std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";

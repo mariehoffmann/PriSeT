@@ -30,7 +30,6 @@ struct setup
     priset::io_cfg_type io_cfg{};
     priset::primer_cfg_type primer_cfg{};
     priset::TKmerLocations kmer_locations;
-    priset::TKmerMap kmer_map;
 
     setup()
     {
@@ -60,8 +59,6 @@ struct setup
         //kmer_locations.push_back(priset::TKmerLocation(1, loc_vec1));
         //kmer_locations.push_back(priset::TKmerLocation(2, loc_vec2));
 
-        kmer_map[1] = priset::TKmer{1, "AAAA", 12.0};
-        kmer_map[2] = priset::TKmer{2, "ACCC", 13.0};
     }
 };
 
@@ -79,15 +76,15 @@ void combine_test()
     setup s{};
 
     priset::TKmerPairs pairs{};
-    priset::combine(s.primer_cfg, s.kmer_locations, s.kmer_map, pairs);
-    priset::print_pairs(pairs, s.kmer_map);
+    priset::combine(s.primer_cfg, s.kmer_locations, pairs);
+    priset::print_pairs(pairs);
 }
 
 void create_table_test()
 {
     setup s{};
     priset::TKmerPairs pairs{};
-    create_table(s.io_cfg, s.kmer_locations, pairs, s.kmer_map);
+    create_table(s.io_cfg, s.kmer_locations, pairs);
 }
 
 void lookup_sequences_test()

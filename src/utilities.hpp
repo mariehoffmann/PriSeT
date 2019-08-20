@@ -9,6 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <seqan/basic.h>
@@ -36,63 +37,9 @@ std::string exec(char const * cmd) {
     return result;
 }
 
-void print_locations(TLocations & locations)
-{
-    using key_type = typename TLocations::key_type;
-    using TSeqNo = typename seqan::Value<key_type, 1>::Type;
-    using TSeqPos = typename seqan::Value<key_type, 2>::Type;
-    //using value1_type = typename seqan::Value<typename TLocations::value_type, 1>::Type;
-    std::cout << "Locations (SeqNo, SeqPos): [(SeqNo, SeqPos)], [(SeqNo, SeqPos)]:\n";
-    for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
-    {
-        std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(it->first) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(it->first) << "): [";
-        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).first)
-            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
-        std::cout << "], [";
-        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).second)
-            std::cout << "(" << seqan::getValueI1(pair) << ", " << seqan::getValueI2(pair) << ") ";
-        std::cout << "]\n";
-    }
-}
-
-void print_kmer_locations(TKmerLocations const & kmer_locations, TKmerMap const & kmer_map)
-{
-    for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
-    {
-        const TKmer kmer{kmer_map.at(kmer_locations[i].get_kmer_ID())};
-        std::cout << kmer.seq << ": [";
-        for (TKmerLocation::size_type j = 0; j < kmer_locations[i].container_size(); ++j)
-            std::cout << "(" << kmer_locations[i].accession_ID_at(j) << ", " << kmer_locations[i].kmer_pos_at(j) << ") ";
-
-        std::cout << "]" << std::endl;
-    }
-}
-
-void print_pairs(TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
-{
-    std::set<TKmerID> legend;
-    std::cout << "\n(kmer ID1, kmer ID2) | reference ID | (pos1, pos2)\n";
-    std::cout << "-------------------------------------------------------\n";
-    if (!kmer_pairs.size())
-        std::cout << "<None>\n";
-    for (typename TKmerPairs::const_iterator it = kmer_pairs.begin(); it != kmer_pairs.end(); ++it)
-    {
-        std::cout << "(" << (*it).get_kmer_ID1() << ", " << (*it).get_kmer_ID2() << ")\t\t| ";
-        legend.insert((*it).get_kmer_ID1());
-        legend.insert((*it).get_kmer_ID2());
-        for (TKmerPairs::size_type i = 0; i < (*it).container_size(); ++i)
-            std::cout << (*it).accession_ID_at(i) << "\t\t| (" << (*it).kmer_pos_at(i, 1) << ", " << (*it).kmer_pos_at(i, 2) << ")\n";
-    }
-    if (kmer_pairs.size())
-    {
-        std::cout << "\n\nkmer ID\t | sequence\n------------------------------\n";
-        for (TKmerID kmer_ID : legend)
-            std::cout << kmer_ID << "\t| " << kmer_map.at(kmer_ID).seq << std::endl;
-    }
-}
-
 // forward declaration
 struct primer_cfg_type;
+//struct io_cfg_type;
 
 // compress to 64 bit integer. 4^i x [0:3] where 0 = 'A', ..., 3 = 'G' as little endian, i.e.,
 // first character add smalled partial code. E.g., ACGT is encoded as 0*1 + 1*4 + 2*16 + 3*64.
@@ -119,8 +66,63 @@ priset::TSeq dna_decoder(uint64_t code)
     return d;
 }
 
+void print_locations(TLocations & locations)
+{
+    using key_type = typename TLocations::key_type;
+    using TSeqNo = typename seqan::Value<key_type, 1>::Type;
+    using TSeqPos = typename seqan::Value<key_type, 2>::Type;
+    //using value1_type = typename seqan::Value<typename TLocations::value_type, 1>::Type;
+    std::cout << "Locations (SeqNo, SeqPos): [(SeqNo, SeqPos)], [(SeqNo, SeqPos)]:\n";
+    for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    {
+        std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(it->first) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(it->first) << "): [";
+        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).first)
+            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
+        std::cout << "], [";
+        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).second)
+            std::cout << "(" << seqan::getValueI1(pair) << ", " << seqan::getValueI2(pair) << ") ";
+        std::cout << "]\n";
+    }
+}
+
+void print_kmer_locations(TKmerLocations const & kmer_locations)
+{
+    for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
+    {
+        auto kmer_ID = kmer_locations[i].get_kmer_ID();
+        std::cout << dna_decoder(kmer_ID) << ": [";
+        for (TKmerLocation::size_type j = 0; j < kmer_locations[i].container_size(); ++j)
+            std::cout << "(" << kmer_locations[i].accession_ID_at(j) << ", " << kmer_locations[i].kmer_pos_at(j) << ") ";
+        std::cout << "]" << std::endl;
+    }
+}
+
+void print_pairs(TKmerPairs const & kmer_pairs)
+{
+    std::set<TKmerID> legend;
+    std::cout << "\n(kmer ID1, kmer ID2) | reference ID | (pos1, pos2)\n";
+    std::cout << "-------------------------------------------------------\n";
+    if (!kmer_pairs.size())
+        std::cout << "<None>\n";
+    for (typename TKmerPairs::const_iterator it = kmer_pairs.begin(); it != kmer_pairs.end(); ++it)
+    {
+        std::cout << "(" << (*it).get_kmer_ID1() << ", " << (*it).get_kmer_ID2() << ")\t\t| ";
+        legend.insert((*it).get_kmer_ID1());
+        legend.insert((*it).get_kmer_ID2());
+        for (TKmerPairs::size_type i = 0; i < (*it).container_size(); ++i)
+            std::cout << (*it).accession_ID_at(i) << "\t\t| (" << (*it).kmer_pos_at(i, 1) << ", " << (*it).kmer_pos_at(i, 2) << ")\n";
+    }
+    if (kmer_pairs.size())
+    {
+        std::cout << "\n\nkmer ID\t | sequence\n------------------------------\n";
+        for (TKmerID kmer_ID : legend)
+            std::cout << kmer_ID << "\t| " << dna_decoder(kmer_ID) << std::endl;
+    }
+}
+
+/*
 // Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
-void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
+void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
 {
     // load corpus
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
@@ -131,18 +133,22 @@ void lookup_sequences(TKmerLocations & kmer_locations, TKmerMap & kmer_map, io_c
     TSeqNo kmer_ID;
     TSeqPos kmer_pos;
     TKmerLength K;
+    // TODO: remove this later, uniqueness should be already ensured by location construction
+    std::unordered_set<TKmerID> seen;
     for (TKmerLocations::iterator kmer_it = kmer_locations.begin(); kmer_it != kmer_locations.end(); ++kmer_it)
     {
-        kmer_ID = kmer_it->accession_ID_at(0);
+        acc_ID = kmer_it->accession_ID_at(0);
         kmer_pos = kmer_it->kmer_pos_at(0);
         K = kmer_it->get_K();
-        seqan::DnaString seq = seqan::valueById(text, kmer_ID);
+        seqan::DnaString seq = seqan::valueById(text, acc_ID);
         auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, K);
         uint64_t kmer_code = dna_encoder(kmer_str);
-        // TODO: continue here
-        kmer_map[kmer_it->get_kmer_ID()] = TKmer{kmer_it->get_kmer_ID(), kmer_str, get_Tm(primer_cfg, kmer_str)};
+        assert(!seen.contains(kmer_code));
+        seen.insert(kmer_code)
+        // replace kmer_ID
+        kmer_it->set_kmer_ID(kmer_code);
     }
-}
+}*/
 
 // set directory information as needed by genmap's fasta file parsing
 void set_directoryInformation(std::string & index_path_base_ids, TDirectoryInformation & directoryInformation)
@@ -172,6 +178,7 @@ void split(std::string const & line, std::vector<std::string> & tokens, std::str
 }
 
 // create_table helper to build accession ID to accession number map
+template<typename io_cfg_type>
 void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, std::unordered_map<TAcc, TAccID> & acc2accID, io_cfg_type const & io_cfg)
 {
     //std::cout << "create_accID2acc_map\n";
@@ -198,6 +205,7 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
 }
 
 // create_table helper to build accession ID to taxon ID map
+template<typename io_cfg_type>
 void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, std::unordered_set<TTaxid> & taxid_set, std::unordered_map<TAcc, TAccID> const & acc2accID, io_cfg_type const & io_cfg)
 {
     std::cout << "create_accID2taxID\n";
@@ -230,6 +238,7 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 }
 
 // load taxonomy from file and store as map {taxid: p_taxid}
+template<typename io_cfg_type>
 void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type const & io_cfg)
 {
     std::cout << "create_tax_map\n";
@@ -250,7 +259,7 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
 }
 
 // accumulate statistics upstream for both container types - TKmerLocations and TKmerPairs
-template<typename TKmerContainer>
+template<typename TKmerContainer, typename io_cfg_type>
 void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::pair<TTaxid, uint16_t>> const & leaves, std::unordered_map<TTaxid, TTaxid> const & tax_map, std::unordered_map<TAccID, TTaxid> const & accID2taxID, std::unordered_map<TAccID, TAcc> const & accID2acc, io_cfg_type const & io_cfg)
 {
     if (!kmer_container.size())
@@ -338,18 +347,17 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 
 
 // Result output helper for writing primer infos.
-void write_primer_info_file(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerMap const & kmer_map)
+template<typename io_cfg_type, typename primer_cfg_type>
+void write_primer_info_file(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations)
 {
     std::ofstream primer_table;
     primer_table.open(io_cfg.get_primer_info_file());
     primer_table << "kmer_ID,kmer_sequence,Tm\n";
-
+    TKmerID kmer_ID;
     for (TKmerLocation kmer_location : kmer_locations)
     {
-        TKmerID kmer_ID = kmer_location.get_kmer_ID();
-        if (kmer_map.find(kmer_ID) == kmer_map.end())
-            std::cout << "ERROR: kmer_ID = " << kmer_ID << " not found in kmer map!\n", exit(0);
-        primer_table << kmer_ID << "," << kmer_map.at(kmer_ID).seq << "," << kmer_map.at(kmer_ID).Tm << "\n";
+        kmer_ID = kmer_location.get_kmer_ID();
+        primer_table << kmer_ID << "," << dna_decoder(kmer_ID) << "," << get_Tm(primer_cfg, kmer_ID) << "\n";
     }
     primer_table.close();
     std::cout << "STATUS: primer_info.csv written to\t" << io_cfg.get_primer_info_file() << std::endl;
@@ -359,14 +367,15 @@ void write_primer_info_file(io_cfg_type const & io_cfg, TKmerLocations const & k
     Write result table with columns: taxid, fwd, rev, matches, coverage, ID_list and
     primer info file with columns kmer_id (1-based), sequence and melting temperature.
 */
-void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs, TKmerMap const & kmer_map)
+template<typename io_cfg_type, typename primer_cfg_type>
+void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs)
 {
     std::cout << "STATUS: will write " << kmer_locations.size() << " single primer results and " << kmer_pairs.size() << " primer pair results\n";
     // TODO: check if unordered_map instead of map
     // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
     std::unordered_map<TAccID, TAcc> accID2acc;
     std::unordered_map<TAcc, TAccID> acc2accID;
-    create_accID2acc_map(accID2acc, acc2accID, io_cfg);
+    create_accID2acc_map<io_cfg_type>(accID2acc, acc2accID, io_cfg);
 
     // build dictionary for taxids and counter for assigned accessions
     std::unordered_map<TAccID, TTaxid> accID2taxID;
@@ -423,14 +432,14 @@ void create_table(io_cfg_type const & io_cfg, TKmerLocations const & kmer_locati
     table.close();
 
     // collect single kmer matches
-    accumulation_loop<TKmerLocations>(kmer_locations, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
+    accumulation_loop<TKmerLocations, io_cfg_type>(kmer_locations, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
 
     // collect kmer pair matches for bottom nodes
     accumulation_loop<TKmerPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
     std::cout << "STATUS: table.csv written to\t" << io_cfg.get_result_file() << std::endl;
 
     // write primer info file
-    write_primer_info_file(io_cfg, kmer_locations, kmer_map);
+    write_primer_info_file(io_cfg, primer_cfg, kmer_locations);
 }
 
 }  // namespace priset

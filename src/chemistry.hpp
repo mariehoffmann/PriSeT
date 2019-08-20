@@ -19,90 +19,79 @@
 
 #include "primer_cfg_type.hpp"
 #include "types.hpp"
+#include "utilities.hpp"
 
 namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
-//struct ::primer_cfg_type;
-
-//!\brief Wallace rule to compute the melting temperature of a primer sequence.
-float primer_melt_wallace(seqan::String<priset::dna> const & sequence)
+//!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.
+float primer_melt_wallace(TKmerID code)
 {
-    assert(length(sequence) < (1 << 8));
-    uint8_t cnt_AT = 0;
-    uint8_t CG_cnt = 0;
-    for (auto c : sequence)
+    uint8_t ctr_AT = 0, ctr_CG = 0;
+    std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
+    while (code != 1)
     {
-        switch(char(c))
+        switch(decodes[3 & code])
         {
             case 'A':
-            case 'T': ++cnt_AT; break;
+            case 'T': ++ctr_AT; break;
             case 'C':
-            case 'G': ++CG_cnt; break;
-            default: std::cout << "ERROR: unsupported sequence character '" << c << "'\n";
+            case 'G': ++ctr_CG;
         }
+        code >>= 2;
     }
-    return 2*cnt_AT + 4*CG_cnt;
+    return (ctr_AT << 1) + (ctr_CG << 2);
 }
 
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
 // input primer:string sequence, Na:float molar Natrium ion concentration
-inline float primer_melt_salt(seqan::String<priset::dna> const & sequence, float const Na)
+inline float primer_melt_salt(TKmerID code, float const Na)
 {
-    assert(length(sequence) < (1 << 8));
-    uint8_t cnt_AT = 0;
-    uint8_t CG_cnt = 0;
-    for (auto c : sequence)
+    uint8_t ctr_CG = 0;
+    uint8_t seq_len = 0;
+    std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
+    while (code != 1)
     {
-        switch(char(c))
+        switch(decodes[3 & code])
         {
-            case 'A':
-            case 'T': ++cnt_AT; break;
             case 'C':
-            case 'G': ++CG_cnt; break;
-            default: std::cout << "ERROR: unsupported sequence character '" << c << "'\n";
+            case 'G': ++ctr_CG;
         }
+        code >>= 2;
+        ++seq_len;
     }
-    return 100.5 + 41.0 * CG_cnt / seqan::length(sequence) - 820.0 / seqan::length(sequence) + 16.6 * std::log10(Na);
+    return 100.5 + 41.0 * ctr_CG / seq_len - 820.0 / seq_len + 16.6 * std::log10(Na);
 }
 
 //!\brief Compute melting temperature of primer sequence with method set in primer configuration.
-float get_Tm(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence) noexcept
+float get_Tm(primer_cfg_type const & primer_cfg, TKmerID kmer_ID) noexcept
 {
     switch(primer_cfg.get_primer_melt_method())
     {
-        case TMeltMethod::WALLACE: return primer_melt_wallace(sequence);
-        default: return primer_melt_salt(sequence, primer_cfg.get_Na());
+        case TMeltMethod::WALLACE: return primer_melt_wallace(kmer_ID);
+        default: return primer_melt_salt(kmer_ID, primer_cfg.get_Na());
     }
-}
-
-//!\brief Check if melting temperature is in range set by the primer configurator.
-inline bool filter_Tm(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
-{
-    float Tm = get_Tm(primer_cfg, sequence);
-    if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
-        return true;
-    return false;
 }
 
 //!\brief Check if CG content is in range set by the primer configurator.
 // Returns false if constraint is violated.
-bool filter_CG(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
+bool filter_CG(primer_cfg_type const & primer_cfg, TKmerID code)
 {
-    assert(length(sequence) < (1 << 8));
-    uint8_t CG_cnt = 0;
-    for (auto c : sequence)
+    uint8_t ctr_CG = 0;
+    uint8_t seq_len = 0;
+    std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
+    while (code != 1)
     {
-        switch(char(c))
+        switch(decodes[3 & code])
         {
-            case 'A': break;
             case 'C':
-            case 'G': ++CG_cnt; break;
-            case 'T': break;
-            default: std::cout << "ERROR: unsupported sequence character '" << c << "'\n";
+            case 'G': ++ctr_CG; break;
         }
+        code >>= 2;
+        ++seq_len;
     }
-    float CG = float(CG_cnt) / float(seqan::length(sequence));
+    // relative CG content
+    float CG = float(ctr_CG) / float(seq_len);
     return (CG >= primer_cfg.get_min_CG_content() && CG <= primer_cfg.get_max_CG_content());
 }
 
@@ -139,8 +128,9 @@ inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::Strin
  * Filter di-nucleotide repeats, like ATATATAT, and runs, i.e. series of same nucleotides.
  * For both the maximum is 4 consecutive di-nucleotides, and 4bp, respectively.
  */
-bool filter_repeats_runs(TSeq & seq)
+bool filter_repeats_runs(TKmerID kmer_ID)
 {
+    TSeq seq = dna_decoder(kmer_ID);
     if (seqan::length(seq) > 4)
     {
         uint8_t repeat_even = 1;
@@ -190,8 +180,8 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
     int8_t const m = seqan::length(t);
     int8_t s1, s2;
     int8_t t1, t2;
-    int8_t cnt_AT, cnt_CG;
-    auto energy = [](int8_t const & cnt_CG, int8_t const &cnt_AT) { return -(cnt_CG + 2*cnt_AT);};
+    int8_t ctr_AT, ctr_CG;
+    auto energy = [](int8_t const & ctr_CG, int8_t const &ctr_AT) { return -(ctr_CG + 2*ctr_AT);};
     //auto lambda = [](const std::string& s) { return std::stoi(s); };
     int8_t energy_min = 0;
     for (int8_t i = 0; i < n + m - 2 * offset + 1; ++i)
@@ -201,21 +191,21 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
         t2 = std::min<int8_t>(i + offset, m);
         s2 = std::min<int8_t>(s1 + t2 - t1, n);
         // count complementary bps
-        cnt_CG = 0;
-        cnt_AT = 0;
+        ctr_CG = 0;
+        ctr_AT = 0;
         for (auto j = 0; j < s2-s1; ++j)
         {
             switch(char(s[s1+j]))
             {
-                case 'A': cnt_AT += (t[t1+j] == 'T') ? 1 : 0; break;
-                case 'T': cnt_AT += (t[t1+j] == 'A') ? 1 : 0; break;
-                case 'C': cnt_CG += (t[t1+j] == 'G') ? 1 : 0; break;
-                case 'G': cnt_CG += (t[t1+j] == 'C') ? 1 : 0; break;
+                case 'A': ctr_AT += (t[t1+j] == 'T') ? 1 : 0; break;
+                case 'T': ctr_AT += (t[t1+j] == 'A') ? 1 : 0; break;
+                case 'C': ctr_CG += (t[t1+j] == 'G') ? 1 : 0; break;
+                case 'G': ctr_CG += (t[t1+j] == 'C') ? 1 : 0; break;
                 default: std::cout << "ERROR: primer contains unknown symbol '" << s[s1+j] << "'" << std::endl;
             }
             // update minimal energy
-            if (energy(cnt_CG, cnt_AT) < energy_min)
-                energy_min = energy(cnt_CG, cnt_AT);
+            if (energy(ctr_CG, ctr_AT) < energy_min)
+                energy_min = energy(ctr_CG, ctr_AT);
         }
     }
     return energy_min;
@@ -224,8 +214,10 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_cross_dimerization(TSeq const & seq1, TSeq const & seq2)
+inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
 {
+    auto seq1 = dna_decoder(kmer_ID1);
+    auto seq2 = dna_decoder(kmer_ID2);
     float dG = gibbs_free_energy(seq1, seq2);
     //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
     return (dG < -10) ? false : true;
@@ -234,9 +226,9 @@ inline bool filter_cross_dimerization(TSeq const & seq1, TSeq const & seq2)
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_self_dimerization(TSeq const & seq)
+inline bool filter_self_dimerization(TKmerID kmer_ID)
 {
-    return filter_cross_dimerization(seq, seq);
+    return filter_cross_dimerization(kmer_ID, kmer_ID);
 }
 
 /*
