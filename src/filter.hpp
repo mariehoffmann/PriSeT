@@ -31,9 +31,6 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & location
     std::cout << "text_path: " << text_path << std::endl;
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
 
-    /*TSeqNo seqNo;
-    TSeqPos seqPos;
-    TKmerLength K;*/
     TKmerID kmer_ID;
     std::vector<TLocation> fwd;
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
@@ -43,9 +40,6 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & location
         if ((it->second).first.size() < cutoff)
             continue;
 
-        //seqNo = std::get<0>(it->first);
-        //seqPos = std::get<1>(it->first);
-        //K = std::get<2>(it->first);
         const auto & [seqNo, seqPos, K] = (it->first);
 
         // use symmetry and lexicographical ordering of locations to skip already seen ones
@@ -85,15 +79,20 @@ void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations &
 
     for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
     {
+
         // TODO: optimize - drop kmer when computing Tm in sequence lookup fct
         kmer_ID = kmer_locations[i].get_kmer_ID1();
+        //std::cout << "kmer_ID = " << kmer_ID << std::endl;
         auto Tm = primer_melt_wallace(kmer_ID);
+    //    std::cout << "Tm = " << Tm << std::endl;
         // filter by melting temperature
         if (Tm >= Tm_min && Tm <= Tm_max)
         {
             // filter by CG content
+    //        std::cout << "call filter_CG ...\n";
             if (filter_CG(primer_cfg, kmer_ID))
             {
+
                 // Filter if Gibb's free energy is below -6 kcal/mol
                 if (filter_self_dimerization(kmer_ID))
                 {
@@ -188,8 +187,9 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
         for (auto it2 = it1+1; it2 != kmer_locations.end(); ++it2)
         {
             K2 = (*it2).get_K();
-            kmer_ID1 = (*it1).get_kmer_ID1();
-            kmer_ID2 = (*it2).get_kmer_ID2();
+            kmer_ID1 = (*it1).get_kmer_ID();
+            kmer_ID2 = (*it2).get_kmer_ID();
+            assert(kmer_ID1 && kmer_ID2);
 
             // continue with next combination if kmer sequences do not pass cross-dimerization filter
             if (!filter_cross_dimerization(kmer_ID1, kmer_ID2))

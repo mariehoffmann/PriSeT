@@ -80,13 +80,6 @@ void combine_test()
     priset::print_pairs(pairs);
 }
 
-void create_table_test()
-{
-    setup s{};
-    priset::TKmerPairs pairs{};
-    create_table(s.io_cfg, s.kmer_locations, pairs);
-}
-
 void lookup_sequences_test()
 {
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
@@ -105,32 +98,15 @@ void dimerization_test()
 
 }
 
-void filter_repeats_runs_test()
-{
-    priset::TSeq seq = "GATATATATG";
-    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
-    seq = "GATATATAGATGG";
-    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
-    seq = "GGGATATATAT";
-    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
-    seq = "GATATATTTTTGG";
-    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
-    seq = "GATATAAAAA";
-    std::cout << "kmer seq = " << seq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
-}
-
 uint64_t dna_encoder(priset::TSeq const & seq)
 {
     uint64_t code = 0;
-    for (uint16_t i = 0; i < seqan::length(seq); ++i)
+    for (uint64_t i = 0; i < seqan::length(seq); ++i)
     {
-        std::cout << "seq[i] = " << seq[i] << " as uint16_t: " << uint16_t(seq[i]) << std::endl;
-        //std::cout << "factor is " << ((1 << (i << 1))) << std::endl;
-        std::cout << "add " << uint16_t(seq[i]) * (1 << (i << 1)) << std::endl;
-        code += uint16_t(seq[i]) * (1 << (i << 1));
+        code += uint64_t(seq[i]) * (1 << (i << 1));
     }
-    std::cout << " add final C: " << (1 << (seqan::length(seq) << 1)) << std::endl;
-    return code + (1 << (seqan::length(seq) << 1));
+    std::cout << "sum = " << code << std::endl;
+    return code + (uint64_t(1) << uint64_t(seqan::length(seq) << 1));
 }
 
 priset::TSeq dna_decoder(uint64_t code)
@@ -140,18 +116,37 @@ priset::TSeq dna_decoder(uint64_t code)
     priset::TSeq d = "";
     while (code != 1)
     {
+
         d += decodes[3 & code];
         code >>= 2;
     }
     return d;
 }
 
+void filter_repeats_runs_test()
+{
+    priset::TSeq seqseq = "GATATATATG";
+    uint64_t seq = dna_encoder(seqseq);
+    std::cout << "kmer seq = " << seqseq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seqseq = "GATATATAGATGG";
+    seq = dna_encoder(seqseq);
+    std::cout << "kmer seq = " << seqseq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seqseq = "GGGATATATAT";
+    seq = dna_encoder(seqseq);
+    std::cout << "kmer seq = " << seqseq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seqseq = "GATATATTTTTGG";
+    seq = dna_encoder(seqseq);
+    std::cout << "kmer seq = " << seqseq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+    seqseq = "GATATAAAAA";
+    seq = dna_encoder(seqseq);
+    std::cout << "kmer seq = " << seqseq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
+}
+
 void test_encoder()
 {
-    priset::TSeq seq = "AAAAAA"; // as int 228 + 256 = 484
-    uint64_t code = dna_encoder(seq);
-    std::cout <<  "seq to int: " << code << std::endl;
-    std::cout <<  "back to dna: " << dna_decoder(code) << std::endl;
+
+    std::cout << "as seq " << dna_decoder(8031228595) << std::endl;
+    std::cout << "TATGGACTGATGGTCT == " << dna_decoder(dna_encoder("TATGGACTGATGGTCT")) << std::endl;
 }
 
 int main()

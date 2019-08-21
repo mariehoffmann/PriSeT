@@ -130,6 +130,7 @@ inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::Strin
  */
 bool filter_repeats_runs(TKmerID kmer_ID)
 {
+
     TSeq seq = dna_decoder(kmer_ID);
     if (seqan::length(seq) > 4)
     {
@@ -216,6 +217,7 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
  */
 inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
 {
+//    std::cout << "enter filter_cross_dimerization with kmer_ID1 = " << kmer_ID1 << " and kmer_ID2 = " << kmer_ID2 << std::endl;
     auto seq1 = dna_decoder(kmer_ID1);
     auto seq2 = dna_decoder(kmer_ID2);
     float dG = gibbs_free_energy(seq1, seq2);

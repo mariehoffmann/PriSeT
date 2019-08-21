@@ -47,15 +47,19 @@ struct primer_cfg_type;
 uint64_t dna_encoder(priset::TSeq const & seq)
 {
     uint64_t code = 0;
-    for (uint16_t i = 0; i < seqan::length(seq); ++i)
-        code += uint16_t(seq[i]) * (1 << (i << 1));
-    return code + (1 << (seqan::length(seq) << 1));
+    for (uint64_t i = 0; i < seqan::length(seq); ++i)
+        code += uint64_t(seq[i]) * (1 << (i << 1));
+    code += (uint64_t(1) << uint64_t(seqan::length(seq) << 1));
+    //if (code == )
+    //    std::cout << "seq = " << seq << " => " << code << std::endl;
+    return code;
 }
 
 // Decode 64 bit integer.
 priset::TSeq dna_decoder(uint64_t code)
 {
     assert(code > 0);
+
     std::array<std::string, 4> decodes = {"A", "C", "G", "T"};
     priset::TSeq d = "";
     while (code != 1)
@@ -277,7 +281,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
         // value_type is either TKmerLocation or TKmerPair
         for (typename TKmerContainer::value_type kmer_location : kmer_container) // taxid, kmer fixed
         {
-
+            // CHECK: behaviour correct for kmer_locations with only one kmer_ID
             TKmerID kmerID1 = kmer_location.get_kmer_ID1();
             TKmerID kmerID2 = kmer_location.get_kmer_ID2();
 
