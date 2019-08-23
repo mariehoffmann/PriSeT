@@ -1,3 +1,6 @@
 [submodule "submodules/genmap"]
 	path = submodules/genmap
 	url = https://github.com/mariehoffmann/genmap.git
+[submodule "submodules/sdsl"]
+	path = submodules/sdsl
+	url = https://github.com/simongog/sdsl-lite.git

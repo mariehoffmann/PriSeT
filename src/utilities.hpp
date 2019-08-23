@@ -55,6 +55,13 @@ uint64_t dna_encoder(priset::TSeq const & seq)
     return code;
 }
 
+uint64_t dna_decoder(text, TSeqNo seqNo, TSeqPos seqPos, TKmerLength K)
+{
+    seqan::DnaString seq = seqan::valueById(text, seqNo);
+    auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
+    return dna_encoder(kmer_str);
+}
+
 // Decode 64 bit integer.
 priset::TSeq dna_decoder(uint64_t code)
 {

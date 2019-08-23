@@ -59,7 +59,11 @@ public:
         skip_idx_flag = skip_idx_flag_;
         index_dir = work_dir;
         mapping_dir = work_dir;
-        genmap_bin = fs::current_path() / "submodules/genmap/bin/genmap";
+        // TODO: path to PriSeT git repos as argument
+        genmap_bin = "~/git/PriSet_git2/PriSeT/submodules/genmap/bin/genmap";
+        std::cout << "genmap exists: " << fs::exists(genmap_bin) << std::endl;
+        std::cout << "current_path = " << fs::current_path() << std::endl;
+    //    /Users/troja/git/PriSet_git2/PriSeT/submodules/genmap/bin/
         // parse library directory and assign paths to the .acc, .fasta, and .tax files
 //        std::cout << "current path: " << fs::current_path() << std::endl;
 

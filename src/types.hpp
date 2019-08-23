@@ -93,6 +93,7 @@ typedef std::string TAcc;
  * Datatype to store a kmer as an alphabet sequence, a melting temperature and
  * a unique integer ID.
  */
+ // TODO: delete after transforming, only used in combiner
 struct TKmer
 {
     // Unique numerical identifier. Default 0 means unset.
@@ -101,6 +102,16 @@ struct TKmer
     // Melting temperature of k-mer sequence.
     float Tm{0};
 };
+
+// A bit vector for each reference, with 1 indicating a kmer starting position.
+typedef std::vector<sdsl::bit_vector> TReferences;
+
+// Stores for each reference the encoded kmers in order of occurrence.
+typedef std::vector<std::vector<TKmerID>> TKmerIDs;
+
+// Transforms sequence ID 0..n-1 to contiguous range 0 .. k <= n-1.
+// Background: some sequences may have no kmers and therefore no space should be reserved in bit vector set.
+typedef std::unordered_map<TSeqNo, TSeqNo> TSeqNoMap;
 
 // todo: TKmerLocation and TKmerPair inherit from same base struct.
 // vector type of k-mers and their locations

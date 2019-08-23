@@ -4,6 +4,7 @@
 #include <bitset>
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <string>
 #include <unordered_set>
 
@@ -59,6 +60,89 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & location
         kmer_locations.push_back(TKmerLocation{kmer_ID, K, fwd});
         // TODO: same for reverse?
         fwd.clear();
+    }
+    locations.clear();
+}
+
+// kmer locations by reference
+void frequency_filter2(priset::io_cfg_type const & io_cfg, TKLocations const & locations, TReferences & references, TKmerIDs &kmers, TSeqNoMap & seqNoMap, TSeqNo const cutoff)
+{
+    // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
+    assert(length(locations));
+
+    kmer_references.clear();
+    // collect distinct sequence identifiers and maximal position of kmer occurences
+    std::unordered_map<TSeqNo, TSeqPos> seqNos;
+    for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    {
+        // cleanup in mapper may lead to undercounting kmer occurrences
+        if ((it->second).first.size() < cutoff)
+            continue;
+        const auto & [seqNo, seqPos, K] = (it->first);
+        // use symmetry and lexicographical ordering of locations to skip already seen ones
+        // TODO: is this already shortcut fm mapper?
+        if (it->second.first.size() && seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)
+            continue;
+
+        // update largest kmer position
+        seqNo_and_max_pos.insert_or_assign(seqNo, std::max(seqNo_and_maxP[seqNo], seqPos));
+        // and also for other occurences
+        for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.second.begin(); it_loc_fwd != it->second.second.end(); ++it_loc_fwd)
+        {
+            TSeqNo seqNo_next = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
+            TSeqPos seqPos_next = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
+            seqNo_and_max_pos.insert_or_assign(seqNo_next, std::max(seqNo_and_maxP[seqNo_next], seqPos_next));
+        }
+    }
+    std::vector<TSeqNo> seqNos_sort;
+    seqNos_sort.reserve(seqNo_and_maxP.size());
+    for (auto it_set = seqNo_and_maxP.begin(); it_set != seqNo_and_maxP.end(); )
+        seqNos_sort.push_back(std::move(seqNo_and_maxP.extract(it_set++).value()));
+    seqNos_sort.sort();
+    seqNoMap.clear();
+    for (auto i = 0; i < seqNos_sort.size(); ++i)
+    {
+        seqNoMap.insert({seqNos_sort[i], i});
+        sdsl::bit_vector bv(seqNo_and_max_pos[seqNos_sort[i]], 0);
+        references.push_back(bv);
+
+    }
+
+    // load corpus for dna to 64 bit conversion
+    seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
+    fs::path text_path = io_cfg.get_index_txt_path();
+    seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
+
+    TKmerID kmer_ID;
+
+    // helper for dna sequence extraction
+    std::function<int (int)> dna_extract = [text](TSeqNo seqNo, TSeqPos seqPos, TKmerLength K) { return i+4; };
+
+    // set bits for kmers in references
+    for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    {
+        // cleanup in mapper may lead to undercounting kmer occurrences
+        if ((it->second).first.size() < cutoff)
+            continue;
+        const auto & [seqNo, seqPos, K] = (it->first);
+        // use symmetry and lexicographical ordering of locations to skip already seen ones
+        // TODO: is this already shortcut fm mapper?
+        if (it->second.first.size() && seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)
+            continue;
+
+        references[seqNoMap.at(seqNo)][seqPos] = 1;
+        // encode dna sequence and store
+        kmer_ID = dna_encoder(text, seqNo, seqPos, K);
+        kmers[seqNoMap.at(seqNo)].push_back(kmer_ID);
+        // same for listed occurrences
+        for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.second.begin(); it_loc_fwd != it->second.second.end(); ++it_loc_fwd)
+        {
+            TSeqNo seqNo_next = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
+            TSeqPos seqPos_next = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
+            references[seqNoMap.at(seqNo_next)][seqPos_next] = 1;
+            kmer_ID = dna_encoder(text, seqNo_next, seqPos_next, K);
+            kmers[seqNoMap.at(seqNo)].push_back(kmer_ID);
+        }
     }
     locations.clear();
 }
