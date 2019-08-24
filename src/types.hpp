@@ -11,6 +11,8 @@
 #include <bitset>
 #include <stdlib.h>
 
+#include <sdsl/bit_vectors.hpp>
+
 #include "../submodules/genmap/src/common.hpp"
 
 //#include "primer_cfg_type.hpp"

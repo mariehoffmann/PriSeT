@@ -4,6 +4,7 @@
 #include <regex>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <unordered_map>
 #include <vector>
 
 #include <seqan/basic.h>
@@ -20,13 +21,15 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/src/test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -o test
+using namespace priset;
+
+// g++ ../PriSeT/src/test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o test
 
 struct setup
 {
     // TODO: make this runnable with arbitrarily located build folders
-    std::string lib_dir = (fs::canonical("../PriSeT/src/tests/library")).string();
-    std::string work_dir = (fs::canonical("../PriSeT/src/tests/work")).string();
+    std::string lib_dir = (fs::canonical("../PriSeT/src/tests/library/3041")).string();
+    std::string work_dir = (fs::canonical("../PriSeT/src/tests/work/3041")).string();
     priset::io_cfg_type io_cfg{};
     priset::primer_cfg_type primer_cfg{};
     priset::TKmerLocations kmer_locations;
@@ -62,6 +65,7 @@ struct setup
     }
 };
 
+/*
 void gui_test()
 {
     setup up{};
@@ -141,20 +145,79 @@ void filter_repeats_runs_test()
     seq = dna_encoder(seqseq);
     std::cout << "kmer seq = " << seqseq << " passes repeat_and_runs filter: " << priset::filter_repeats_runs(seq) << std::endl;
 }
+*/
 
-void test_encoder()
+/*
+ * seq 0:   00100100000000010010000000000000000000001
+ *          01234567890123456789012345678901234567890
+ *          kmer1, kmer2, kmer1, kmer3, kmer4
+ * seq 2:   01100000000000000100000000000000000000001
+ *          01234567890123456789012345678901234567890
+ *          kmer1, kmer4, kmer3
+ * kmer1 =
+*/
+void converter_test()
 {
+    setup su{};
+    std::vector<priset::TSeq> kmers = {
+            "CACGATTACCAATCAC",
+            "GATTACCAATCACGAT",
+            "GATTACCAATCACGGC",
+            "ACGATTACCAATCACG"};
+    for (auto const kmer : kmers)
+        std::cout << kmer << " => " << priset::dna_encoder(kmer) << std::endl;
 
-    std::cout << "as seq " << dna_decoder(8031228595) << std::endl;
-    std::cout << "TATGGACTGATGGTCT == " << dna_decoder(dna_encoder("TATGGACTGATGGTCT")) << std::endl;
+    std::vector<priset::TKmerID> kmer_IDs;
+    std::transform(kmers.begin(), kmers.end(), std::back_inserter(kmer_IDs), [](priset::TSeq seq){return priset::dna_encoder(seq);});
+
+    // src
+    priset::TKLocations locations;
+    std::vector<priset::TLocation> dummy;
+    std::vector<priset::TKLocation> keys{priset::TKLocation{0, 2, 16}, priset::TKLocation{0, 5, 16}, priset::TKLocation{0, 18, 16}, TKLocation{0, 50, 16}};
+    std::vector<std::vector<TLocation>> values{
+        std::vector<TLocation>{TLocation{0,2}, TLocation{0, 15}, TLocation{2, 1}},
+        std::vector<TLocation>{TLocation{0,5}, TLocation{2, 50}},
+        std::vector<TLocation>{TLocation{0,18}, TLocation{2, 17}},
+        std::vector<TLocation>{TLocation{0,50}, TLocation{2, 2}}
+    };
+
+    for (unsigned i = 0; i < keys.size(); ++i)
+    {
+        auto value = std::make_pair(values[i], dummy);
+        std::cout << "value.first.size = " << value.first.size() << std::endl;
+        locations.insert({keys[i], value});
+    }
+    // dst
+    priset::TReferences references;
+    priset::TKmerIDs kmerIDs;
+    priset::TSeqNoMap seqNoMap;
+    priset::TSeqNo const cutoff = 2;
+
+    std::unordered_map<std::string, priset::TSeq> seq_map;
+    seq_map.insert({"0_2",  "CACGATTACCAATCAC"});
+    seq_map.insert({"0_5",  "GATTACCAATCACGAT"});
+    seq_map.insert({"0_18", "GATTACCAATCACGGC"});
+    seq_map.insert({"0_50", "ACGATTACCAATCACG"});
+
+    priset::frequency_filter2(su.io_cfg, locations, references, kmerIDs, seqNoMap, cutoff, seq_map);
+    std::cout << "references: \n";
+    for (auto reference : references)
+    {
+        for (unsigned i = 0; i < reference.size(); ++i)
+            std::cout << reference[i];
+        std::cout << std::endl;
+    }
+    std::cout << "and associated kmers: \n";
+    for (unsigned i = 0; i < kmerIDs.size(); ++i)
+    {
+        for (priset::TKmerID kmerID : kmerIDs[i])
+            std::cout << kmerID << ", ";
+        std::cout << std::endl;
+    }
+
 }
 
 int main()
 {
-    //combine_test();
-    //create_table_test();
-    //gui_test();
-    //lookup_sequences_test();
-    //filter_repeats_runs_test();
-    test_encoder();
+    converter_test();
 }
