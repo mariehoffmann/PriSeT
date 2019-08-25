@@ -106,7 +106,8 @@ struct TKmer
 };
 
 // A bit vector for each reference, with 1 indicating a kmer starting position.
-typedef std::vector<sdsl::bit_vector> TReferences;
+typedef sdsl::bit_vector TReference;
+typedef std::vector<TReference> TReferences;
 
 // Stores for each reference the encoded kmers in order of occurrence.
 typedef std::vector<std::vector<TKmerID>> TKmerIDs;
@@ -182,8 +183,8 @@ public:
 
 };
 
-// List type of TKmerLocation.
-typedef std::vector<TKmerLocation > TKmerLocations;
+// Kmer combinations given by their indices in kmer ID vector.
+typedef std::vector<std::pair<uint64_t, uint64_t>> TPairs;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TKmerPair

@@ -76,7 +76,7 @@ TKmerID encode_wrapper(TText const & text, TSeqNo const seqNo, TSeqPos const seq
 };
 
 // kmer locations by reference
-void frequency_filter2(priset::io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, std::unordered_map<std::string, TSeq> seq_map)
+void frequency_filter2(priset::io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff)
 {
     std::cout << "Enter frequency_filter2 ...\n";
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
@@ -161,24 +161,26 @@ void frequency_filter2(priset::io_cfg_type const & io_cfg, TKLocations & locatio
 
         references[seqNoMap.at(seqNo)][seqPos] = 1;
         // delete this, debug only
-        std::string key = std::to_string(seqNo) + "_" + std::to_string(seqPos);
-        priset::TSeq const & seq = seq_map[key];
-        kmerID = dna_encoder(seq);
+        //std::string key = std::to_string(seqNo) + "_" + std::to_string(seqPos);
+        //priset::TSeq const & seq = seq_map[key];
+        //kmerID = dna_encoder(seq);
         // encode dna sequence and store
-        //kmerID = encode_wrapper<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> >(text, seqNo, seqPos, K);
+        kmerID = encode_wrapper<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> >(text, seqNo, seqPos, K);
         //kmerIDs[seqNoMap.at(seqNo)].push_back(kmerID);
         // insert now unique occurrences listed in first vector (forward mappings)
-        std::cout << "h6\n";
         for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
         {
-            std::cout << "h7\n";
             TSeqNo seqNo_other = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
             TSeqPos seqPos_other = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
-            references[seqNoMap.at(seqNo_other)][seqPos_other] = 1;
-            //kmerID = dna_encoder(text, seqNo_next, seqPos_next, K);
-            std::cout << "insert kmerIDs for seq " << seqNoMap.at(seqNo_other) << std::endl;
-            kmerIDs[seqNoMap.at(seqNo_other)].push_back(kmerID);
-            std::cout << "h8\n";
+            auto idx = seqNoMap.at(seqNo_other); // compressed sequence id
+            references[idx][seqPos_other] = 1;
+            // rank computes number of 1s until given position (exclusive)
+            sdsl::rank_support_v<> rb(&references[idx]);
+            std::cout << "insert kmerIDs for seq " << idx << " at position " << rb(seqPos_other) << std::endl;
+
+            kmerIDs[idx].insert(kmerIDs[idx].begin() + rb(seqPos_other), kmerID);
+
+            std::cout << "insert kmerID = " << kmerID << " found at (" << seqNo_other << ", " << seqPos_other << " into row = " << idx << std::endl;
         }
     }
     locations.clear();
@@ -254,7 +256,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
 }*/
 
 // filter k-mers by frequency and chemical properties
-void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TKmerLocations & kmer_locations)
+void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
 
@@ -263,9 +265,10 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     // continue here
     std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching
-    frequency_filter(io_cfg, locations, kmer_locations, cutoff);
+    //priset::io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, std::unordered_map<std::string, TSeq> seq_map
+    frequency_filter2(io_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff);
     std::cout << "INFO: kmers after frequency cutoff = " << kmer_locations.size() << std::endl;
-    chemical_filter_single(primer_cfg, kmer_locations);
+    //chemical_filter_single(primer_cfg, kmer_locations);
     std::cout << "INFO: kmers after chemical filtering = " << kmer_locations.size() << std::endl;
 }
 
@@ -380,9 +383,48 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
     }
 }
 
-/*void post_filter_main(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations, TKmerPairs & pairs)
+// primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs
+void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairs & pairs)
+{
+    pairs.clear();
+    pairs.resize(kmerIDs.size());
+    uint64_t offset_min = primer_cfg.get_transcript_range().first;
+    uint64_t offset_max = primer_cfg.get_transcript_range().second;
+    for (uint64_t i = 0; i < references.size(); ++i)
+    {
+        TReference reference = references.at(i);
+        auto kmerID_list = kmerIDs.at(i);
+
+        sdsl::rank_support_v5<1, 1> r1s(reference);
+        sdsl::select_support_mcl<1> s1s(reference);
+
+        for (uint64_t r = 1; r < r1s.rank(reference->size()); ++r)
+        {
+            uint64_t idx = s1s.select(r); // position of r-th k-mer
+            // window start position (inclusive)
+            uint64_t w_begin = std::min(reference->size()-1, idx + K + offset_min + 1);
+            // window end position (exclusive)
+            uint64_t w_end = std::min(reference->size(), idx + K + offset_max + 1);
+            //cout << "w_begin = " << w_begin << ", w_end = " << w_end << ", rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << endl;
+            cout << "number of ones in window: " << (r1s.rank(w_end) - r1s.rank(w_begin)) << std::endl;
+            for (uint64_t k = 1; k <= r1s.rank(w_end) - r1s.rank(w_begin); ++k)
+            {
+                uint64_t r2 = r1s.rank(w_begin) + k; // relative kmer position in kmerIDs
+                uint64_t idx2 = s1s.select(r2);
+                if (kmerID_list.at(r) != kmerID_list.at(r2))
+                {
+                    pairs[i].push_back(std::make_pair(idx, idx2));
+                    std::cout << "pair: (" << idx << ", " << idx2 << ") = " << "'"<< dna_decoder(kmerID_list.at(r)) << "' and '" << dna_decoder(kmerID_list.at(r2)) << "'\n";
+                }
+            }
+        }
+    }
+}
+
+primer_cfg, kmerIDs, pairs
+void post_filter_main(primer_cfg_type const & primer_cfg, TKmerIDs & kmerIDs, TPairs & pairs)
 {
 
-}*/
+}
 
 }  // namespace priset

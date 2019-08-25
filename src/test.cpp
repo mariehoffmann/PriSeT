@@ -194,10 +194,10 @@ void converter_test()
     priset::TSeqNo const cutoff = 2;
 
     std::unordered_map<std::string, priset::TSeq> seq_map;
-    seq_map.insert({"0_2",  "CACGATTACCAATCAC"});
-    seq_map.insert({"0_5",  "GATTACCAATCACGAT"});
-    seq_map.insert({"0_18", "GATTACCAATCACGGC"});
-    seq_map.insert({"0_50", "ACGATTACCAATCACG"});
+    seq_map.insert({"0_2",  kmers[0]});
+    seq_map.insert({"0_5",  kmers[1]});
+    seq_map.insert({"0_18", kmers[2]});
+    seq_map.insert({"0_50", kmers[3]});
 
     priset::frequency_filter2(su.io_cfg, locations, references, kmerIDs, seqNoMap, cutoff, seq_map);
     std::cout << "references: \n";

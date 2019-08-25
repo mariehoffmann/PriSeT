@@ -102,7 +102,11 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     priset::TKmerLocations kmer_locations;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
-    priset::pre_filter_main(io_cfg, primer_cfg, locations, kmer_locations);
+    // pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap)
+    TReferences references;
+    TKmerIDs kmerIDs;
+    TSeqNoMap seqNoMap;
+    priset::pre_filter_main(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
@@ -110,10 +114,11 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     }
 
     // TODO: delete locations
-    priset::TKmerPairs pairs;
+    priset::TPairs pairs;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
-    priset::combine(primer_cfg, kmer_locations, pairs);
+    //combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TKmerPairs2 & pairs)
+    priset::combine2(primer_cfg, references, kmerIDs, pairs);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
@@ -126,7 +131,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
-    //priset::post_filter_main(primer_cfg, kmer_locations, pairs);
+    priset::post_filter_main(primer_cfg, kmerIDs, pairs);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
