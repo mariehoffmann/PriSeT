@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iostream>
 #include <experimental/filesystem>
 #include <fstream>
@@ -32,7 +33,6 @@ struct setup
     std::string work_dir = (fs::canonical("../PriSeT/src/tests/work/3041")).string();
     priset::io_cfg_type io_cfg{};
     priset::primer_cfg_type primer_cfg{};
-    priset::TKmerLocations kmer_locations;
 
     setup()
     {
@@ -55,12 +55,6 @@ struct setup
         priset::TLocation loc2_kmer1{1, 75};
         priset::TLocation loc1_kmer2{1, 5};
         priset::TLocation loc2_kmer2{1, 80};
-
-        // init locations
-        priset::TKmerLocation::TLocationVec loc_vec1{{loc1_kmer1, loc2_kmer1}};
-        priset::TKmerLocation::TLocationVec loc_vec2{{loc1_kmer2, loc2_kmer2}};
-        //kmer_locations.push_back(priset::TKmerLocation(1, loc_vec1));
-        //kmer_locations.push_back(priset::TKmerLocation(2, loc_vec2));
 
     }
 };
@@ -101,32 +95,63 @@ void dimerization_test()
 {
 
 }
+*/
 
-uint64_t dna_encoder(priset::TSeq const & seq)
+/* encode a single sequence (K_min = 0) or a list of sequences with same prefix
+ * and lengths in [K_min : seq.size()].
+ * bits [0 .. |seq|-1]  complete sequence
+ * bit [|seq|]          closure symbol 'C'
+ * bits [60:64]         lower sequence length bound in case of variable length
+ */
+uint64_t dna_encoder_test(priset::TSeq const & seq, TKmerLength const K_min = 0)
 {
-    uint64_t code = 0;
+    uint64_t code = (K_min << 60ULL) + (1ULL << uint64_t(seqan::length(seq) << 1ULL));
+    //std::cout << "length K_min = " << K_min << " encoded as: " << code << std::endl;
     for (uint64_t i = 0; i < seqan::length(seq); ++i)
-    {
-        code += uint64_t(seq[i]) * (1 << (i << 1));
-    }
-    std::cout << "sum = " << code << std::endl;
-    return code + (uint64_t(1) << uint64_t(seqan::length(seq) << 1));
+        code += uint64_t(seq[i]) * (1ULL << (i << 1ULL));
+    return code;
 }
 
-priset::TSeq dna_decoder(uint64_t code)
+// return full length sequence, ignore variable length info in leading bits.
+TSeq dna_decoder_test(uint64_t code)
 {
-    assert(code > 0);
-    std::array<std::string, 4> decodes = {"A", "C", "G", "T"};
+    #define NDEBUG
+    assert(code != 0);
+    code &= (1ULL << 60ULL) - 1ULL;
+    std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
     priset::TSeq d = "";
     while (code != 1)
     {
-
-        d += decodes[3 & code];
+        d += sigmas[3 & code];
         code >>= 2;
     }
     return d;
 }
 
+void dna_decoder_test(uint64_t code, std::vector<TSeq> & decodes)
+{
+    // note that assert converted to nop due to seqan's #define NDEBUG
+    if (code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
+    decodes.clear();
+    // extract 4 highest bits encoding variable kmer length
+    uint64_t min_K = ((15ULL << 60ULL) & code) >> 60ULL;
+    code &= (1ULL << 60ULL) - 1ULL;
+    std::cout << "min_K = " << min_K << std::endl;
+    std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
+    priset::TSeq d = "";
+    uint64_t k = 1;
+    while (code != 1)
+    {
+        std::cout << "current decode = " << d << ", current code = " << code << std::endl;
+        d += sigmas[3 & code];
+        if (min_K && min_K <= k++)
+            decodes.push_back(d);
+        code >>= 2;
+    }
+}
+
+/*
 void filter_repeats_runs_test()
 {
     priset::TSeq seqseq = "GATATATATG";
@@ -147,77 +172,19 @@ void filter_repeats_runs_test()
 }
 */
 
-/*
- * seq 0:   00100100000000010010000000000000000000001
- *          01234567890123456789012345678901234567890
- *          kmer1, kmer2, kmer1, kmer3, kmer4
- * seq 2:   01100000000000000100000000000000000000001
- *          01234567890123456789012345678901234567890
- *          kmer1, kmer4, kmer3
- * kmer1 =
-*/
-void converter_test()
-{
-    setup su{};
-    std::vector<priset::TSeq> kmers = {
-            "CACGATTACCAATCAC",
-            "GATTACCAATCACGAT",
-            "GATTACCAATCACGGC",
-            "ACGATTACCAATCACG"};
-    for (auto const kmer : kmers)
-        std::cout << kmer << " => " << priset::dna_encoder(kmer) << std::endl;
-
-    std::vector<priset::TKmerID> kmer_IDs;
-    std::transform(kmers.begin(), kmers.end(), std::back_inserter(kmer_IDs), [](priset::TSeq seq){return priset::dna_encoder(seq);});
-
-    // src
-    priset::TKLocations locations;
-    std::vector<priset::TLocation> dummy;
-    std::vector<priset::TKLocation> keys{priset::TKLocation{0, 2, 16}, priset::TKLocation{0, 5, 16}, priset::TKLocation{0, 18, 16}, TKLocation{0, 50, 16}};
-    std::vector<std::vector<TLocation>> values{
-        std::vector<TLocation>{TLocation{0,2}, TLocation{0, 15}, TLocation{2, 1}},
-        std::vector<TLocation>{TLocation{0,5}, TLocation{2, 50}},
-        std::vector<TLocation>{TLocation{0,18}, TLocation{2, 17}},
-        std::vector<TLocation>{TLocation{0,50}, TLocation{2, 2}}
-    };
-
-    for (unsigned i = 0; i < keys.size(); ++i)
-    {
-        auto value = std::make_pair(values[i], dummy);
-        std::cout << "value.first.size = " << value.first.size() << std::endl;
-        locations.insert({keys[i], value});
-    }
-    // dst
-    priset::TReferences references;
-    priset::TKmerIDs kmerIDs;
-    priset::TSeqNoMap seqNoMap;
-    priset::TSeqNo const cutoff = 2;
-
-    std::unordered_map<std::string, priset::TSeq> seq_map;
-    seq_map.insert({"0_2",  kmers[0]});
-    seq_map.insert({"0_5",  kmers[1]});
-    seq_map.insert({"0_18", kmers[2]});
-    seq_map.insert({"0_50", kmers[3]});
-
-    priset::frequency_filter2(su.io_cfg, locations, references, kmerIDs, seqNoMap, cutoff, seq_map);
-    std::cout << "references: \n";
-    for (auto reference : references)
-    {
-        for (unsigned i = 0; i < reference.size(); ++i)
-            std::cout << reference[i];
-        std::cout << std::endl;
-    }
-    std::cout << "and associated kmers: \n";
-    for (unsigned i = 0; i < kmerIDs.size(); ++i)
-    {
-        for (priset::TKmerID kmerID : kmerIDs[i])
-            std::cout << kmerID << ", ";
-        std::cout << std::endl;
-    }
-
-}
-
 int main()
 {
-    converter_test();
+    priset::TSeq seq = "ACGTACGTAAAA";
+    std::cout << seq << " as full length code [12] = " << dna_encoder_test(seq) << " and back to " << dna_decoder_test(dna_encoder_test(seq)) << std::endl;
+    auto c = dna_encoder_test(seq, 9);
+    std::cout << seq << " as variable length code [9:12]= " << c << std::endl;
+    std::vector<TSeq> decodes;
+    dna_decoder_test(c, decodes);
+    std::cout << "decoded: ";
+    for (auto decode : decodes)
+        std::cout << decode << ", " << std::endl;
+
+    std::cout << "code 0: \n";
+    dna_decoder_test(0);
+    //converter_test();
 }

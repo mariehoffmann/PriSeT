@@ -99,13 +99,12 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches
     // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
-    priset::TKmerLocations kmer_locations;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
     // pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap)
-    TReferences references;
-    TKmerIDs kmerIDs;
-    TSeqNoMap seqNoMap;
+    priset::TReferences references;
+    priset::TKmerIDs kmerIDs;
+    priset::TSeqNoMap seqNoMap;
     priset::pre_filter_main(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap);
     if (timeit_flag)
     {
@@ -131,7 +130,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
-    priset::post_filter_main(primer_cfg, kmerIDs, pairs);
+    //priset::post_filter_main(primer_cfg, kmerIDs, pairs);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
@@ -141,7 +140,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     std::cout << "INFO: pairs filtered = " << pairs.size() << std::endl;
     if (!timeit_flag)
     {
-        priset::create_table(io_cfg, primer_cfg, kmer_locations, pairs);
+        priset::create_table(io_cfg, primer_cfg, references, kmerIDs, pairs);
         // create app script
         if (! priset::gui::generate_app(io_cfg) && priset::gui::compile_app(io_cfg))
             std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";

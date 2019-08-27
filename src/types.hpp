@@ -43,7 +43,7 @@ typedef seqan::Dna5 dna;
 using TSeqNo = uint64_t;
 using TSeqPos = uint64_t;
 // Kmer length type. A negative indicates reverse direction given associated position.
-using TKmerLength = int8_t;
+using TKmerLength = int64_t;
 using TBWTLen = uint64_t;
 using TFMIndexConfig = TGemMapFastFMIndexConfig<TBWTLen>;
 typedef String<seqan::Dna, seqan::Alloc<>> TString;
@@ -184,7 +184,7 @@ public:
 };
 
 // Kmer combinations given by their indices in kmer ID vector.
-typedef std::vector<std::pair<uint64_t, uint64_t>> TPairs;
+typedef std::vector<std::vector<std::pair<uint64_t, uint64_t>>> TPairs;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TKmerPair

@@ -8,6 +8,8 @@
 #include <string>
 #include <unordered_set>
 
+#include <sdsl/bit_vectors.hpp>
+
 #include "../submodules/genmap/src/common.hpp"
 #include "../submodules/genmap/src/genmap_helper.hpp"
 
@@ -19,11 +21,76 @@
 
 namespace priset
 {
+
+/*
+ * Filter kmers based on their chemical properties regardless of their pairing.
+ * Constraints that are checked: melting tempaerature, CG content
+ */
+bool chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerID const & kmerID)
+{
+    assert(kmerID > 0);
+
+    float Tm = get_Tm(primer_cfg, kmerID);
+
+    // Filter by melting temperature
+    if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
+    {
+        // Filter for CG content.
+        if (filter_CG(primer_cfg, kmerID))
+        {
+            // Filter if Gibb's free energy is below -6 kcal/mol
+            if (filter_self_dimerization(kmerID))
+            {
+                if (filter_repeats_runs(kmerID))
+                    return true;
+            }
+
+        }
+    }
+
+/*
+    for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
+    {
+
+        // TODO: optimize - drop kmer when computing Tm in sequence lookup fct
+        kmerID = kmer_locations[i].get_kmer_ID1();
+        //std::cout << "kmerID = " << kmerID << std::endl;
+        auto Tm = primer_melt_wallace(kmerID);
+    //    std::cout << "Tm = " << Tm << std::endl;
+        // filter by melting temperature
+        if (Tm >= Tm_min && Tm <= Tm_max)
+        {
+            // filter by CG content
+    //        std::cout << "call filter_CG ...\n";
+            if (filter_CG(primer_cfg, kmerID))
+            {
+
+                // Filter if Gibb's free energy is below -6 kcal/mol
+                if (filter_self_dimerization(kmerID))
+                {
+                    if (filter_repeats_runs(kmerID))
+                        mask.set(i);
+                }
+            }
+        }
+    }
+
+    // Delete all masked out entries (mask_i = 0).
+    for (int32_t i = kmer_locations.size() - 1; i >= 0; --i)
+    {
+        if (!mask[i])
+            kmer_locations.erase(kmer_locations.begin() + i);
+    }
+*/
+    return false;
+}
+
+
 // TODO: kmer_location is the transformed to reference bit vector
 // pre-filter and sequence fetch
 // 1. filter candidates by number of occurences only independent of their chemical suitability
 // 2. fetch sequence and check chemical constraints that need to hold for a single primer
-void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & locations, TKmerLocations & kmer_locations, TSeqNo const cutoff)
+/*void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & locations, TKmerLocations & kmer_locations, TSeqNo const cutoff)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -65,87 +132,89 @@ void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & location
     }
     locations.clear();
 }
-
+*/
 // helper for dna sequence extraction
-template<typename TText>
+/*template<typename TText>
 TKmerID encode_wrapper(TText const & text, TSeqNo const seqNo, TSeqPos const seqPos, TKmerLength const K)
 {
     seqan::DnaString seq = seqan::valueById(text, seqNo);
     auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
     return dna_encoder(kmer_str);
-};
+};*/
 
-// kmer locations by reference
-void frequency_filter2(priset::io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff)
+// Filter of single kmers and transform of references to bit vectors.
+void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff)
 {
-    std::cout << "Enter frequency_filter2 ...\n";
+    std::cout << "Enter filter_and_transform ...\n";
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
 
     references.clear();
     kmerIDs.clear();
 
-    // collect distinct sequence identifiers and maximal position of kmer occurences
-    std::unordered_map<TSeqNo, TSeqPos> seqNo2maxPos;
-    for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
-    {
-        std::cout << "iterate through locations\n";
-        // cleanup in mapper may lead to undercounting kmer occurrences
-        if ((it->second).first.size() < cutoff)
-        {
-            std::cout << "(it->second).first.size() = " << (it->second).first.size() << ", cutoff = " << cutoff << std::endl;
-            std::cout << "continue due to first location vector size < cutoff\n";
-            continue;
-        }
-        const auto & [seqNo, seqPos, K] = (it->first);
-        // use symmetry and lexicographical ordering of locations to skip already seen ones
-        // TODO: is this already shortcut fm mapper?
-        if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
-            (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo && seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
-        {
-            std::cout << "continue due to first location vector size < cutoff\n";
-            continue;
-        }
-
-        // update largest kmer position
-        seqNo2maxPos.insert_or_assign(seqNo, std::max(seqNo2maxPos[seqNo], seqPos));
-        // and also for other occurences
-        for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
-        {
-            TSeqNo seqNo_next = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
-            TSeqPos seqPos_next = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
-            seqNo2maxPos.insert_or_assign(seqNo_next, std::max(seqNo2maxPos[seqNo_next], seqPos_next));
-        }
-    }
-    std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
-    for (auto it = seqNo2maxPos.begin(); it != seqNo2maxPos.end(); ++it)
-        std::cout << it->first << "\t" << it->second << std::endl;
-    std::vector<TSeqNo> seqNos_sort;
-    seqNos_sort.reserve(seqNo2maxPos.size());
-    for (auto it_map = seqNo2maxPos.begin(); it_map != seqNo2maxPos.end(); ++it_map)
-        seqNos_sort.push_back(it_map->first);
-    std::sort(seqNos_sort.begin(), seqNos_sort.end());
-    seqNoMap.clear();
-    for (long unsigned i = 0; i < seqNos_sort.size(); ++i)
-    {
-        std::cout << "seqNoMap, insert: " << seqNos_sort[i] << " and " << i << std::endl;
-        seqNoMap.insert({seqNos_sort[i], i});
-        sdsl::bit_vector bv(seqNo2maxPos[seqNos_sort[i]] + 1, 0);
-        references.push_back(bv);
-    }
-    kmerIDs.resize(references.size());
-
-    std::cout << "h1\n";
     // load corpus for dna to 64 bit conversion
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-    std::cout << "h2\n";
-    TKmerID kmerID;
-    // set bits for kmers in references
+
+    // (i) collect distinct sequence identifiers and maximal position of kmer occurences
+    std::cout << "Step 1\n";
+    std::vector<TSeqPos> seqNo2maxPos(1 << 10);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        std::cout << "h3\n";
+    //    std::cout << "iterate through locations\n";
+        // cleanup in mapper may lead to undercounting kmer occurrences
+        if ((it->second).first.size() < cutoff)
+            continue;
+
+        const auto & [seqNo, seqPos, K] = (it->first);
+        // use symmetry and lexicographical ordering of locations to skip already seen ones
+        // TODO: is this already shortcut fm mapper?
+        if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo || (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&  seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
+            continue;
+        // update largest kmer position
+        if (seqNo >= seqNo2maxPos.size())
+            seqNo2maxPos.resize(seqNo + 1);
+        seqNo2maxPos[seqNo] = std::max(seqNo2maxPos.at(seqNo), seqPos);
+        // and also for other occurences
+        for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
+        {
+            TSeqNo seqNo_fwd = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
+            TSeqPos seqPos_fwd = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
+            if (seqNo_fwd >= seqNo2maxPos.size())
+                seqNo2maxPos.resize(seqNo_fwd + 1);
+            seqNo2maxPos[seqNo_fwd] = std::max(seqNo2maxPos.at(seqNo_fwd), seqPos_fwd);
+        }
+    }
+
+    // (ii) create bit vectors and set bits for kmer occurrences
+    std::cout << "Step 2\n";
+    /*
+    seqan::DnaString seq = seqan::valueById(text, seqNo);
+    auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
+    TKmerID kmerID = dna_encoder(kmer_str);
+    */
+    std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
+    for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
+        if (seqNo2maxPos[i])
+            std::cout << i << "\t->\t" << seqNo2maxPos[i] << std::endl;
+    seqNoMap.clear();
+
+    unsigned i_cx = 0;
+    for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
+    {
+        if (!seqNo2maxPos[i])
+            continue;
+        std::cout << "seqNoMap, insert: " << i << " -> " << seqNo2maxPos[i] << std::endl;
+        seqNoMap[i] = i_cx++;
+        sdsl::bit_vector bv(seqNo2maxPos[i] + 1, 0);
+        references.push_back(bv);
+    }
+
+    // set bits for kmers in references
+    std::vector<std::vector<std::pair<TSeqPos, TKmerID>>> pos_kmers(references.size());
+    for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    {
         // cleanup in mapper may lead to undercounting kmer occurrences
         if ((it->second).first.size() < cutoff)
             continue;
@@ -153,86 +222,69 @@ void frequency_filter2(priset::io_cfg_type const & io_cfg, TKLocations & locatio
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
-            (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo && seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
-        {
-            std::cout << "continue due to first location vector size < cutoff\n";
+            (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&
+            seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
             continue;
-        }
 
-        references[seqNoMap.at(seqNo)][seqPos] = 1;
-        // delete this, debug only
-        //std::string key = std::to_string(seqNo) + "_" + std::to_string(seqPos);
-        //priset::TSeq const & seq = seq_map[key];
-        //kmerID = dna_encoder(seq);
-        // encode dna sequence and store
-        kmerID = encode_wrapper<seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> >(text, seqNo, seqPos, K);
-        //kmerIDs[seqNoMap.at(seqNo)].push_back(kmerID);
         // insert now unique occurrences listed in first vector (forward mappings)
         for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
         {
-            TSeqNo seqNo_other = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
-            TSeqPos seqPos_other = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
-            auto idx = seqNoMap.at(seqNo_other); // compressed sequence id
-            references[idx][seqPos_other] = 1;
-            // rank computes number of 1s until given position (exclusive)
-            sdsl::rank_support_v<> rb(&references[idx]);
-            std::cout << "insert kmerIDs for seq " << idx << " at position " << rb(seqPos_other) << std::endl;
+            TSeqNo seqNo = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
+            TSeqPos seqPos = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
+            auto idx = seqNoMap.at(seqNo); // compressed sequence id
 
-            kmerIDs[idx].insert(kmerIDs[idx].begin() + rb(seqPos_other), kmerID);
+            seqan::DnaString seq = seqan::valueById(text, seqNo);
+            auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
+            TKmerID kmerID = dna_encoder(kmer_str);
 
-            std::cout << "insert kmerID = " << kmerID << " found at (" << seqNo_other << ", " << seqPos_other << " into row = " << idx << std::endl;
-        }
-    }
-    locations.clear();
-    std::cout << "Leaving frequency_filter2\n";
-}
-
-/*
- * Filter kmers based on their chemical properties regardless of their pairing.
- * Constraints that are checked: melting tempaerature, CG content
- */
-void chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerLocations & kmer_locations)
-{
-    assert(kmer_locations.size() < (1 << 24));
-    auto mask = std::bitset<1 << 24>{};
-    //std::bitset<1 << 18> aux_filter{};
-    // Filter by melting temperature
-    float Tm_min = primer_cfg.get_min_Tm();
-    float Tm_max = primer_cfg.get_max_Tm();
-    TKmerID kmerID;
-
-    for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
-    {
-
-        // TODO: optimize - drop kmer when computing Tm in sequence lookup fct
-        kmerID = kmer_locations[i].get_kmer_ID1();
-        //std::cout << "kmerID = " << kmerID << std::endl;
-        auto Tm = primer_melt_wallace(kmerID);
-    //    std::cout << "Tm = " << Tm << std::endl;
-        // filter by melting temperature
-        if (Tm >= Tm_min && Tm <= Tm_max)
-        {
-            // filter by CG content
-    //        std::cout << "call filter_CG ...\n";
-            if (filter_CG(primer_cfg, kmerID))
+            if (chemical_filter_single(primer_cfg, kmerID))
             {
-
-                // Filter if Gibb's free energy is below -6 kcal/mol
-                if (filter_self_dimerization(kmerID))
-                {
-                    if (filter_repeats_runs(kmerID))
-                        mask.set(i);
-                }
+                references[idx][seqPos] = 1;
+                pos_kmers[idx].push_back(std::make_pair(seqPos, kmerID));
             }
         }
     }
 
-    // Delete all masked out entries (mask_i = 0).
-    for (int32_t i = kmer_locations.size() - 1; i >= 0; --i)
+    // (iii) lookup kmer sequences and encode to 64 bit integers
+    // inverse reference ID map
+    // todo: use one bit vector instead with rank support
+    std::unordered_map<TSeqNo, TSeqNo> seqNoMap_inv;
+    for (auto it = seqNoMap.begin(); it != seqNoMap.end(); ++it)
+        seqNoMap_inv.insert({it->second, it->first});
+    kmerIDs.resize(references.size());
+    for (unsigned i = 0; i < pos_kmers.size(); ++i)
     {
-        if (!mask[i])
-            kmer_locations.erase(kmer_locations.begin() + i);
+        std::sort(pos_kmers[i].begin(), pos_kmers[i].end());
+
+        for (unsigned j = 1; j < pos_kmers[i].size(); ++j)
+            if (pos_kmers[i][j-1].first == pos_kmers[i][j].first)
+            {
+                std::cout << "WARNING: two kmers at same position: (" << seqNoMap_inv[i] << ", " << pos_kmers[i][j-1].first << ") = " << dna_decoder(pos_kmers[i][j-1].second) << " | " << dna_decoder(pos_kmers[i][j].second) << std::endl;
+            }
+        if (pos_kmers[i].size())
+        {
+            kmerIDs[i].push_back(pos_kmers[i].begin()->second);
+            for (auto it_kmer_srtd = pos_kmers[i].begin() + 1; it_kmer_srtd != pos_kmers[i].end(); ++it_kmer_srtd)
+            {
+                // favor shortest kmer
+                if ((it_kmer_srtd-1)->first < it_kmer_srtd->first)
+                    kmerIDs[i].push_back(it_kmer_srtd->second);
+            }
+        }
+        sdsl::rank_support_v5<1> r1s(&references[i]);
+        assert(kmerIDs[i].size() == r1s.rank(references[i].size()));
     }
+
+    for (auto kmerID_list : kmerIDs)
+    {
+        for (auto kmerID : kmerID_list)
+            if (!kmerID)
+            {
+                std::cout << "ERROR: kmerID = 0" << std::endl;
+                exit(0);
+            }
+    }
+    locations.clear();
 }
 
 // check cross-dimerization.
@@ -265,13 +317,13 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     // continue here
     std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching
-    //priset::io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, std::unordered_map<std::string, TSeq> seq_map
-    frequency_filter2(io_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff);
-    std::cout << "INFO: kmers after frequency cutoff = " << kmer_locations.size() << std::endl;
-    //chemical_filter_single(primer_cfg, kmer_locations);
-    std::cout << "INFO: kmers after chemical filtering = " << kmer_locations.size() << std::endl;
+    filter_and_transform(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff);
+    std::unordered_set<TKmerID> kmer_set;
+    unique_kmers(kmerIDs, kmer_set);
+    std::cout << "INFO: kmers after frequency cutoff and chemical filtering = " << kmer_set.size() << std::endl;
 }
 
+/*
 // combine helper, forward window until both iterators point to same reference ID or end
 void fast_forward(TKmerLocation::TLocationVec const & locations1, TKmerLocations::value_type::const_iterator & it1_loc_start, TKmerLocation::TLocationVec const & locations2, TKmerLocations::value_type::const_iterator & it2_loc_start)
 {
@@ -287,17 +339,15 @@ void fast_forward(TKmerLocation::TLocationVec const & locations1, TKmerLocations
     }
     //std::cout << "... leaving ff" << std::endl;
 }
+*/
 
-/*
- * Helper for combine.
- *
- */
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
  * Chemical suitability will be tested by a different function. First position indicates,
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
+ /*
 void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs)
 {
     using it_loc_type = TKmerLocations::value_type::const_iterator;
@@ -382,6 +432,7 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
         }
     }
 }
+*/
 
 // primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs
 void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairs & pairs)
@@ -392,39 +443,60 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
     uint64_t offset_max = primer_cfg.get_transcript_range().second;
     for (uint64_t i = 0; i < references.size(); ++i)
     {
-        TReference reference = references.at(i);
-        auto kmerID_list = kmerIDs.at(i);
+        std::cout << "reference ID = " << i << std::endl;
+        //TReference reference = references.at(i);
+        //auto kmerID_list = kmerIDs.at(i);
 
-        sdsl::rank_support_v5<1, 1> r1s(reference);
-        sdsl::select_support_mcl<1> s1s(reference);
+        sdsl::bit_vector reference;
+        sdsl::util::assign(reference, references.at(i));
+        sdsl::rank_support_v5<1, 1> r1s(&reference); // replace after bugfix with
+        sdsl::select_support_mcl<1> s1s(&reference);
 
-        for (uint64_t r = 1; r < r1s.rank(reference->size()); ++r)
+        std::cout << "iterate over " << r1s.rank(reference.size()) << " kmers\n";
+        for (uint64_t r = 1; r < r1s.rank(reference.size()); ++r)
         {
+            std::cout << "get index of " << r << "-th kmer in reference of length = " << references.at(i).size() << "...\n";
             uint64_t idx = s1s.select(r); // position of r-th k-mer
+            std::cout << idx << std::endl;
+            TKmerLength K = get_kmer_length(kmerIDs[i][idx]);
+            std::cout << "K = " << uint64_t(K) << std::endl;
             // window start position (inclusive)
-            uint64_t w_begin = std::min(reference->size()-1, idx + K + offset_min + 1);
+            uint64_t w_begin = idx + K + offset_min + 1;
+            // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
+            if (w_begin > reference.size() - 1)
+                break;
             // window end position (exclusive)
-            uint64_t w_end = std::min(reference->size(), idx + K + offset_max + 1);
-            //cout << "w_begin = " << w_begin << ", w_end = " << w_end << ", rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << endl;
-            cout << "number of ones in window: " << (r1s.rank(w_end) - r1s.rank(w_begin)) << std::endl;
-            for (uint64_t k = 1; k <= r1s.rank(w_end) - r1s.rank(w_begin); ++k)
+            uint64_t w_end = std::min(reference.size(), idx + K + offset_max + 1);
+            std::cout << "w_begin = " << w_begin << ", w_end = " << w_end << ", rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << " corresponding to " << (r1s.rank(w_end) - r1s.rank(w_begin)) << " candidate pairing mates\n";
+            uint64_t rank_w_begin = r1s.rank(w_begin);
+            uint64_t rank_w_end = r1s.rank(w_end);
+            for (uint64_t k = 1; k <= rank_w_end - rank_w_begin; ++k)
             {
-                uint64_t r2 = r1s.rank(w_begin) + k; // relative kmer position in kmerIDs
+                std::cout << "k = " << k << std::endl;
+                uint64_t r2 = rank_w_begin + k; // relative kmer position in kmerIDs
+                std::cout << "r2 = " << r2 << std::endl;
                 uint64_t idx2 = s1s.select(r2);
-                if (kmerID_list.at(r) != kmerID_list.at(r2))
+                std::cout << "select on r2 = " << idx2 << std::endl;
+                assert(r < kmerIDs.at(i).size() && r2 < kmerIDs.at(i).size());
+                if (kmerIDs.at(i).at(r) != kmerIDs.at(i).at(r2))
                 {
-                    pairs[i].push_back(std::make_pair(idx, idx2));
-                    std::cout << "pair: (" << idx << ", " << idx2 << ") = " << "'"<< dna_decoder(kmerID_list.at(r)) << "' and '" << dna_decoder(kmerID_list.at(r2)) << "'\n";
+                    std::vector<TSeq> decodes;
+                    pairs[i].push_back(std::make_pair(r, r2));
+                    dna_decoder(kmerIDs.at(i).at(r), decodes);
+                    dna_decoder(kmerIDs.at(i).at(r2), decodes);
+                    std::cout << "pair: (" << idx << ", " << idx2 << ") = " << "'"<< decodes.at(0) << "' and '" << decodes.at(1) << "'\n";
                 }
             }
         }
+        std::cout << "next reference\n";
     }
+    std::cout << "leaving combine2\n";
 }
 
-primer_cfg, kmerIDs, pairs
+/*
 void post_filter_main(primer_cfg_type const & primer_cfg, TKmerIDs & kmerIDs, TPairs & pairs)
 {
 
-}
+}*/
 
 }  // namespace priset

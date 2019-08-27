@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -41,41 +42,99 @@ std::string exec(char const * cmd) {
 struct primer_cfg_type;
 //struct io_cfg_type;
 
-// compress to 64 bit integer. 4^i x [0:3] where 0 = 'A', ..., 3 = 'G' as little endian, i.e.,
-// first character add smalled partial code. E.g., ACGT is encoded as 0*1 + 1*4 + 2*16 + 3*64.
-// Non-zero encoded character is added for differentiating prefix..[A]^k from prefix..[A]^m.
-uint64_t dna_encoder(priset::TSeq const & seq)
+// helper to compute number of unique kmers, insert constant, but not sorted
+void unique_kmers(TKmerIDs const & kmerIDs, std::unordered_set<TKmerID> & kmer_set)
 {
-    uint64_t code = 0;
+    kmer_set.clear();
+    for (auto kmerID_list : kmerIDs)
+        for (TKmerID kmerID : kmerID_list)
+            kmer_set.insert(kmerID);
+}
+
+// helper to compute number of unique kmers, insert log(n), but sorted
+void unique_kmers(TKmerIDs const & kmerIDs, std::set<TKmerID> & kmer_set)
+{
+    kmer_set.clear();
+    for (auto kmerID_list : kmerIDs)
+        for (TKmerID kmerID : kmerID_list)
+            kmer_set.insert(kmerID);
+}
+
+/* Encode a single sequence (K_min = 0) or a list of sequences with same prefix
+ * and lengths in [K_min : seq.size()] as a 64 bit integer.
+ * Details: encoding schme is \sum_i 4^i*x_i, starting with the first character
+ * (little endian) and x_i being the 2 bit representation of 'A' (=0), 'C' (=1),
+ * 'G' (=2), and 'T' (=4) ..., 3 = 'G'. E.g., ACGT is encoded as 0*4^0 + 1*4^1 + 2*4^2 + 3*4^2.
+ * Non-zero encoded character ('C') is added because of flexible sequence lengths
+ * and therefore the necessity to differentiate 'XA' from 'XAA'. Since multiple
+ * kmers may start at one position in the reference (which means that they all
+ * share the same prefix), the code stores in its four highest bits the minimal
+ * length and represents the actual sequences {seq[:K_min], seq[:K_min+1], ..., seq[:]}.
+ * Bit layout:
+ * [0 .. |seq|-1]       complete sequence
+ * [|seq|] = 1          stop symbol 'C'
+ * [60:64] = K_min      lower sequence length bound in case of variable length
+ */
+uint64_t dna_encoder(TSeq const & seq, TKmerLength const K_min = 0)
+{
+    uint64_t code = (K_min << 60ULL) + (1ULL << uint64_t(seqan::length(seq) << 1ULL));
     for (uint64_t i = 0; i < seqan::length(seq); ++i)
-        code += uint64_t(seq[i]) * (1 << (i << 1));
-    code += (uint64_t(1) << uint64_t(seqan::length(seq) << 1));
-    //if (code == )
-    //    std::cout << "seq = " << seq << " => " << code << std::endl;
+        code += uint64_t(seq[i]) * (1ULL << (i << 1ULL));
     return code;
 }
 
-/*
-uint64_t dna_encoder(seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> const & text, TSeqNo const seqNo, TSeqPos const seqPos, TKmerLength const K)
+// return full length sequence, ignore variable length info in leading bits.
+TSeq dna_decoder(uint64_t code)
 {
-    seqan::DnaString seq = seqan::valueById(text, seqNo);
-    auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
-    return dna_encoder(kmer_str);
-}*/
-
-// Decode 64 bit integer.
-priset::TSeq dna_decoder(uint64_t code)
-{
-    assert(code > 0);
-
-    std::array<std::string, 4> decodes = {"A", "C", "G", "T"};
-    priset::TSeq d = "";
+    // note that assert converted to nop due to seqan's #define NDEBUG
+    if (code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
+    code &= (1ULL << 60ULL) - 1ULL;
+    std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
+    TSeq d = "";
     while (code != 1)
     {
-        d += decodes[3 & code];
+        d += sigmas[3 & code];
         code >>= 2;
     }
     return d;
+}
+
+void dna_decoder(uint64_t code, std::vector<TSeq> & decodes)
+{
+    // note that assert converted to nop due to seqan's #define NDEBUG
+    if (code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
+    decodes.clear();
+    // extract 4 highest bits encoding variable kmer length
+    uint64_t min_K = ((15ULL << 60ULL) & code) >> 60ULL;
+    code &= (1ULL << 60ULL) - 1ULL;
+    std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
+    TSeq d = "";
+    uint64_t k = 1;
+    while (code != 1)
+    {
+        d += sigmas[3 & code];
+        if (min_K && min_K <= k++)
+            decodes.push_back(d);
+        code >>= 2;
+    }
+}
+
+TKmerLength get_kmer_length(uint64_t code)
+{
+    // note that assert converted to nop due to seqan's #define NDEBUG
+    if (code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
+    TKmerLength K = 0;
+    assert(code >= 1);
+    while (code != 1)
+    {
+        code >>= 2;
+        ++K;
+    }
+    std::cout << "leave with K = " << K << std::endl;
+    return K;
 }
 
 void print_locations(TLocations & locations)
@@ -97,6 +156,7 @@ void print_locations(TLocations & locations)
     }
 }
 
+/*
 void print_kmer_locations(TKmerLocations const & kmer_locations)
 {
     for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
@@ -107,7 +167,7 @@ void print_kmer_locations(TKmerLocations const & kmer_locations)
             std::cout << "(" << kmer_locations[i].accession_ID_at(j) << ", " << kmer_locations[i].kmer_pos_at(j) << ") ";
         std::cout << "]" << std::endl;
     }
-}
+}*/
 
 void print_pairs(TKmerPairs const & kmer_pairs)
 {
@@ -126,9 +186,16 @@ void print_pairs(TKmerPairs const & kmer_pairs)
     }
     if (kmer_pairs.size())
     {
-        std::cout << "\n\nkmer ID\t | sequence\n------------------------------\n";
+        std::cout << "\n\nkmer ID\t | sequence(s)\n------------------------------\n";
+        std::vector<TSeq> decodes;
         for (TKmerID kmer_ID : legend)
-            std::cout << kmer_ID << "\t| " << dna_decoder(kmer_ID) << std::endl;
+        {
+            dna_decoder(kmer_ID, decodes);
+            std::cout << kmer_ID << "\t| ";
+            for (auto decode : decodes)
+                std::cout << decode << " " << std::endl;
+        }
+
     }
 }
 
@@ -360,16 +427,17 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 
 // Result output helper for writing primer infos.
 template<typename io_cfg_type, typename primer_cfg_type>
-void write_primer_info_file(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations)
+void write_primer_info_file(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKmerIDs const & kmerIDs)
 {
     std::ofstream primer_table;
     primer_table.open(io_cfg.get_primer_info_file());
     primer_table << "kmer_ID,kmer_sequence,Tm\n";
-    TKmerID kmer_ID;
-    for (TKmerLocation kmer_location : kmer_locations)
+    std::set<TKmerID> kmer_ordered_set;
+    unique_kmers(kmerIDs, kmer_ordered_set);
+    uint64_t i = 0;
+    for (TKmerID kmerID : kmer_ordered_set)
     {
-        kmer_ID = kmer_location.get_kmer_ID();
-        primer_table << kmer_ID << "," << dna_decoder(kmer_ID) << "," << get_Tm(primer_cfg, kmer_ID) << "\n";
+        primer_table << (i++) << "," << dna_decoder(kmerID) << "," << get_Tm(primer_cfg, kmerID) << "\n";
     }
     primer_table.close();
     std::cout << "STATUS: primer_info.csv written to\t" << io_cfg.get_primer_info_file() << std::endl;
@@ -380,9 +448,12 @@ void write_primer_info_file(io_cfg_type const & io_cfg, primer_cfg_type const & 
     primer info file with columns kmer_id (1-based), sequence and melting temperature.
 */
 template<typename io_cfg_type, typename primer_cfg_type>
-void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs const & kmer_pairs)
+void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairs const & pairs)
 {
-    std::cout << "STATUS: will write " << kmer_locations.size() << " single primer results and " << kmer_pairs.size() << " primer pair results\n";
+    std::set<TKmerID> kmer_ordered_set;
+    unique_kmers(kmerIDs, kmer_ordered_set);
+    std::cout << "STATUS: will write " << kmer_ordered_set.size() << " single primer results and " << pairs.size() << " primer pair results\n";
+    /*
     // TODO: check if unordered_map instead of map
     // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
     std::unordered_map<TAccID, TAcc> accID2acc;
@@ -452,6 +523,7 @@ void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg
 
     // write primer info file
     write_primer_info_file(io_cfg, primer_cfg, kmer_locations);
+    */
 }
 
 }  // namespace priset
