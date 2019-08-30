@@ -218,11 +218,9 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
 inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
 {
 //    std::cout << "enter filter_cross_dimerization with kmer_ID1 = " << kmer_ID1 << " and kmer_ID2 = " << kmer_ID2 << std::endl;
-    std::vector<TSeq> decodes;
-    dna_decoder(kmer_ID1, decodes);
-    dna_decoder(kmer_ID2, decodes);
-    auto seq1 = decodes.at(0);
-    auto seq2 = decodes.at(1);
+    TSeq seq1 = dna_decoder(kmer_ID1);
+    TSeq seq2 = dna_decoder(kmer_ID2);
+
     float dG = gibbs_free_energy(seq1, seq2);
     //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
     return (dG < -10) ? false : true;

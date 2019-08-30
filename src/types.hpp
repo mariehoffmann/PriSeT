@@ -29,6 +29,16 @@ enum TIMEIT {
     SIZE
 };
 
+enum KMER_COUNTS
+{
+    MAP_CNT, // single kmers
+    FILTER1_CNT, // kmer pairs
+    COMBINER_CNT,
+    FILTER2_CNT
+};
+
+typedef std::array<uint64_t, 10> TKmerCountStats;
+
 //!\brief Enums for computational methods for primer melting temperature.
 enum class TMeltMethod
 {
@@ -110,7 +120,7 @@ typedef sdsl::bit_vector TReference;
 typedef std::vector<TReference> TReferences;
 
 // Stores for each reference the encoded kmers in order of occurrence.
-typedef std::vector<std::vector<TKmerID>> TKmerIDs;
+typedef std::vector<std::deque<TKmerID>> TKmerIDs;
 
 // Transforms sequence ID 0..n-1 to contiguous range 0 .. k <= n-1.
 // Background: some sequences may have no kmers and therefore no space should be reserved in bit vector set.

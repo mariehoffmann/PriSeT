@@ -39,6 +39,19 @@ public:
     // Frequency cutoff, i.e. all kmer occurences below will be dropped.
     static constexpr uint64_t const cutoff{10};
 
+    // The number of tailing bits reserved in a KmerID for holding the integer compression of a kmer DNA sequence.
+    static constexpr TKmerID const kmer_word_size{52};
+
+    // The number of leading bits reserved in a KmerID to store kmer lengths.
+    static constexpr TKmerID const pattern_word_size{12};
+
+    // The minimal primer length (or a kmer).
+    static constexpr TKmerID const primer_min_length{16};
+
+    // The maximal primer length (or a kmer).
+    static constexpr TKmerID const primer_max_length{27};
+
+
 
 private:
     // Root taxonomic identifier below which references are sampled.
@@ -48,6 +61,7 @@ private:
     TMeltMethod melt_method{TMeltMethod::WALLACE};
 
     // Primer length range.
+    // Note: currently a length difference of 16 bp can be used.
     size_interval_type primer_length_range{16, 25};
 
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.

@@ -21,7 +21,6 @@
 
 namespace priset
 {
-
 /*
  * Filter kmers based on their chemical properties regardless of their pairing.
  * Constraints that are checked: melting tempaerature, CG content
@@ -143,8 +142,9 @@ TKmerID encode_wrapper(TText const & text, TSeqNo const seqNo, TSeqPos const seq
 };*/
 
 // Filter of single kmers and transform of references to bit vectors.
-void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff)
+void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, std::array<uint64_t, 10> & kmer_counts)
 {
+    //filter_stats stats{};
     std::cout << "Enter filter_and_transform ...\n";
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -158,6 +158,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
 
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
+    // to have a compressed representation.
     std::cout << "Step 1\n";
     std::vector<TSeqPos> seqNo2maxPos(1 << 10);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
@@ -187,13 +188,9 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         }
     }
 
-    // (ii) create bit vectors and set bits for kmer occurrences
-    std::cout << "Step 2\n";
-    /*
-    seqan::DnaString seq = seqan::valueById(text, seqNo);
-    auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
-    TKmerID kmerID = dna_encoder(kmer_str);
-    */
+    // (ii) Create bit vectors in the length of largest kmer occurences, and set
+    // bits for kmer occurrences. Collect also kmer lengths encoded in final kmer
+    // code of type uint64_t. Final sequence lookup and encoding is done in next step.
     std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
     for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
         if (seqNo2maxPos[i])
@@ -201,6 +198,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     seqNoMap.clear();
 
     unsigned i_cx = 0;
+    // reserve space for bit vectors
     for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
     {
         if (!seqNo2maxPos[i])
@@ -211,14 +209,24 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         references.push_back(bv);
     }
 
-    // set bits for kmers in references
-    std::vector<std::vector<std::pair<TSeqPos, TKmerID>>> pos_kmers(references.size());
+    // set bits for kmers in references and collect Ks
+    // bit 0: set if kmer of length primer_length_min found ...
+    // bit primer_length_max-primer_length_min: set if kmer of length primer_length_max found
+    // => maximal encodable length difference is 16!
+    std::unordered_map<uint64_t, uint64_t> loc_and_ks;
+    kmerIDs.clear();
+    kmerIDs.resize(references.size());
+    auto K_prev = 1;
+    //std::vector<std::vector<std::pair<TSeqPos, TKmerID>>> pos_kmers(references.size());
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // cleanup in mapper may lead to undercounting kmer occurrences
         if ((it->second).first.size() < cutoff)
             continue;
         const auto & [seqNo, seqPos, K] = (it->first);
+        if (K < K_prev)
+            std::cout << "WARNING: locations not ordered monotonously by K\n";
+        K_prev = K;
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
@@ -231,49 +239,77 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         {
             TSeqNo seqNo = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
             TSeqPos seqPos = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
-            auto idx = seqNoMap.at(seqNo); // compressed sequence id
+            auto seqNo_cx = seqNoMap.at(seqNo); // compressed sequence id
 
-            seqan::DnaString seq = seqan::valueById(text, seqNo);
-            auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
-            TKmerID kmerID = dna_encoder(kmer_str);
-
-            if (chemical_filter_single(primer_cfg, kmerID))
-            {
-                references[idx][seqPos] = 1;
-                pos_kmers[idx].push_back(std::make_pair(seqPos, kmerID));
-            }
+            references[seqNo_cx][seqPos] = 1;
+            auto K_store_offset = K - primer_cfg.get_primer_length_range().first;
+            if (K_store_offset > 12)
+                throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
+            uint64_t loc_key = location_encode(seqNo, seqPos);
+            uint64_t loc_val = 1 << (63 + K_store_offset);
+            // locations filled for K_min to K_max
+            if (K == primer_cfg.get_primer_length_range().first || loc_and_ks.find(seqPos) != loc_and_ks.end())
+                loc_and_ks.insert({loc_key, loc_val});
+            else // update
+                loc_and_ks[loc_key] |= loc_val;
         }
     }
 
-    // (iii) lookup kmer sequences and encode to 64 bit integers
+    // (iii) lookup kmer sequences, filter and encode as 64 bit integers.
     // inverse reference ID map
     // todo: use one bit vector instead with rank support
     std::unordered_map<TSeqNo, TSeqNo> seqNoMap_inv;
     for (auto it = seqNoMap.begin(); it != seqNoMap.end(); ++it)
         seqNoMap_inv.insert({it->second, it->first});
     kmerIDs.resize(references.size());
-    for (unsigned i = 0; i < pos_kmers.size(); ++i)
+    uint64_t const kmer_length_mask = ~((1ULL << 52ULL) - 1ULL);
+    for (unsigned i = 0; i < references.size(); ++i)
     {
-        std::sort(pos_kmers[i].begin(), pos_kmers[i].end());
-
-        for (unsigned j = 1; j < pos_kmers[i].size(); ++j)
-            if (pos_kmers[i][j-1].first == pos_kmers[i][j].first)
-            {
-                std::cout << "WARNING: two kmers at same position: (" << seqNoMap_inv[i] << ", " << pos_kmers[i][j-1].first << ") = " << dna_decoder(pos_kmers[i][j-1].second) << " | " << dna_decoder(pos_kmers[i][j].second) << std::endl;
-            }
-        if (pos_kmers[i].size())
+        sdsl::rank_support_v5<1> r1s(&references[i]); // check if once initialized modification of references[i] does not invalidate rank support
+        sdsl::select_support_mcl<1,1> s1s(&references[i]);
+        for (unsigned r = r1s.rank(references[i].size()); r > 0; --r)
         {
-            kmerIDs[i].push_back(pos_kmers[i].begin()->second);
-            for (auto it_kmer_srtd = pos_kmers[i].begin() + 1; it_kmer_srtd != pos_kmers[i].end(); ++it_kmer_srtd)
+            TSeqNo seqNo = seqNoMap_inv[i];
+            TSeqPos seqPos = s1s.select(r);
+            uint64_t loc_key = location_encode(seqNo, seqPos);
+
+            std::cout << "kmer pattern for (TSeqNo=" << seqNo << ", TSeqPos=" << seqPos << ") = ";
+            if (loc_and_ks.find(loc_key) != loc_and_ks.end())
+                throw std::invalid_argument("ERROR: " + std::to_string(loc_key) + " not in loc_and_ks dictionary.");
+            TKmerID kmerID_head = loc_and_ks[loc_key]; // tail not filled yet & kmer_length_mask;
+            TKmerID k_pattern = kmerID_head >> 52ULL;
+            TKmerLength k = primer_cfg.primer_max_length; // identify highest set bit in head
+            // lookup sequence in corpus and encode
+            seqan::DnaString seq = seqan::valueById(text, seqNo);
+            auto const & kmer_str = seqan::infixWithLength(seq, seqPos, k);
+            TKmerID kmerID = dna_encoder(kmer_str);
+            TKmerID kmerID_trim = kmerID;
+            kmerID |= kmerID_head;
+            TKmerID trim_offset = 0;
+            while (!k_pattern)
             {
-                // favor shortest kmer
-                if ((it_kmer_srtd-1)->first < it_kmer_srtd->first)
-                    kmerIDs[i].push_back(it_kmer_srtd->second);
+                if (k_pattern & 1)
+                {
+                    // erase bit in head
+                    if (!chemical_filter_single(primer_cfg, kmerID_trim))
+                    {
+                        kmerID ^= 1 << (52ULL + trim_offset);
+                    }
+                    else
+                        kmer_counts[KMER_COUNTS::FILTER1_CNT]++;
+                }
+                kmerID_trim >>= 2;
+                k_pattern >>= 1;
+                ++trim_offset;
             }
+            // do not store Kmer and reset bit if for no length the filter was passed
+            if (!(kmer_length_mask & kmerID))
+                references[i][seqPos] = 0;
+            else
+                kmerIDs[i].push_front(kmerID);
         }
-        sdsl::rank_support_v5<1> r1s(&references[i]);
-        assert(kmerIDs[i].size() == r1s.rank(references[i].size()));
     }
+    // TODO: delete references with no more bits, or too inefficient w.r.t. possible space gain?
 
     for (auto kmerID_list : kmerIDs)
     {
@@ -285,9 +321,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             }
     }
     locations.clear();
+
+
 }
 
 // check cross-dimerization.
+// Note: No length bit shall be set in head, code corresponds to true length.
 void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & kmer_pairs)
 {
     assert(kmer_pairs.size() < (1 << 24));
@@ -441,6 +480,7 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
     pairs.resize(kmerIDs.size());
     uint64_t offset_min = primer_cfg.get_transcript_range().first;
     uint64_t offset_max = primer_cfg.get_transcript_range().second;
+    /*
     for (uint64_t i = 0; i < references.size(); ++i)
     {
         std::cout << "reference ID = " << i << std::endl;
@@ -489,7 +529,7 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
             }
         }
         std::cout << "next reference\n";
-    }
+    }*/
     std::cout << "leaving combine2\n";
 }
 

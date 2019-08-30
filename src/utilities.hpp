@@ -60,28 +60,37 @@ void unique_kmers(TKmerIDs const & kmerIDs, std::set<TKmerID> & kmer_set)
             kmer_set.insert(kmerID);
 }
 
-/* Encode a single sequence (K_min = 0) or a list of sequences with same prefix
- * and lengths in [K_min : seq.size()] as a 64 bit integer.
+/* Encode a single sequence as a 64 bit integer.
  * Details: encoding schme is \sum_i 4^i*x_i, starting with the first character
  * (little endian) and x_i being the 2 bit representation of 'A' (=0), 'C' (=1),
  * 'G' (=2), and 'T' (=4) ..., 3 = 'G'. E.g., ACGT is encoded as 0*4^0 + 1*4^1 + 2*4^2 + 3*4^2.
  * Non-zero encoded character ('C') is added because of flexible sequence lengths
- * and therefore the necessity to differentiate 'XA' from 'XAA'. Since multiple
- * kmers may start at one position in the reference (which means that they all
- * share the same prefix), the code stores in its four highest bits the minimal
- * length and represents the actual sequences {seq[:K_min], seq[:K_min+1], ..., seq[:]}.
+ * and therefore the necessity to differentiate 'XA' from 'XAA'.
+ * Since multiple kmers may start at one position in the reference (which means that they all
+ * share the same prefix), the code stores in its 12 highest bits flags for which length
+ * the code represents. E.g. if the 1st bit is set, the code represents a string
+ * with the length of the shortest possible primer length, if the 5th bit is set, the code also represents
+ * a string of minimal primer length plus 4, and so forth.
+ *
  * Bit layout:
- * [0 .. |seq|-1]       complete sequence
- * [|seq|] = 1          stop symbol 'C'
- * [60:64] = K_min      lower sequence length bound in case of variable length
+ * bits [0 .. |seq|-1]  complete sequence
+ * bit [|seq|]          closure symbol 'C'
+ * bits [60:64]         lower sequence length bound in case of variable length
  */
-uint64_t dna_encoder(TSeq const & seq, TKmerLength const K_min = 0)
-{
-    uint64_t code = (K_min << 60ULL) + (1ULL << uint64_t(seqan::length(seq) << 1ULL));
-    for (uint64_t i = 0; i < seqan::length(seq); ++i)
-        code += uint64_t(seq[i]) * (1ULL << (i << 1ULL));
-    return code;
-}
+ uint64_t dna_encoder(TSeq const & seq)
+ {
+     uint64_t code = 1ULL << uint64_t(seqan::length(seq) << 1ULL); // stop symbol 'C' = 1
+     for (uint64_t i = 0; i < seqan::length(seq); ++i)
+     {
+         switch (char(seq[i]))
+         {
+             case 'C': code |=  1ULL << (i << 1ULL); break;
+             case 'G': code |=  2ULL << (i << 1ULL); break;
+             case 'T': code |=  3ULL << (i << 1ULL);
+         }
+     }
+     return code;
+ }
 
 // return full length sequence, ignore variable length info in leading bits.
 TSeq dna_decoder(uint64_t code)
@@ -100,26 +109,34 @@ TSeq dna_decoder(uint64_t code)
     return d;
 }
 
-void dna_decoder(uint64_t code, std::vector<TSeq> & decodes)
+void dna_decoder(primer_cfg_type const & primer_cfg, uint64_t code, std::vector<TSeq> & decodes)
 {
     // note that assert converted to nop due to seqan's #define NDEBUG
     if (code == 0ULL)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
     decodes.clear();
-    // extract 4 highest bits encoding variable kmer length
-    uint64_t min_K = ((15ULL << 60ULL) & code) >> 60ULL;
-    code &= (1ULL << 60ULL) - 1ULL;
-    std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
-    TSeq d = "";
-    uint64_t k = 1;
-    while (code != 1)
+    uint64_t kmer_length_mask = (code & ~((1ULL << 52ULL) - 1ULL)) >> 52ULL;
+    if (code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
+    decodes.clear();
+    code &= (1ULL << 52ULL) - 1ULL; // clear leading kmer length information
+    TSeq decode = dna_decoder(code); // largest kmer
+    uint64_t K = seqan::length(decode); //
+    kmer_length_mask >>= primer_cfg.primer_min_length - K;
+    while (kmer_length_mask != 0)
     {
-        d += sigmas[3 & code];
-        if (min_K && min_K <= k++)
-            decodes.push_back(d);
-        code >>= 2;
+        if (kmer_length_mask & 1)
+            decodes.push_back(seqan::prefix(decode, K)); //.substr(0, K));
+        kmer_length_mask >>= 1;
+        --K;
     }
 }
+
+uint64_t location_encode(TSeqNo seqNo, TSeqPos seqPos)
+{
+    return (seqNo << 10ULL) + seqPos;
+}
+
 
 TKmerLength get_kmer_length(uint64_t code)
 {
@@ -169,7 +186,7 @@ void print_kmer_locations(TKmerLocations const & kmer_locations)
     }
 }*/
 
-void print_pairs(TKmerPairs const & kmer_pairs)
+void print_pairs(primer_cfg_type const & primer_cfg, TKmerPairs const & kmer_pairs)
 {
     std::set<TKmerID> legend;
     std::cout << "\n(kmer ID1, kmer ID2) | reference ID | (pos1, pos2)\n";
@@ -190,7 +207,7 @@ void print_pairs(TKmerPairs const & kmer_pairs)
         std::vector<TSeq> decodes;
         for (TKmerID kmer_ID : legend)
         {
-            dna_decoder(kmer_ID, decodes);
+            dna_decoder(primer_cfg, kmer_ID, decodes);
             std::cout << kmer_ID << "\t| ";
             for (auto decode : decodes)
                 std::cout << decode << " " << std::endl;
