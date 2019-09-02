@@ -6,12 +6,12 @@ wget-log*
 *.ipynb
 
 # ignore work directory
-tests/*
 benchmarks/bin*
 benchmarks/build*
 benchmarks/googlebenchmark
 index.zip
 **/index
+!**/one_seq/index/
 **/tmp
 
 # exclude working directory content, but not index.zip!

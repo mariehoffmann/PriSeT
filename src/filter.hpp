@@ -142,7 +142,7 @@ TKmerID encode_wrapper(TText const & text, TSeqNo const seqNo, TSeqPos const seq
 };*/
 
 // Filter of single kmers and transform of references to bit vectors.
-void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, std::array<uint64_t, 10> & kmer_counts)
+void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, TKmerCounts & kmerCounts)
 {
     //filter_stats stats{};
     std::cout << "Enter filter_and_transform ...\n";
@@ -155,7 +155,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     // load corpus for dna to 64 bit conversion
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
+    std::cout << "text_path = " << text_path << std::endl;
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
+    std::cout << "text length = " << seqan::length(text) << std::endl;
+    for (auto ss : text)
+        std::cout << ss << ", ";
+    std::cout << std::endl;
 
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
     // to have a compressed representation.
@@ -227,6 +232,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         if (K < K_prev)
             std::cout << "WARNING: locations not ordered monotonously by K\n";
         K_prev = K;
+        std::cout << "CURRENT K = " << K << std::endl;
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
@@ -246,12 +252,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             if (K_store_offset > 12)
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
             uint64_t loc_key = location_encode(seqNo, seqPos);
-            uint64_t loc_val = 1 << (63 + K_store_offset);
+            uint64_t loc_val = 1ULL << (63ULL - K_store_offset);
             // locations filled for K_min to K_max
-            if (K == primer_cfg.get_primer_length_range().first || loc_and_ks.find(seqPos) != loc_and_ks.end())
+            if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 loc_and_ks.insert({loc_key, loc_val});
             else // update
-                loc_and_ks[loc_key] |= loc_val;
+                loc_and_ks[loc_key] += loc_val;
         }
     }
 
@@ -272,16 +278,23 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             TSeqNo seqNo = seqNoMap_inv[i];
             TSeqPos seqPos = s1s.select(r);
             uint64_t loc_key = location_encode(seqNo, seqPos);
-
-            std::cout << "kmer pattern for (TSeqNo=" << seqNo << ", TSeqPos=" << seqPos << ") = ";
-            if (loc_and_ks.find(loc_key) != loc_and_ks.end())
+            std::cout << "seqNo and seqpos as key = " << loc_key << std::endl;
+            if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 throw std::invalid_argument("ERROR: " + std::to_string(loc_key) + " not in loc_and_ks dictionary.");
+
             TKmerID kmerID_head = loc_and_ks[loc_key]; // tail not filled yet & kmer_length_mask;
             TKmerID k_pattern = kmerID_head >> 52ULL;
-            TKmerLength k = primer_cfg.primer_max_length; // identify highest set bit in head
+            TKmerID k_pattern_cpy{k_pattern};
+            std::cout << "k_pattern = " << k_pattern << std::endl;
+            //while(!k_pattern_cpy)
+            //    std::cout << ((k_pattern  & 1) ? "1" : "0");
+            // TODO: identify highest set bit in head
+            TKmerLength k = primer_cfg.primer_max_length;
             // lookup sequence in corpus and encode
+            std::cout << "seqNo = " << seqNo << ", k = " << k << std::endl;
             seqan::DnaString seq = seqan::valueById(text, seqNo);
-            auto const & kmer_str = seqan::infixWithLength(seq, seqPos, k);
+            std::cout << "seq loaded from text.concat = " << seq << std::endl;
+            TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k);
             TKmerID kmerID = dna_encoder(kmer_str);
             TKmerID kmerID_trim = kmerID;
             kmerID |= kmerID_head;
@@ -296,7 +309,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
                         kmerID ^= 1 << (52ULL + trim_offset);
                     }
                     else
-                        kmer_counts[KMER_COUNTS::FILTER1_CNT]++;
+                        kmerCounts[KMER_COUNTS::FILTER1_CNT]++;
                 }
                 kmerID_trim >>= 2;
                 k_pattern >>= 1;
@@ -347,7 +360,7 @@ void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & 
 }*/
 
 // filter k-mers by frequency and chemical properties
-void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap)
+void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & kmerCounts)
 {
     using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
 
@@ -356,7 +369,7 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     // continue here
     std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching
-    filter_and_transform(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff);
+    filter_and_transform(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff, kmerCounts);
     std::unordered_set<TKmerID> kmer_set;
     unique_kmers(kmerIDs, kmer_set);
     std::cout << "INFO: kmers after frequency cutoff and chemical filtering = " << kmer_set.size() << std::endl;
@@ -474,7 +487,7 @@ void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_loc
 */
 
 // primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs
-void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairs & pairs)
+void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairs & pairs, TKmerCounts & kmerCounts)
 {
     pairs.clear();
     pairs.resize(kmerIDs.size());

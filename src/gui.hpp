@@ -24,7 +24,7 @@ namespace priset::gui
 {
 
 // Compiles Shiny app and starts browser on success.
-bool compile_app(priset::io_cfg_type & io_cfg)
+bool compile_app(io_cfg_type & io_cfg)
 {
     std::cout << "Enter compile app\n";
     std::string cmd_str = "Rscript " + io_cfg.get_script_file().string() + "\0";
@@ -56,7 +56,7 @@ bool compile_app(priset::io_cfg_type & io_cfg)
 }
 
 // Generates app script from template.
-bool generate_app(priset::io_cfg_type & io_cfg)
+bool generate_app(io_cfg_type & io_cfg)
 {
     // copy first template into newly created `app` folder in working directory
     fs::path const app_template = io_cfg.get_app_template();
@@ -93,4 +93,4 @@ bool generate_app(priset::io_cfg_type & io_cfg)
     return true;
 }
 
-}  // namespace priset
+}  // namespace priset::gui

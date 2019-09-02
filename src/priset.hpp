@@ -24,6 +24,8 @@
 
 #define DEBUG 1
 
+using namespace priset;
+
 /*
  * usage        g++ ../PriSeT/src/priset.cpp -Wno-write-strings -std=c++17 -lstdc++fs -Wall -Wextra -o priset
  *              ./priset <lib_dir> <work_dir>
@@ -32,23 +34,26 @@
  * src_dir      path to folder containing fasta (*.fa) and taxonomy file (*.tax)
  * work_dir     path to store indices, mappings, annotations, and other results
  */
-int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT::SIZE> * runtimes = nullptr)
+int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> * runtimes = nullptr)
 {
     bool timeit_flag(runtimes);
     // Store start and finish times for optional runtime measurements
     std::chrono::time_point<std::chrono::system_clock> start, finish;
 
+    // collect number of kmers or kmer pairs left after relevant processing steps
+    TKmerCounts kmerCounts{0, 0, 0, 0};
+
     // set path prefixes for library files
-    priset::io_cfg_type io_cfg{};
+    io_cfg_type io_cfg{};
 
     // get instance to primer sequence settings
-    priset::primer_cfg_type primer_cfg{};
+    primer_cfg_type primer_cfg{};
 
     // parse options and init io and primer configurators
-    priset::options opt(argc, argv, primer_cfg, io_cfg);
+    options opt(argc, argv, primer_cfg, io_cfg);
 
     // build taxonomy in RAM
-    //priset::taxonomy tax{io_cfg.get_tax_file()};
+    //taxonomy tax{io_cfg.get_tax_file()};
     //tax.print_taxonomy();
 
     // create FM index if SKIP_IDX not in argument list
@@ -57,7 +62,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     {
         std::cout << "MESSAGE: skip index recomputation" << std::endl;
     }
-    else if ((ret_code = priset::fm_index(io_cfg)))
+    else if ((ret_code = fm_index(io_cfg)))
     {
         std::cout << "ERROR: " << ret_code << std::endl;
         exit(-1);
@@ -70,27 +75,27 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     }
 
     // dictionary for storing FM mapping results
-    priset::TKLocations locations;
+    TKLocations locations;
 
     // directory info needed for genmap's fasta file parser
-    priset::TDirectoryInformation directoryInformation;
+    TDirectoryInformation directoryInformation;
 
     // container for fasta header lines
-    priset::TSequenceNames sequenceNames;
+    TSequenceNames sequenceNames;
 
     // container for fasta sequence lengths
-    priset::TSequenceLengths sequenceLengths;
+    TSequenceLengths sequenceLengths;
 
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
     // compute k-mer mappings
-    priset::fm_map(io_cfg, primer_cfg, locations);
+    fm_map(io_cfg, primer_cfg, locations);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
         // duration obj
         //auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
-        runtimes->at(priset::TIMEIT::MAP) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::MAP) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     // Do not modify or delete STATS lines, since they are captured for statistical analysis
@@ -102,26 +107,27 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
     // pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap)
-    priset::TReferences references;
-    priset::TKmerIDs kmerIDs;
-    priset::TSeqNoMap seqNoMap;
-    priset::pre_filter_main(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap);
+    TReferences references;
+    TKmerIDs kmerIDs;
+    TSeqNoMap seqNoMap;
+    TKmerCounts kmerCounts;
+    pre_filter_main(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(priset::TIMEIT::FILTER1) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::FILTER1) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     // TODO: delete locations
-    priset::TPairs pairs;
+    TPairs pairs;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
     //combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TKmerPairs2 & pairs)
-    priset::combine2(primer_cfg, references, kmerIDs, pairs);
+    combine2(primer_cfg, references, kmerIDs, pairs, kmerCounts);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(priset::TIMEIT::COMBINER) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::COMBINER) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: pairs combined = " << pairs.size() << std::endl;
@@ -130,19 +136,19 @@ int priset_main(int argc, char * const * argv, std::array<size_t, priset::TIMEIT
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
-    //priset::post_filter_main(primer_cfg, kmerIDs, pairs);
+    //post_filter_main(primer_cfg, kmerIDs, pairs);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(priset::TIMEIT::FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: pairs filtered = " << pairs.size() << std::endl;
     if (!timeit_flag)
     {
-        priset::create_table(io_cfg, primer_cfg, references, kmerIDs, pairs);
+        create_table(io_cfg, primer_cfg, references, kmerIDs, pairs);
         // create app script
-        if (! priset::gui::generate_app(io_cfg) && priset::gui::compile_app(io_cfg))
+        if (! gui::generate_app(io_cfg) && gui::compile_app(io_cfg))
             std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";
     }
     return 0;

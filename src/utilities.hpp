@@ -79,16 +79,20 @@ void unique_kmers(TKmerIDs const & kmerIDs, std::set<TKmerID> & kmer_set)
  */
  uint64_t dna_encoder(TSeq const & seq)
  {
+     std::cout << "Enter dna_encoder\n";
+     std::cout << "input seq in dna_encoder: " << seq << std::endl;
      uint64_t code = 1ULL << uint64_t(seqan::length(seq) << 1ULL); // stop symbol 'C' = 1
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
-         switch (char(seq[i]))
+         switch (char(seqan::getValue(seq, i))) //char(seq[i]))
          {
              case 'C': code |=  1ULL << (i << 1ULL); break;
              case 'G': code |=  2ULL << (i << 1ULL); break;
              case 'T': code |=  3ULL << (i << 1ULL);
          }
      }
+
+         std::cout << "Return from dna_encoder\n";
      return code;
  }
 

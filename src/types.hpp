@@ -37,7 +37,7 @@ enum KMER_COUNTS
     FILTER2_CNT
 };
 
-typedef std::array<uint64_t, 10> TKmerCountStats;
+typedef std::array<uint64_t, 4> TKmerCounts;
 
 //!\brief Enums for computational methods for primer melting temperature.
 enum class TMeltMethod
