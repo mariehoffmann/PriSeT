@@ -9,6 +9,7 @@
 #include <memory>
 #include <set>
 #include <stdexcept>
+#include <stdint.h>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -23,6 +24,15 @@
 
 namespace priset
 {
+
+// Identify highest set bit without loop
+static inline uint64_t log2_asm(uint64_t const x) {
+  uint64_t y;
+  asm( "\tbsr %1, %0\n"
+        : "=r"(y)
+        : "r" (x));
+  return y;
+}
 
 // Execute in terminal and collect command return value.
 std::string exec(char const * cmd) {

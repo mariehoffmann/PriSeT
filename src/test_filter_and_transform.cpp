@@ -33,7 +33,14 @@ struct setup
     std::string work_dir = (fs::canonical("../PriSeT/src/tests/work/one_seq")).string();
     io_cfg_type io_cfg{};
     primer_cfg_type primer_cfg{};
-    TKLocations kLocations{};
+    TKLocations locations{};
+    using TLocationPair = std::pair<std::vector<TLocation>, std::vector<TLocation>>;
+
+    TReferences references;
+    TKmerIDs kmerIDs;
+    TSeqNoMap seqNoMap;
+    TSeqNo cutoff = 1;
+    TKmerCounts kmerCounts;
 
     fs::path idx_dir = work_dir + "/index";
     fs::path idx_zip = work_dir + "/index.zip";
@@ -41,8 +48,11 @@ struct setup
 
     setup()
     {
+        // delete previous index dir if existent
+        fs::remove_all(idx_dir);
         // unzip index.zip into same named directory
         std::system(("unzip -n -d " + work_dir + " " + idx_zip.string()).c_str());
+
         // create tmp dir
         if (!fs::create_directory(tmp_dir))
             std::cout << "ERROR: could not create tmp_dir = " << tmp_dir << std::endl;
@@ -55,36 +65,36 @@ struct setup
             std::cout << "arg[" << i << "] = " << argv[i] << std::endl;
         options opt(argc, argv, primer_cfg, io_cfg);
 
+        std::vector<TLocation> loc1{TLocation{0, 10}}, vd{}; // seqan::Pair<TSeqNo, TSeqPos>
+        locations.insert({TKLocation{0, 10, 19}, TLocationPair{loc1, vd}});
+        locations.insert({TKLocation{0, 10, 21}, TLocationPair{loc1, vd}});
+        locations.insert({TKLocation{0, 10, 23}, TLocationPair{loc1, vd}});
+
+        std::vector<TLocation> loc2{TLocation{0, 90}}; // seqan::Pair<TSeqNo, TSeqPos>
+        locations.insert({TKLocation{0, 90, 21}, TLocationPair{loc2, vd}});
+
     }
 };
 
 /*
  * tests interfaces between fm_map and filter_and_transform
  * Passes chemical filter for Tm, CG content and runs for length 23, 21, 19
- * s1 = "AACGTAACGTAACGTACGTACGT" at pos 10
- *       01234567890123456789012
- * k1_pattern_2 = 000101010000_{2}|133286677332880_{10} = 47421082764723088
  *
+ * kmer 1-3 at position 10: "AACGTAACGTAACGTACGTACGT"         133286677332880
+ * head = (1 << (63-3)) + (1 << (63-5)) + (1 << (63-7)) + 1513209474796486656
+ *                                                        -------------------
+ * head + seq_27                                        = 1513342761473819536
+ *
+ * kmer 2 at position 90: "TAGCTAACTACATAGCTACGA"               5031068910435
+ * head = (1 << (63 - (21-16)))                          + 288230376151711744
+ *                                                         ------------------
+ *                                                       = 288235407220622179
  */
-void test_one_seq()
+void test_filter_and_transform()
 {
     setup su{};
-    TKLocations locations; // zero-based
-    std::vector<TLocation> loc{TLocation{0, 10}}, vd{}; // seqan::Pair<TSeqNo, TSeqPos>
-    using TLocationPair = std::pair<std::vector<TLocation>, std::vector<TLocation>>;
-    // encode("AACGTAACGTAACGTACGT") = 520648278928
-    locations.insert({TKLocation{0, 10, 19}, TLocationPair{loc, vd}});
-    // encode("AACGTAACGTAACGTACGTAC") = 5743328510864
-    locations.insert({TKLocation{0, 10, 21}, TLocationPair{loc, vd}});
-    // encode("AACGTAACGTAACGTACGTACGT") = 133286677332880
-    locations.insert({TKLocation{0, 10, 23}, TLocationPair{loc, vd}});
 
-    TReferences references;
-    TKmerIDs kmerIDs;
-    TSeqNoMap seqNoMap;
-    TSeqNo cutoff = 1;
-    TKmerCounts kmerCounts;
-    filter_and_transform(su.io_cfg, su.primer_cfg, locations, references, kmerIDs, seqNoMap, cutoff, kmerCounts);
+    filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
     std::cout << "References:\n";
     for (TReference reference : references)
     {
@@ -100,11 +110,26 @@ void test_one_seq()
             std::cout << kmerID << " | ";
         std::cout << std::endl;
     }
+
+    TKmerID expect1 = 1513342761473819536;
+    TKmerID expect2 = 288235407220622179;
+    if (!kmerIDs.size() || kmerIDs[0].size() != 2 || kmerIDs[0][0] != expect1 || kmerIDs[0][1] != expect2)
+        std::cout << "ERROR: expect kmerID1 = " << expect1 << " and kmerID2 = " << expect2 << ", but got nothing or a wrong kmerID\n";
+    else
+        std::cout << "SUCCESS: Result as expected!\n";
+}
+
+void test_combine()
+{
+    setup su{};
+    filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
+    TPairs pairs;
+    combine2(su.primer_cfg, su.references, su.kmerIDs, pairs, su.kmerCounts);
 }
 
 int main()
 {
 
-    test_one_seq();
+    test_filter_and_transform();
     return 0;
 }

@@ -40,18 +40,23 @@ public:
     static constexpr uint64_t const cutoff{10};
 
     // The number of tailing bits reserved in a KmerID for holding the integer compression of a kmer DNA sequence.
-    static constexpr TKmerID const kmer_word_size{52};
+    static constexpr TKmerID const kmer_word_length{52};
 
-    // The number of leading bits reserved in a KmerID to store kmer lengths.
-    static constexpr TKmerID const pattern_word_size{12};
+    // The number of leading bits reserved in a KmerID to store kmer lengths (64 - kmer_word_length).
+    static constexpr TKmerID const pattern_word_length{12};
 
     // The minimal primer length (or a kmer).
     static constexpr TKmerID const primer_min_length{16};
 
     // The maximal primer length (or a kmer).
-    static constexpr TKmerID const primer_max_length{27};
+    static constexpr TKmerID const primer_max_length{27}; // min + pattern_word_length - 1
 
+    // The minimal distance (bp) between two identical kmers on same reference.
+    static constexpr uint64_t const same_kmer_distance{400};
 
+    // Maximal permitted temperature difference [Kelvin] of primers.
+    // Differences above 5 Kelvin can lead to no amplification.
+    static constexpre float const primer_melt_diff{4.0};
 
 private:
     // Root taxonomic identifier below which references are sampled.
@@ -59,10 +64,6 @@ private:
 
     // Default primer melting temperature formular (see chemistry.hpp for details)
     TMeltMethod melt_method{TMeltMethod::WALLACE};
-
-    // Primer length range.
-    // Note: currently a length difference of 16 bp can be used.
-    size_interval_type primer_length_range{16, 25};
 
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
     size_type E{0};
@@ -72,10 +73,6 @@ private:
 
     // Range of primer melting temperatures (best results in range [52-58] degree C).
     std::pair<float, float> primer_melt_range{50.0, 62.0};
-
-    // Maximal permitted temperature difference [Kelvin] of primers.
-    // Differences above 5 Kelvin can lead to no amplification.
-    float const primer_melt_diff{4.0};
 
     // Method for computing melting temperature of primer.
     TMeltMethod primer_melt_method{TMeltMethod::WALLACE};

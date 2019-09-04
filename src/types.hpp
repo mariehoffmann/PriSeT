@@ -193,8 +193,57 @@ public:
 
 };
 
-// Kmer combinations given by their indices in kmer ID vector.
-typedef std::vector<std::vector<std::pair<uint64_t, uint64_t>>> TPairs;
+// Store enumerated length combinations of two kmers in two 64 bit unsigned integers.
+// Enumerations follow lexicographical ordering. Since a kmerID may store up to
+// 10 different kmer lengths, we have 100 possible kmer combinations. One bit for
+// each kmer combination is reserved in the mask in big endian fashion, s.t. mask
+// can be seen as the concatenation of 2x64 bits.
+// 0: 0 with 0, i.e. length pattern l_min of kmerID1 combined with l_min of kmerID2
+// 1: 0 with 1
+// x: x/10 with x%10
+struct TCombinePattern
+{
+    // TODO: use union type for mask when doing SIMD vectorization
+    std::uint64_t data[2];
+    TKmerLength k_min;
+    TCombinePattern(TKmerLength const primer_min_length) : k_min{primer_min_length} {}
+
+    // set a kmer combination by its lengths
+    static inline void set(TKmerLength const k1, TKmerLength const k2) noexcept
+    {
+        uint16_t const l1 = k1 - k_min;
+        uint16_t const l2 = k2 - k_min;
+        data[(l1*10 + l2) >> 6] += 1 << (63 - ((l1*10 + l2) % 64));
+    }
+
+    // unset bit if length combination doesn't pass a filter anymore
+    static inline void unset(TKmerLength const k1, TKmerLength const k2) noexcept
+    {
+        uint16_t const l1 = k1 - k_min;
+        uint16_t const l2 = k2 - k_min;
+        data[(l1*10 + l2) >> 6] -= 1 << (63 - ((l1*10 + l2) % 64));
+    }
+
+    // return all length combination translated into kmer lengths
+    void get_combinations(std::vector<std::pair<TKmerLength>> & combinations)
+    {
+        combinations.clear();
+        for (uint8_t i = 0; i < 100; ++i)
+        {
+            uint8_t mask = 1 << (63 - (i % 64));
+            if (data[i >> 6] & mask)
+            {
+                TKmerLength k1 = k_min + i/10 - 1;
+                TKmerLength k2 = k_min + (i % 10);
+                combinations.push_back(std::make_pair(k1, k2));
+            }
+        }
+    }
+};
+
+// Kmer combinations given by their indices in kmer ID vector and a length pattern
+// combination mask, i.e. a list of flags indicating if len_i combines with len_j.
+typedef std::vector<std::vector<std::tuple<uint64_t, uint64_t, TCombinePattern>>> TPairs;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TKmerPair

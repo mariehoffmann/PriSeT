@@ -24,11 +24,37 @@
 namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
+// Difference in melting temperatures (degree Celsius) according to Wallace rule.
+inline float Tm_delta(TKmerID kmerID1, TKmerLength k1, TKmerID kmerID2, TKmerLength k2)
+{
+    int8_t ctr_AT = 0;
+    int8_t ctr_CG = 0;
+    std::array<char, 4> const decodes = {'A', 'C', 'G', 'T'};
+    while (k1-- > 0)
+    {
+        if (!(kmerID1 & 3) || (kmerID1 & 3) == 3)  // 'A' (00) or 'T' (11)
+            ++ctr_AT;
+        else
+            ++ctr_CG;
+        kmerID1 >>= 1;
+    }
+    while (k2-- > 0)
+    {
+        if (!(kmerID2 & 3) || (kmerID2 & 3) == 3)  // 'A' (00) or 'T' (11)
+            --ctr_AT;
+        else
+            --ctr_CG;
+        kmerID2 >>= 1;
+    }
+    return std::abs(ctr_AT * 2 + ctr_CG * 4);
+}
+
 //!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.
 float primer_melt_wallace(TKmerID code)
 {
     uint8_t ctr_AT = 0, ctr_CG = 0;
     std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
+    code &= ~((1 << 52) - 1); // delete length mask
     while (code != 1)
     {
         switch(decodes[3 & code])
