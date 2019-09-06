@@ -42,8 +42,8 @@ public:
     // The number of tailing bits reserved in a KmerID for holding the integer compression of a kmer DNA sequence.
     static constexpr TKmerID const kmer_word_length{52};
 
-    // The number of leading bits reserved in a KmerID to store kmer lengths (64 - kmer_word_length).
-    static constexpr TKmerID const pattern_word_length{12};
+    // The number of leading bits reserved in a KmerID to store kmer lengths (= primer_max_length - primer_min_length + 1).
+    static constexpr TKmerID const pattern_word_length{10};
 
     // The minimal primer length (or a kmer).
     static constexpr TKmerID const primer_min_length{16};
@@ -56,7 +56,7 @@ public:
 
     // Maximal permitted temperature difference [Kelvin] of primers.
     // Differences above 5 Kelvin can lead to no amplification.
-    static constexpre float const primer_melt_diff{4.0};
+    static constexpr float const primer_melt_diff{4.0};
 
 private:
     // Root taxonomic identifier below which references are sampled.
@@ -102,7 +102,7 @@ public:
     primer_cfg_type & operator=(primer_cfg_type && rhs) = default;
 
     // Init with user defined k-mer length and error number
-    primer_cfg_type(size_type K_, size_type E_) : primer_length_range{K_, primer_length_range.second}
+    primer_cfg_type(size_type E_)
     {
         E = E_;
     }
@@ -156,20 +156,6 @@ public:
     constexpr float get_Na() const noexcept
     {
         return Na;
-    }
-
-    // Set primer length range.
-    void set_primer_length_range(size_type primer_length_min, size_type primer_length_max = 24)
-    {
-        //assert(primer_length_min <= primer_length_max);
-        primer_length_range = size_interval_type{primer_length_min, primer_length_max};
-    }
-
-
-    // Get primer length range
-    constexpr size_interval_type get_primer_length_range() const noexcept
-    {
-        return primer_length_range;
     }
 
     // Set method for computing primer melting temperature.

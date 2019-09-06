@@ -96,7 +96,7 @@ void test_filter_and_transform()
 
     filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
     std::cout << "References:\n";
-    for (TReference reference : references)
+    for (TReference reference : su.references)
     {
         std::cout << "\t";
         for (auto bit : reference)
@@ -104,7 +104,7 @@ void test_filter_and_transform()
         std::cout << std::endl;
     }
     std::cout << "KmerIDs:\n";
-    for (auto kmerID_list : kmerIDs)
+    for (auto kmerID_list : su.kmerIDs)
     {
         for (TKmerID kmerID : kmerID_list)
             std::cout << kmerID << " | ";
@@ -113,7 +113,7 @@ void test_filter_and_transform()
 
     TKmerID expect1 = 1513342761473819536;
     TKmerID expect2 = 288235407220622179;
-    if (!kmerIDs.size() || kmerIDs[0].size() != 2 || kmerIDs[0][0] != expect1 || kmerIDs[0][1] != expect2)
+    if (!su.kmerIDs.size() || su.kmerIDs[0].size() != 2 || su.kmerIDs[0][0] != expect1 || su.kmerIDs[0][1] != expect2)
         std::cout << "ERROR: expect kmerID1 = " << expect1 << " and kmerID2 = " << expect2 << ", but got nothing or a wrong kmerID\n";
     else
         std::cout << "SUCCESS: Result as expected!\n";
@@ -125,11 +125,13 @@ void test_combine()
     filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
     TPairs pairs;
     combine2(su.primer_cfg, su.references, su.kmerIDs, pairs, su.kmerCounts);
+
+    print_combinations(su.primer_cfg, su.kmerIDs, pairs);
 }
 
 int main()
 {
 
-    test_filter_and_transform();
+    test_combine();
     return 0;
 }

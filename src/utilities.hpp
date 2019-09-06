@@ -168,6 +168,37 @@ TKmerLength get_kmer_length(uint64_t code)
     return K;
 }
 
+// print binary format
+template<typename uint_type>
+void print_bits(uint_type i)
+{
+    if (!i)
+        std::cout << "0";
+    while(i)
+        (i & 1) ? std::cout << "1" : std::cout << "0";
+    std::cout << std::endl;
+}
+
+void print_combinations(primer_cfg_type const & primer_cfg, TKmerIDs const & kmerIDs, TPairs const & pairs) noexcept
+{
+    std::cout << "KmerID_fwd\t| KmerID_rev\t| Substring Combinations \n";
+    std::cout << "----------------------------------------------------\n";
+    for (TPair pair : pairs)
+    {
+        TKmerID kmerID_fwd = std::get<0>(pair);
+        TKmerID kmerID_rev = std::get<1>(pair);
+
+        std::cout << TKmerID_fwd << "\t | " << TKmerID_rev << "\t| ";
+        TCombinePattern cp = std::get<2>(pair);
+        std::vector<std::pair<TKmerLength, TKmerLength>> combinations;
+        cp.get_combinations(combinations, primer_cfg.primer_min_length);
+        TSeq kmer_fwd = decode(kmerID_fwd);
+        TSeq kmer_rev = decode(kmerID_rev);
+        for (auto lc : combinations)
+            std::cout << "\t\t | \t\t | (kmerID_fwd[" lc.first << ":], kmerID_rev[" << lc.second << "]) = (" << seqan::infixWithLength(kmer_fwd, 0, lc.first) << ", " << seqan::infixWithLength(kmer_rev, 0, lc.second) << ")\n";
+    }
+}
+
 void print_locations(TLocations & locations)
 {
     using key_type = typename TLocations::key_type;

@@ -204,46 +204,46 @@ public:
 struct TCombinePattern
 {
     // TODO: use union type for mask when doing SIMD vectorization
-    std::uint64_t data[2];
-    TKmerLength k_min;
-    TCombinePattern(TKmerLength const primer_min_length) : k_min{primer_min_length} {}
+    std::uint64_t data[2]; // or std::bitset<100> ? or union with SIMD 128
 
-    // set a kmer combination by its lengths
-    static inline void set(TKmerLength const k1, TKmerLength const k2) noexcept
+    // set a kmer combination by its lengths given the maximal length difference
+    inline void set(TKmerID const mask1, TKmerID const mask2, TKmerLength const l_max) noexcept
     {
-        uint16_t const l1 = k1 - k_min;
-        uint16_t const l2 = k2 - k_min;
-        data[(l1*10 + l2) >> 6] += 1 << (63 - ((l1*10 + l2) % 64));
+        auto idx = (63 - log2_asm(mask1)) * l_max + (63 - log2_asm(mask2)); // in [0:l_max^2[
+        data[idx >> 6] += 1 << (63 - (idx % 64));
     }
 
     // unset bit if length combination doesn't pass a filter anymore
-    static inline void unset(TKmerLength const k1, TKmerLength const k2) noexcept
+    inline void unset(TKmerLength const k1, TKmerLength const k2, TKmerLength const k_min) noexcept
     {
         uint16_t const l1 = k1 - k_min;
         uint16_t const l2 = k2 - k_min;
         data[(l1*10 + l2) >> 6] -= 1 << (63 - ((l1*10 + l2) % 64));
     }
 
-    // return all length combination translated into kmer lengths
-    void get_combinations(std::vector<std::pair<TKmerLength>> & combinations)
+    // return all enumerated length combinations translated into kmer lengths
+    void get_combinations(std::vector<std::pair<TKmerLength, TKmerLength>> & combinations, TKmerLength const k_min, TKmerLength const k_max)
     {
-        combinations.clear();
+        combinations.resize((k_max - k_min) * (k_max python - k_min));
         for (uint8_t i = 0; i < 100; ++i)
         {
+            std::pair<TKmerLength, TKmerLength> pair{0, 0}
             uint8_t mask = 1 << (63 - (i % 64));
             if (data[i >> 6] & mask)
             {
-                TKmerLength k1 = k_min + i/10 - 1;
-                TKmerLength k2 = k_min + (i % 10);
-                combinations.push_back(std::make_pair(k1, k2));
+                pair.first = k_min + i/10 - 1;
+                pair.second = k_min + (i % 10);
             }
+            combinations[i] = pair;
         }
     }
 };
 
+typedef std::tuple<uint64_t, uint64_t, TCombinePattern> TPair;
+
 // Kmer combinations given by their indices in kmer ID vector and a length pattern
 // combination mask, i.e. a list of flags indicating if len_i combines with len_j.
-typedef std::vector<std::vector<std::tuple<uint64_t, uint64_t, TCombinePattern>>> TPairs;
+typedef std::vector<std::vector<TPair>> TPairs;
 
  // Type for storing kmer combinations by their IDs and spatial occurences.
 struct TKmerPair
