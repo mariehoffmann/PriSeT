@@ -15,6 +15,7 @@
 
 //#include "../submodules/sdsl/include/sdsl/bit_vectors.hpp"
 
+#include "combine_types.hpp"
 #include "primer_cfg_type.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
@@ -246,7 +247,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             TSeqPos seqPos = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
             auto seqNo_cx = seqNoMap.at(seqNo); // compressed sequence id
             // continue and delete previous bit if same kmer occurs within 400 bp
-            if (it_loc_fwd > it->second.first.begin() && seqNo_prev == seqNo && seqPos_prev + primer_cfg.same_kmer_distance < seqPos)
+            if (it_loc_fwd > it->second.first.begin() && seqNo_prev == seqNo && seqPos_prev + TRAP_DIST < seqPos)
             {
                 // undo previous kmer bit in reference
                 references[seqNo_cx][seqPos_prev] = 0;
@@ -256,11 +257,11 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             }
 
             references[seqNo_cx][seqPos] = 1;
-            auto K_store_offset = K - primer_cfg.primer_min_length;
-            if (K_store_offset > 12)
+            auto K_store_offset = K - PRIMER_MIN_LEN;
+            if (K_store_offset > (PRIMER_MAX_LEN - PRIMER_MIN_LEN + 1))
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
             uint64_t loc_key = location_encode(seqNo, seqPos);
-            uint64_t loc_val = 1ULL << (63ULL - K_store_offset);
+            uint64_t loc_val = 1ULL << (WORD_SIZE - 1 - K_store_offset);
             // locations filled for K_min to K_max
             if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 loc_and_ks.insert({loc_key, loc_val});
@@ -282,7 +283,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     for (auto it = seqNoMap.begin(); it != seqNoMap.end(); ++it)
         seqNoMap_inv.insert({it->second, it->first});
     kmerIDs.resize(references.size());
-    uint64_t const kmer_length_mask = ~((1ULL << 52ULL) - 1ULL);
+    uint64_t const kmer_length_mask = ~((1ULL << KMER_SIZE) - 1ULL);
     for (unsigned i = 0; i < references.size(); ++i)
     {
         sdsl::rank_support_v5<1> r1s(&references[i]); // check if once initialized modification of references[i] does not invalidate rank support
@@ -296,14 +297,14 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 throw std::invalid_argument("ERROR: " + std::to_string(loc_key) + " not in loc_and_ks dictionary.");
 
-            TKmerID kmerID_head = loc_and_ks[loc_key]; // tail not filled yet & kmer_length_mask;
-            TKmerID k_pattern = kmerID_head >> 52ULL;
+            TKmerID kmerID_head = loc_and_ks[loc_key]; // tail not filled yet & KMER_SIZEgth_mask;
+            TKmerID k_pattern = kmerID_head >> (WORD_SIZE - LEN_MASK_SIZE);
             TKmerID k_pattern_cpy{k_pattern};
             std::cout << "k_pattern = " << k_pattern << std::endl;
             //while(!k_pattern_cpy)
             //    std::cout << ((k_pattern  & 1) ? "1" : "0");
             // TODO: identify highest set bit in head
-            TKmerLength k = primer_cfg.primer_min_length + primer_cfg.pattern_word_length - 1;
+            TKmerLength k = PRIMER_MIN_LEN + LEN_MASK_SIZE - 1;
             while (!(k_pattern_cpy & 1) && k--)
                 k_pattern_cpy >>= 1;
 
@@ -323,7 +324,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
                     // erase bit in head
                     if (!chemical_filter_single(primer_cfg, kmerID_trim))
                     {
-                        kmerID ^= 1 << (52ULL + trim_offset);
+                        kmerID ^= 1 << (KMER_SIZE + trim_offset);
                     }
                     else
                         stats[KMER_COUNTS::FILTER1_CNT]++;
@@ -353,21 +354,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     locations.clear();
 }
 
-// check cross-dimerization.
-// Note: No length bit shall be set in head, code corresponds to true length.
-void chemical_filter_pairs(/*primer_cfg_type const & primer_cfg, */TKmerPairs & kmer_pairs)
-{
-    assert(kmer_pairs.size() < (1 << 24));
-    std::bitset<1 << 24> mask{};
-    uint16_t i = 0;
-    for (auto kmer_pair : kmer_pairs)
-    {
-        if (filter_cross_dimerization(kmer_pair.get_kmer_ID1(), kmer_pair.get_kmer_ID2()))
-            mask.set(i);
-        ++i;
-    }
-}
-
 // post-filter candidates fulfilling chemical constraints by their relative frequency
 /*void post_frequency_filter(TKmerLocations kmer_locations, TSeqNo occurrence_freq)
 {
@@ -385,138 +371,28 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
     std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
     // frequency filter and sequence fetching
     filter_and_transform(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff, kmerCounts);
-    std::unordered_set<TKmerID> kmer_set;
-    unique_kmers(kmerIDs, kmer_set);
-    std::cout << "INFO: kmers after frequency cutoff and chemical filtering = " << kmer_set.size() << std::endl;
 }
-
-/*
-// combine helper, forward window until both iterators point to same reference ID or end
-void fast_forward(TKmerLocation::TLocationVec const & locations1, TKmerLocations::value_type::const_iterator & it1_loc_start, TKmerLocation::TLocationVec const & locations2, TKmerLocations::value_type::const_iterator & it2_loc_start)
-{
-    //std::cout << "enter fast_forward ..." << std::endl;
-    while (it1_loc_start != locations1.end() && it2_loc_start != locations2.end() &&
-            seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_start) != seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_start))
-    {
-        // speedup: use lower_bound/upper_bound
-        while (it1_loc_start != locations1.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_start))
-            ++it1_loc_start;
-        while (it2_loc_start != locations2.end() && seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_start) < seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_start))
-            ++it2_loc_start;
-    }
-    //std::cout << "... leaving ff" << std::endl;
-}
-*/
-
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
  * Chemical suitability will be tested by a different function. First position indicates,
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
- /*
-void combine(primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs)
-{
-    using it_loc_type = TKmerLocations::value_type::const_iterator;
-    it_loc_type it1_loc_start, it1_loc_aux;
-    it_loc_type it2_loc_start, it2_loc_aux;
-    TKmer kmer1, kmer2;
-    TKmerID kmer_ID1, kmer_ID2;
-    TKmerLength K1, K2;
-    for (auto it1 = kmer_locations.begin(); it1 != kmer_locations.end() && it1 != kmer_locations.end()-1; ++it1)
-    {
-        K1 = (*it1).get_K();
-        for (auto it2 = it1+1; it2 != kmer_locations.end(); ++it2)
-        {
-            K2 = (*it2).get_K();
-            kmer_ID1 = (*it1).get_kmer_ID();
-            kmer_ID2 = (*it2).get_kmer_ID();
-            assert(kmer_ID1 && kmer_ID2);
-
-            // continue with next combination if kmer sequences do not pass cross-dimerization filter
-            if (!filter_cross_dimerization(kmer_ID1, kmer_ID2))
-                continue;
-            // iterator to start position of current location for k-mer 1
-            it1_loc_start = (*it1).locations.begin();
-            // iterator to start position of current location for k-mer 2
-            it2_loc_start = (*it2).locations.begin();
-            // forward iterators to correspond to refer to same sequence ID or end
-            fast_forward((*it1).locations, it1_loc_start, (*it2).locations, it2_loc_start);
-            // no common reference sequences => forward kmer iterators
-            if (it1_loc_start == (*it1).locations.end() || it2_loc_start == (*it2).locations.end())
-                continue;
-
-            // foward iterator for k-mer 1 on same sequence (loc)
-            it1_loc_aux = it1_loc_start;
-            // foward iterator for k-mer 2 on same sequence (loc)
-            it2_loc_aux = it2_loc_start;
-            // invariant after entering this loop: loc(it1) == loc(it2)
-            auto seq_ID = seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_start);
-            while (it1_loc_start != (*it1).locations.end() && it1_loc_aux != (*it1).locations.end() && it2_loc_start != (*it2).locations.end() && seq_ID == seqan::getValueI1<TSeqNo, TSeqPos>(*it2_loc_aux))
-            {
-                // valid combination?
-                auto pos_kmer1 = seqan::getValueI2<TSeqNo, TSeqPos>(*it1_loc_aux);
-                if (it2_loc_aux != (*it2).locations.end())
-                {
-                    auto pos_kmer2 = seqan::getValueI2<TSeqNo, TSeqPos>(*it2_loc_aux);
-                    auto pos_delta = (pos_kmer1 < pos_kmer2) ? pos_kmer2 - pos_kmer1 - K1: pos_kmer1 - pos_kmer2 - K2;
-                    if (pos_delta >= primer_cfg.get_transcript_range().first && pos_delta <= primer_cfg.get_transcript_range().second)
-                    {
-                        TKmerID kmer_fwd_new = (pos_kmer1 < pos_kmer2) ? (*it1).get_kmer_ID() : (*it2).get_kmer_ID();
-                        TKmerID kmer_rev_new = (pos_kmer1 < pos_kmer2) ? (*it2).get_kmer_ID() : (*it1).get_kmer_ID();
-                        auto pair_location = std::make_tuple(seq_ID, std::min<TSeqPos>(pos_kmer1, pos_kmer2), std::max<TSeqPos>(pos_kmer1, pos_kmer2));
-
-                        // extend location vector if pair combinations already in result
-                        if (kmer_pairs.size() && kmer_pairs.back().get_kmer_ID1() == kmer_fwd_new && kmer_pairs.back().get_kmer_ID2() == kmer_rev_new)
-                        {
-                            kmer_pairs[kmer_pairs.size()-1].pair_locations.push_back(pair_location);
-                        }
-                        else
-                        {
-                            TKmerPair pair{kmer_fwd_new, kmer_rev_new, abs(primer_melt_wallace(kmer_fwd_new) - primer_melt_wallace(kmer_rev_new)), pair_location};
-                            kmer_pairs.push_back(pair);
-                        }
-                    }
-                    ++it2_loc_aux;
-                }
-                // all combinations tested for second k-mer
-                if (it2_loc_aux == (*it2).locations.end())
-                {
-                    // reset to start of current sequence if next k-mer of it1 refers to same sequence, else forward it2
-                    if (++it1_loc_aux == (*it1).locations.end())
-                        break;
-                    if (seqan::getValueI1<TSeqNo, TSeqPos>(*it1_loc_aux) == pos_kmer1)
-                        it2_loc_aux = it2_loc_start;
-                    else
-                    {
-                        it1_loc_start = it1_loc_aux;
-                        fast_forward((*it1).locations, it1_loc_start, (*it2).locations, it2_loc_start);
-                        it1_loc_aux = it1_loc_start;
-                        it2_loc_aux = it2_loc_start;
-                    }
-                }
-            }
-        }
-    }
-}
-*/
-
 // primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs
-void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairs & pairs, TKmerCounts & stats)
+// TODO: add concept requring outer and inner container to provide begin/end/push_back
+template<typename TPairList>
+void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
 {
     pairs.clear();
-    pairs.resize(kmerIDs.size());
     uint64_t offset_max = primer_cfg.get_transcript_range().second;
-
+    TKmerID mask_fwd, mask_rev;
     for (uint64_t i = 0; i < references.size(); ++i)
     {
         std::cout << "reference ID = " << i << std::endl;
-        //TReference reference = references.at(i);
-        //auto kmerID_list = kmerIDs.at(i);
 
         sdsl::bit_vector reference;
         sdsl::util::assign(reference, references.at(i));
-        sdsl::rank_support_v5<1, 1> r1s(&reference); // replace after bugfix with
+        sdsl::rank_support_v5<1, 1> r1s(&references.at(i)); // replace after bugfix with
         sdsl::select_support_mcl<1> s1s(&reference);
 
         std::cout << "iterate over " << r1s.rank(reference.size()) << " kmer IDs\n";
@@ -525,22 +401,25 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
             // text position of r-th k-mer
             uint64_t idx_fwd = s1s.select(r_fwd);
             std::cout << "text index of r_fwd = " << r_fwd << " is " << idx_fwd << std::endl;
-            TKmerID kmerID_fwd = kmerIDs[i][r_fwd-1];
-            if (!(kmerID_fwd >> primer_cfg.kmer_word_length))
+            TKmerID kmerID_fwd = kmerIDs[i][r_fwd - 1];
+            if (!(kmerID_fwd >> KMER_SIZE))
             {
                 std::cout << "ERROR: k length pattern is zero\n";
                 exit(-1);
             }
-            std::cout << "INFO: kurrent kmerID_fwd = " << kmerID_fwd << std::endl;
-
-            TKmerID mask_fwd = 1ULL << 63ULL;
-            while (mask_fwd >= (1ULL << primer_cfg.kmer_word_length))
+            std::cout << "INFO: current kmerID_fwd = " << kmerID_fwd << std::endl;
+            // reset mask to highest bit (= PRIMER_MIN_LEN position)
+            mask_fwd = ONE_LSHIFT_64;
+            std::cout << "DEBUG: init mask_fwd = " << bits2str(mask_fwd) << std::endl;
+            while (mask_fwd >= (1ULL << KMER_SIZE))
             {
-                std::cout << "\tINFO: current length bit mask = " << print_bits(mask_fwd);
+                std::cout << "DEBUG: mask_fwd = " << bits2str(mask_fwd) << std::endl;
+                std::cout << "\tINFO: current length bit mask = " << bits2str(mask_fwd);
                 if (mask_fwd & kmerID_fwd)
                 {
                     // window start position (inclusive)
-                    auto k_fwd = 63 - log2_asm(mask_fwd) + primer_cfg.primer_min_length;
+                    auto k_fwd = WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN;
+                    std::cout << "DEBUG: k_fwd = " << k_fwd << std::endl;
                     uint64_t w_begin = idx_fwd + k_fwd + primer_cfg.get_transcript_range().first + 1;
                     std::cout << "\tINFO: current length pattern in kmerID_fwd corresponding to k_fwd = " << k_fwd << std::endl;
                     // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
@@ -554,22 +433,22 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
                     {
                         // iterate through encoded lengths
                         TKmerID kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
-                        TKmerID mask_rev = 1ULL << 63ULL;
-                        TCombinePattern cp{};
+                        mask_rev = 1ULL << (WORD_SIZE - 1);
+                        TCombinePattern<TKmerID, TKmerLength> cp;
                         std::cout << "\t\tINFO: current kmerID_rev = " << kmerID_rev << std::endl;
-                        while (mask_rev >= (1ULL << primer_cfg.kmer_word_length))
+                        while (mask_rev >= (1ULL << KMER_SIZE))
                         {
-                            std::cout << "\t\tINFO: current length bit mask = ";
-                            print_bits(mask_fwd);
+                            std::cout << "\t\tINFO: current length bit mask = " << bits2str(mask_rev) << std::endl;
+
                             if (mask_rev & kmerID_rev)
                             {
                                 std::cout << "\t\tINFO: current length pattern in kmerID_fwd corresponding to k_fwd = " << log2_asm(mask_rev) << std::endl;
                                 // TODO: add more filter here
-                                std::cout << "\t\tINFO: compute Tm_delta(" << kmerID_fwd << ", " << (63 - log2_asm(mask_fwd)+primer_cfg.primer_min_length) << ", " << kmerID_rev << ", " << (63 - log2_asm(mask_rev) + primer_cfg.primer_min_length) << ") = " << Tm_delta(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
-                                if (Tm_delta(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= primer_cfg.primer_melt_diff)
+                                std::cout << "\t\tINFO: compute Tm_delta(" << kmerID_fwd << ", " << (WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN) << ", " << kmerID_rev << ", " << (WORD_SIZE - 1 - log2_asm(mask_rev) + PRIMER_MIN_LEN) << ") = " << Tm_delta(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev, PRIMER_MIN_LEN) << std::endl;
+                                if (Tm_delta(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev, PRIMER_MIN_LEN) <= primer_cfg.primer_melt_diff)
                                 {
                                     std::cout << "\t\tINFO: Tm_delta in range, set combination bit\n";
-                                    cp.set(mask_fwd, mask_rev, primer_cfg.pattern_word_length);
+                                    cp.set(mask_fwd, mask_rev, LEN_MASK_SIZE);
                                     ++stats[KMER_COUNTS::COMBINER_CNT];
                                 }
                                 else
@@ -578,7 +457,7 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
                             mask_rev >>= 1ULL;
                         }
                         if (cp.data[0] | cp.data[1])
-                            pairs[i].push_back(TPair{r_fwd, r_rev, cp});
+                            pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
                     }
                 }
                 mask_fwd >>= 1ULL;
@@ -588,11 +467,5 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
     }
     std::cout << "leaving combine2\n";
 }
-
-/*
-void post_filter_main(primer_cfg_type const & primer_cfg, TKmerIDs & kmerIDs, TPairs & pairs)
-{
-
-}*/
 
 }  // namespace priset

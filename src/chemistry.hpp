@@ -25,7 +25,7 @@ namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
-inline float Tm_delta(TKmerID const kmerID1, TKmerID const mask1, TKmerID const kmerID2, TKmerID const mask2, TKmerLength const min_k)
+extern inline float Tm_delta(TKmerID kmerID1, TKmerID const mask1, TKmerID kmerID2, TKmerID const mask2, TKmerLength const min_k)
 {
     int8_t ctr_AT = 0;
     int8_t ctr_CG = 0;
@@ -51,7 +51,7 @@ inline float Tm_delta(TKmerID const kmerID1, TKmerID const mask1, TKmerID const 
 }
 
 //!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.
-float primer_melt_wallace(TKmerID code)
+extern inline float primer_melt_wallace(TKmerID code)
 {
     uint8_t ctr_AT = 0, ctr_CG = 0;
     std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
@@ -72,7 +72,7 @@ float primer_melt_wallace(TKmerID code)
 
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
 // input primer:string sequence, Na:float molar Natrium ion concentration
-inline float primer_melt_salt(TKmerID code, float const Na)
+extern inline float primer_melt_salt(TKmerID code, float const Na)
 {
     uint8_t ctr_CG = 0;
     uint8_t seq_len = 0;
@@ -91,7 +91,7 @@ inline float primer_melt_salt(TKmerID code, float const Na)
 }
 
 //!\brief Compute melting temperature of primer sequence with method set in primer configuration.
-float get_Tm(primer_cfg_type const & primer_cfg, TKmerID kmer_ID) noexcept
+extern inline float get_Tm(primer_cfg_type const & primer_cfg, TKmerID kmer_ID) noexcept
 {
     switch(primer_cfg.get_primer_melt_method())
     {
@@ -102,7 +102,7 @@ float get_Tm(primer_cfg_type const & primer_cfg, TKmerID kmer_ID) noexcept
 
 //!\brief Check if CG content is in range set by the primer configurator.
 // Returns false if constraint is violated.
-bool filter_CG(primer_cfg_type const & primer_cfg, TKmerID code)
+extern inline bool filter_CG(primer_cfg_type const & primer_cfg, TKmerID code)
 {
     uint8_t ctr_CG = 0;
     uint8_t seq_len = 0;
@@ -125,7 +125,7 @@ bool filter_CG(primer_cfg_type const & primer_cfg, TKmerID code)
 //  Check if not more than 3 out of the 5 last bases at the 3' end are CG.
 //  DNA sense/'+': 5' to 3', antisense/'-': 3' to 5'
 // Returns false if constraint is violated.
-inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::String<priset::dna> const & sequence, char const sense)
+extern inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::String<priset::dna> const & sequence, char const sense)
 {
     assert(seqan::length(sequence) < (1 << 8));
     assert(sense == '+' || sense == '-');
@@ -156,7 +156,7 @@ inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan::Strin
  * For both the maximum is 4 consecutive di-nucleotides, and 4bp, respectively.
  * Needs to be called with non-ambigous kmerID, i.e. an ID encoding a length-variable kmer sequence.
  */
-bool filter_repeats_runs(TKmerID kmer_ID)
+extern inline bool filter_repeats_runs(TKmerID kmer_ID)
 {
     TSeq seq = dna_decoder(kmer_ID);
     if (seqan::length(seq) > 4)
@@ -201,7 +201,7 @@ bool filter_repeats_runs(TKmerID kmer_ID)
  *position the Gibb's free energy is computed and the minimum returned;
  * TODO: see "Improved thermodynamic parameters and helix initiation factor to predict stability of DNA duplexes" Sugimoto et al. 1996
  */
-float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<priset::dna> const & t)
+extern inline float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<priset::dna> const & t)
 {
     int8_t offset = 2;
     int8_t const n = seqan::length(s);
@@ -242,7 +242,7 @@ float gibbs_free_energy(seqan::String<priset::dna> const & s, seqan::String<pris
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
+extern inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
 {
 //    std::cout << "enter filter_cross_dimerization with kmer_ID1 = " << kmer_ID1 << " and kmer_ID2 = " << kmer_ID2 << std::endl;
     TSeq seq1 = dna_decoder(kmer_ID1);
@@ -256,7 +256,7 @@ inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-inline bool filter_self_dimerization(TKmerID kmer_ID)
+extern inline bool filter_self_dimerization(TKmerID kmer_ID)
 {
     return filter_cross_dimerization(kmer_ID, kmer_ID);
 }

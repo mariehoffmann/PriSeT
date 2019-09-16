@@ -119,11 +119,11 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     }
 
     // TODO: delete locations
-    TPairs pairs;
+    TPairLList pairs;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
     //combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TKmerPairs2 & pairs)
-    combine2(primer_cfg, references, kmerIDs, pairs, kmerCounts);
+    combine2<TPairLList>(primer_cfg, references, kmerIDs, pairs, kmerCounts);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();

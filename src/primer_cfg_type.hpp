@@ -15,8 +15,27 @@
 //#include "chemistry.hpp"
 #include "types.hpp"
 
+
 namespace priset
 {
+
+#define WORD_SIZE 64
+
+// The number of tailing bits reserved in a KmerID for holding the integer compression of a kmer DNA sequence.
+#define KMER_SIZE 52
+
+// The number of leading bits reserved in a KmerID to store kmer lengths (= primer_max_length - primer_min_length + 1).
+// Maximal possible length is 64 - KMER_SIZE.
+#define LEN_MASK_SIZE 10
+
+// The minimal primer length (or a kmer).
+#define PRIMER_MIN_LEN 16
+
+// The maximal primer length (or a kmer).
+#define PRIMER_MAX_LEN 27
+
+// The minimal distance (bp) between two identical kmers on same reference.
+#define TRAP_DIST 400
 
 struct primer_cfg_type
 {
@@ -38,21 +57,6 @@ public:
 
     // Frequency cutoff, i.e. all kmer occurences below will be dropped.
     static constexpr uint64_t const cutoff{10};
-
-    // The number of tailing bits reserved in a KmerID for holding the integer compression of a kmer DNA sequence.
-    static constexpr TKmerID const kmer_word_length{52};
-
-    // The number of leading bits reserved in a KmerID to store kmer lengths (= primer_max_length - primer_min_length + 1).
-    static constexpr TKmerID const pattern_word_length{10};
-
-    // The minimal primer length (or a kmer).
-    static constexpr TKmerID const primer_min_length{16};
-
-    // The maximal primer length (or a kmer).
-    static constexpr TKmerID const primer_max_length{27}; // min + pattern_word_length - 1
-
-    // The minimal distance (bp) between two identical kmers on same reference.
-    static constexpr uint64_t const same_kmer_distance{400};
 
     // Maximal permitted temperature difference [Kelvin] of primers.
     // Differences above 5 Kelvin can lead to no amplification.

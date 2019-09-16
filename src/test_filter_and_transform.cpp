@@ -15,6 +15,7 @@
 #include <seqan/stream.h>
 
 #include "argument_parser.hpp"
+#include "combine_types.hpp"
 #include "filter.hpp"
 #include "gui.hpp"
 #include "primer_cfg_type.hpp"
@@ -123,15 +124,19 @@ void test_combine()
 {
     setup su{};
     filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
-    TPairs pairs;
-    combine2(su.primer_cfg, su.references, su.kmerIDs, pairs, su.kmerCounts);
 
-    print_combinations(su.primer_cfg, su.kmerIDs, pairs);
+    //using TPair = TPair;
+    using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
+    TPairList pairs;
+    //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::primer_cfg_type&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::TCombinePattern<long long unsigned int, long long int> > >&)'
+//     print_combinations<>(su.primer_cfg, su.kmerIDs, pairs);
+    combine2(su.primer_cfg, su.references, su.kmerIDs, pairs, su.kmerCounts);
+    print_combinations<TPairList>(su.kmerIDs, pairs);
 }
 
 int main()
 {
-
-    test_combine();
+    test_filter_and_transform();
+//    test_combine();
     return 0;
 }
