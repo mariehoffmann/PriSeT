@@ -17,7 +17,7 @@
 
 //#include "primer_cfg_type.hpp"
 
-#define ONE_LSHIFT_64 9223372036854775808ULL
+#define ONE_LSHIFT_63 9223372036854775808ULL
 
 namespace priset
 {

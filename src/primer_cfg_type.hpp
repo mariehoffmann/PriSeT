@@ -34,6 +34,12 @@ namespace priset
 // The maximal primer length (or a kmer).
 #define PRIMER_MAX_LEN 27
 
+// The minimal transcript length.
+#define TRANSCRIPT_MIN_LEN 30
+
+// The minimal transcript length.
+#define TRANSCRIPT_MAX_LEN 700
+
 // The minimal distance (bp) between two identical kmers on same reference.
 #define TRAP_DIST 400
 
@@ -71,9 +77,6 @@ private:
 
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
     size_type E{0};
-
-    // Transcript length range.
-    size_interval_type transcript_range{30, 700};
 
     // Range of primer melting temperatures (best results in range [52-58] degree C).
     std::pair<float, float> primer_melt_range{50.0, 62.0};
@@ -172,19 +175,6 @@ public:
     enum TMeltMethod get_primer_melt_method() const noexcept
     {
         return primer_melt_method;
-    }
-
-    // Set distance_range.
-    void set_transcript_range(size_type transcript_range_min, size_type transcript_range_max)
-    {
-        assert(transcript_range_min < transcript_range_max);
-        transcript_range = size_interval_type{transcript_range_min, transcript_range_max};
-    }
-
-    // Get distance_range.
-    constexpr size_interval_type get_transcript_range() const noexcept
-    {
-        return transcript_range;
     }
 
     // Get CG content range.

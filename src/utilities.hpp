@@ -159,7 +159,11 @@ std::string bits2str(uint_type i)
     if (!i)
         return "0";
     while(i)
+    {
         s += (i & 1) ? "1" : "0";
+        i >>= 1;
+    }
+    std::reverse(s.begin(), s.end());
     return s;
 }
 
