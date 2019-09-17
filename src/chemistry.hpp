@@ -25,29 +25,45 @@ namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
-extern inline float Tm_delta(TKmerID kmerID1, TKmerID const mask1, TKmerID kmerID2, TKmerID const mask2, TKmerLength const min_k)
+extern inline float dTm(TKmerID kmerID1, TKmerID const mask1, TKmerID kmerID2, TKmerID const mask2)
 {
     int8_t ctr_AT = 0;
     int8_t ctr_CG = 0;
-    TKmerLength k1 = 63 - log2_asm(mask1) + min_k;
-    TKmerLength k2 = 63 - log2_asm(mask2) + min_k;
-    while (k1-- > 0)
+    TKmerLength k1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;
+    TKmerLength k2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;
+
+    // remove length mask
+    kmerID1 = (kmerID1 << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+    kmerID2 = (kmerID2 << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+
+    // truncate encoded kmerID if length given by mask is below encoded one
+    TKmerID kmerID1_total_len = (WORD_SIZE - (__builtin_clzl(kmerID1) + 1)) >> 1;
+    TKmerID kmerID2_total_len = (WORD_SIZE - (__builtin_clzl(kmerID2) + 1)) >> 1;
+
+    std::cout << "complete len = " << kmerID1_total_len << ", left-shift to correct: " << ((kmerID1_total_len - k1) << 1) << std::endl;
+    kmerID1 >>= ((kmerID1_total_len - k1) << 1);
+    kmerID2 >>= ((kmerID2_total_len - k2) << 1);
+
+    std::cout << "corrected kmerID1[1:" << k1 << "] = " << kmerID1 << std::endl;
+    std::cout << "corrected kmerID2[1:" << k2 << "] = " << kmerID2 << std::endl;
+
+    while (kmerID1 != 1)
     {
         if (!(kmerID1 & 3) || (kmerID1 & 3) == 3)  // 'A' (00) or 'T' (11)
             ++ctr_AT;
         else
             ++ctr_CG;
-        kmerID1 >>= 1;
+        kmerID1 >>= 2;
     }
-    while (k2-- > 0)
+    while (kmerID2 != 1)
     {
         if (!(kmerID2 & 3) || (kmerID2 & 3) == 3)  // 'A' (00) or 'T' (11)
             --ctr_AT;
         else
             --ctr_CG;
-        kmerID2 >>= 1;
+        kmerID2 >>= 2;
     }
-    return std::abs(ctr_AT * 2 + ctr_CG * 4);
+    return std::abs((ctr_AT << 1) + (ctr_CG << 2));
 }
 
 //!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.

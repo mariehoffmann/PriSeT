@@ -70,11 +70,11 @@ struct primer_cfg_type;
  * bit [|seq|]          closure symbol 'C'
  * bits [60:64]         lower sequence length bound in case of variable length
  */
- uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
- {
-     std::cout << "Enter dna_encoder\n";
-     std::cout << "input seq in dna_encoder: " << seq << std::endl;
-     uint64_t code = 1ULL << uint64_t(seqan::length(seq) << 1ULL); // stop symbol 'C' = 1
+seqan::String<priset::dna> dna_decoder(uint64_t code);
+
+uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
+{
+     uint64_t code = 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
          switch (char(seqan::getValue(seq, i))) //char(seq[i]))
@@ -84,10 +84,8 @@ struct primer_cfg_type;
              case 'T': code |=  3ULL << (i << 1ULL);
          }
      }
-
-         std::cout << "Return from dna_encoder\n";
      return code;
- }
+}
 
 // return full length sequence, ignore variable length info in leading bits.
 seqan::String<priset::dna> dna_decoder(uint64_t code)
@@ -134,23 +132,6 @@ extern inline uint64_t location_encode(TSeqNo seqNo, TSeqPos seqPos)
     return (seqNo << 10ULL) + seqPos;
 }
 
-
-TKmerLength get_kmer_length(uint64_t code)
-{
-    // note that assert converted to nop due to seqan's #define NDEBUG
-    if (code == 0ULL)
-        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
-    TKmerLength K = 0;
-    assert(code >= 1);
-    while (code != 1)
-    {
-        code >>= 2;
-        ++K;
-    }
-    std::cout << "leave with K = " << K << std::endl;
-    return K;
-}
-
 // print binary format
 template<typename uint_type>
 std::string bits2str(uint_type i)
@@ -171,7 +152,7 @@ template<typename TPairList>
 void print_combinations(TKmerIDs const & kmerIDs, TPairList const & pairs) noexcept
 {
     std::cout << "Reference ID\t| KmerID_fwd\t| KmerID_rev\t| Substring Combinations \n";
-    std::cout << "----------------------------------------------------\n";
+    std::cout << "----------------------------------------------------------------------\n";
     for (auto pair : pairs)
     {
         TKmerID kmerID_fwd = kmerIDs[pair.reference][pair.r_fwd];

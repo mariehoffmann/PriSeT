@@ -384,8 +384,9 @@ template<typename TPairList>
 void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
 {
     pairs.clear();
-    uint64_t offset_max = primer_cfg.get_transcript_range().second;
-    TKmerID mask_fwd, mask_rev;
+    uint64_t offset_max = TRANSCRIPT_MAX_LEN;
+    TKmerID mask_fwd{0}, mask_rev{0};
+    TKmerID kmerID_fwd{0}, kmerID_rev{0};
     for (uint64_t i = 0; i < references.size(); ++i)
     {
         std::cout << "reference ID = " << i << std::endl;
@@ -396,63 +397,64 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
         sdsl::select_support_mcl<1> s1s(&reference);
 
         std::cout << "iterate over " << r1s.rank(reference.size()) << " kmer IDs\n";
-        for (uint64_t r_fwd = 1; r_fwd <= r1s.rank(reference.size()); ++r_fwd)
+        for (uint64_t r_fwd = 1; r_fwd < r1s.rank(reference.size()); ++r_fwd)
         {
             // text position of r-th k-mer
             uint64_t idx_fwd = s1s.select(r_fwd);
             std::cout << "text index of r_fwd = " << r_fwd << " is " << idx_fwd << std::endl;
-            TKmerID kmerID_fwd = kmerIDs[i][r_fwd - 1];
+            kmerID_fwd = kmerIDs[i][r_fwd - 1];
             if (!(kmerID_fwd >> KMER_SIZE))
             {
                 std::cout << "ERROR: k length pattern is zero\n";
                 exit(-1);
             }
-            std::cout << "INFO: current kmerID_fwd = " << kmerID_fwd << std::endl;
             // reset mask to highest bit (= PRIMER_MIN_LEN position)
-            mask_fwd = ONE_LSHIFT_64;
-            std::cout << "DEBUG: init mask_fwd = " << bits2str(mask_fwd) << std::endl;
+            mask_fwd = ONE_LSHIFT_63;
             while (mask_fwd >= (1ULL << KMER_SIZE))
             {
-                std::cout << "DEBUG: mask_fwd = " << bits2str(mask_fwd) << std::endl;
-                std::cout << "\tINFO: current length bit mask = " << bits2str(mask_fwd);
+
                 if (mask_fwd & kmerID_fwd)
                 {
+                    std::cout << "INFO: current k of kmerID_fwd = " << __builtin_clzl(mask_fwd)+PRIMER_MIN_LEN << std::endl;
+
                     // window start position (inclusive)
                     auto k_fwd = WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN;
-                    std::cout << "DEBUG: k_fwd = " << k_fwd << std::endl;
-                    uint64_t w_begin = idx_fwd + k_fwd + primer_cfg.get_transcript_range().first + 1;
-                    std::cout << "\tINFO: current length pattern in kmerID_fwd corresponding to k_fwd = " << k_fwd << std::endl;
+                    TRANSCRIPT_MIN_LEN << std::endl;
+                    uint64_t w_begin = idx_fwd + k_fwd + TRANSCRIPT_MIN_LEN;
                     // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
+
                     if (w_begin > reference.size() - 1)
                         break;
+
                     // window end position (exclusive)
                     uint64_t w_end = std::min(reference.size(), idx_fwd + k_fwd + offset_max + 1);
+                    if (w_end < w_begin + TRANSCRIPT_MIN_LEN)
+                        break;
+
+
                     std::cout << "\tINFO: search window = [" << w_begin << ", " << w_end << "], rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << " corresponding to " << (r1s.rank(w_end) - r1s.rank(w_begin)) << " candidate pairing mates\n";
                     // iterate through kmers in reference sequence window [w_begin : w_end]
-                    for (uint64_t r_rev = r1s.rank(w_begin); r_rev <= r1s.rank(w_end); ++r_rev)
+                    for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
                     {
                         // iterate through encoded lengths
-                        TKmerID kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
+                        kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
                         mask_rev = 1ULL << (WORD_SIZE - 1);
                         TCombinePattern<TKmerID, TKmerLength> cp;
-                        std::cout << "\t\tINFO: current kmerID_rev = " << kmerID_rev << std::endl;
                         while (mask_rev >= (1ULL << KMER_SIZE))
                         {
-                            std::cout << "\t\tINFO: current length bit mask = " << bits2str(mask_rev) << std::endl;
-
                             if (mask_rev & kmerID_rev)
                             {
-                                std::cout << "\t\tINFO: current length pattern in kmerID_fwd corresponding to k_fwd = " << log2_asm(mask_rev) << std::endl;
+                                std::cout << "\t\tINFO: current length pattern in kmerID_rev corresponding to k_rev = " << log2_asm(mask_rev) << std::endl;
                                 // TODO: add more filter here
-                                std::cout << "\t\tINFO: compute Tm_delta(" << kmerID_fwd << ", " << (WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN) << ", " << kmerID_rev << ", " << (WORD_SIZE - 1 - log2_asm(mask_rev) + PRIMER_MIN_LEN) << ") = " << Tm_delta(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev, PRIMER_MIN_LEN) << std::endl;
-                                if (Tm_delta(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev, PRIMER_MIN_LEN) <= primer_cfg.primer_melt_diff)
+                                std::cout << "\t\tINFO: compute dTm(" << kmerID_fwd << ", " << (WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN) << ", " << kmerID_rev << ", " << (WORD_SIZE - 1 - log2_asm(mask_rev) + PRIMER_MIN_LEN) << ") = " << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
+                                if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= primer_cfg.primer_melt_diff)
                                 {
-                                    std::cout << "\t\tINFO: Tm_delta in range, set combination bit\n";
-                                    cp.set(mask_fwd, mask_rev, LEN_MASK_SIZE);
+                                    std::cout << "\t\tINFO: dTm in range, set combination bit\n";
+                                    cp.set(mask_fwd, mask_rev);
                                     ++stats[KMER_COUNTS::COMBINER_CNT];
                                 }
                                 else
-                                    std::cout << "\t\tINFO: Tm_delta outside of range, no bit setting\n";
+                                    std::cout << "\t\tINFO: dTm outside of range, no bit setting\n";
                             }
                             mask_rev >>= 1ULL;
                         }

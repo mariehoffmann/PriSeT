@@ -25,10 +25,11 @@ struct TCombinePattern
     std::uint64_t data[2]; // or std::bitset<100> ? or union with SIMD 128
 
     // set a kmer combination by its lengths given the maximal length difference
-    inline void set(TKmerID const mask1, TKmerID const mask2, TKmerLength const l_max) noexcept
+    inline void set(TKmerID const mask1, TKmerID const mask2) noexcept
     {
-        auto idx = (63 - log2_asm(mask1)) * l_max + (63 - log2_asm(mask2)); // in [0:l_max^2[
-        data[idx >> 6] += 1 << (63 - (idx % 64));
+        auto idx = __builtin_clzl(mask1) * LEN_MASK_SIZE + __builtin_clzl(mask2); // in [0:l_max^2[
+        std::cout << "computed index for bit set in cp: " << idx << std::endl;
+        data[idx >> 6] += 1 << (WORD_SIZE - 1 - (idx % WORD_SIZE));
     }
 
     // unset bit if length combination doesn't pass a filter anymore
@@ -36,7 +37,7 @@ struct TCombinePattern
     {
         uint16_t const l1 = k1 - k_min;
         uint16_t const l2 = k2 - k_min;
-        data[(l1*10 + l2) >> 6] -= 1 << (63 - ((l1*10 + l2) % 64));
+        data[(l1 * LEN_MASK_SIZE + l2) >> 6] -= 1 << ((WORD_SIZE - 1) - ((l1 * LEN_MASK_SIZE + l2) % WORD_SIZE));
     }
 
     // return all enumerated length combinations translated into kmer lengths

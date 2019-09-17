@@ -81,7 +81,7 @@ struct setup
  * tests interfaces between fm_map and filter_and_transform
  * Passes chemical filter for Tm, CG content and runs for length 23, 21, 19
  *
- * kmer 1-3 at position 10: "AACGTAACGTAACGTACGTACGT"         133286677332880
+ * kmer 1-3 at position 10: "(C)AACGTAACGTAACGTACGTACGT"      133286677332880
  * head = (1 << (63-3)) + (1 << (63-5)) + (1 << (63-7)) + 1513209474796486656
  *                                                        -------------------
  * head + seq_27                                        = 1513342761473819536
@@ -90,6 +90,11 @@ struct setup
  * head = (1 << (63 - (21-16)))                          + 288230376151711744
  *                                                         ------------------
  *                                                       = 288235407220622179
+
+    dTm(1513342761473819536, 19, 288235407220622179, 21) = 12
+
+    AACGTAACGTAACGTACGT         AT_cnt = 11 CG_cnt = 8 => 11*2 + 8*4 = 54 degrees
+    TAGCTAACTACATAGCTACGA       AT_cnt = 13 CG_cnt = 8 => 26 + 32 = 58 degrees
  */
 void test_filter_and_transform()
 {
@@ -136,7 +141,7 @@ void test_combine()
 
 int main()
 {
-    test_filter_and_transform();
-//    test_combine();
+//    test_filter_and_transform();
+    test_combine();
     return 0;
 }

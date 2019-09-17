@@ -209,18 +209,18 @@ private:
     // k-mer identifier for reverse (3') primer sequence
     TKmerID kmer_ID2{0};
     // absolute difference of their melting temperatures
-    float Tm_delta;
+    float dTm;
 
 public:
     // The container for storing pair locations.
     // TODO: make private and provide push_back and at functions
     TKmerPairLocations pair_locations;
 
-    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_) :
-        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_} {}
+    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float dTm_) :
+        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, dTm{dTm_} {}
 
-    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float Tm_delta_, TKmerPairLocation & pair_location_) :
-        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, Tm_delta{Tm_delta_}
+    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float dTm_, TKmerPairLocation & pair_location_) :
+        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, dTm{dTm_}
     {
         pair_locations.push_back(pair_location_);
         // .resize(pair_locations_.size());
@@ -237,9 +237,9 @@ public:
         return kmer_ID2;
     }
 
-    float get_Tm_delta() const noexcept
+    float get_dTm() const noexcept
     {
-        return Tm_delta;
+        return dTm;
     }
 
     size_t container_size() const noexcept
