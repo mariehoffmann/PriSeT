@@ -146,7 +146,7 @@ TKmerID encode_wrapper(TText const & text, TSeqNo const seqNo, TSeqPos const seq
 void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, TKmerCounts & stats)
 {
     //filter_stats stats{};
-    std::cout << "Enter filter_and_transform ...\n";
+    //std::cout << "Enter filter_and_transform ...\n";
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
 
@@ -156,16 +156,15 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     // load corpus for dna to 64 bit conversion
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
-    std::cout << "text_path = " << text_path << std::endl;
+    //std::cout << "text_path = " << text_path << std::endl;
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-    std::cout << "text length = " << seqan::length(text) << std::endl;
+    /*std::cout << "text length = " << seqan::length(text) << std::endl;
     for (auto ss : text)
         std::cout << ss << ", ";
     std::cout << std::endl;
-
+*/
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
     // to have a compressed representation.
-    std::cout << "Step 1\n";
     std::vector<TSeqPos> seqNo2maxPos(1 << 10);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
@@ -197,10 +196,11 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     // (ii) Create bit vectors in the length of largest kmer occurences, and set
     // bits for kmer occurrences. Collect also kmer lengths encoded in final kmer
     // code of type uint64_t. Final sequence lookup and encoding is done in next step.
-    std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
+    /*std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
     for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
         if (seqNo2maxPos[i])
             std::cout << i << "\t->\t" << seqNo2maxPos[i] << std::endl;
+    */
     seqNoMap.clear();
 
     unsigned i_cx = 0;
@@ -209,7 +209,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     {
         if (!seqNo2maxPos[i])
             continue;
-        std::cout << "seqNoMap, insert: " << i << " -> " << seqNo2maxPos[i] << std::endl;
+        //std::cout << "seqNoMap, insert: " << i << " -> " << seqNo2maxPos[i] << std::endl;
         seqNoMap[i] = i_cx++;
         sdsl::bit_vector bv(seqNo2maxPos[i] + 1, 0);
         references.push_back(bv);
@@ -230,7 +230,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         if ((it->second).first.size() < cutoff)
             continue;
         const auto & [seqNo, seqPos, K] = (it->first);
-        std::cout << "CURRENT K = " << K << std::endl;
+        //std::cout << "CURRENT K = " << K << std::endl;
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
@@ -293,22 +293,17 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             TSeqNo seqNo = seqNoMap_inv[i];
             TSeqPos seqPos = s1s.select(r);
             uint64_t loc_key = location_encode(seqNo, seqPos);
-            std::cout << "seqNo and seqpos as key = " << loc_key << std::endl;
             if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 throw std::invalid_argument("ERROR: " + std::to_string(loc_key) + " not in loc_and_ks dictionary.");
 
             TKmerID kmerID_head = loc_and_ks[loc_key]; // tail not filled yet & KMER_SIZEgth_mask;
             TKmerID k_pattern = kmerID_head >> (WORD_SIZE - LEN_MASK_SIZE);
             TKmerID k_pattern_cpy{k_pattern};
-            std::cout << "k_pattern = " << k_pattern << std::endl;
-            //while(!k_pattern_cpy)
-            //    std::cout << ((k_pattern  & 1) ? "1" : "0");
             // TODO: identify highest set bit in head
             TKmerLength k = PRIMER_MIN_LEN + LEN_MASK_SIZE - 1;
             while (!(k_pattern_cpy & 1) && k--)
                 k_pattern_cpy >>= 1;
 
-            std::cout << "MSG: maximal identified k = " << k << std::endl;
             // lookup sequence in corpus and encode
             seqan::DnaString seq = seqan::valueById(text, seqNo);
             TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k);
@@ -381,12 +376,9 @@ void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_
 // primer_cfg_type const & primer_cfg, TKmerLocations const & kmer_locations, TKmerPairs & kmer_pairs
 // TODO: add concept requring outer and inner container to provide begin/end/push_back
 template<typename TPairList>
-void combine2(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
+void combine(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
 {
     pairs.clear();
-    uint64_t offset_max = TRANSCRIPT_MAX_LEN;
-    TKmerID mask_fwd{0}, mask_rev{0};
-    TKmerID kmerID_fwd{0}, kmerID_rev{0};
     for (uint64_t i = 0; i < references.size(); ++i)
     {
         std::cout << "reference ID = " << i << std::endl;
@@ -402,51 +394,47 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
             // text position of r-th k-mer
             uint64_t idx_fwd = s1s.select(r_fwd);
             std::cout << "text index of r_fwd = " << r_fwd << " is " << idx_fwd << std::endl;
-            kmerID_fwd = kmerIDs[i][r_fwd - 1];
+            TKmerID const kmerID_fwd = kmerIDs[i][r_fwd - 1];
             if (!(kmerID_fwd >> KMER_SIZE))
             {
                 std::cout << "ERROR: k length pattern is zero\n";
                 exit(-1);
             }
-            // reset mask to highest bit (= PRIMER_MIN_LEN position)
-            mask_fwd = ONE_LSHIFT_63;
-            while (mask_fwd >= (1ULL << KMER_SIZE))
+            // minimal window start position for pairing kmer
+            uint64_t w_begin = idx_fwd + PRIMER_MIN_LEN + TRANSCRIPT_MIN_LEN;
+
+            // maximal window end position (exclusive) for pairing kmer
+            uint64_t w_end = std::min(reference.size(), idx_fwd + PRIMER_MAX_LEN + TRANSCRIPT_MAX_LEN + 1);
+
+            // iterate through kmers in reference sequence window [w_begin : w_end]
+            // note that w_begin/end are updated due to varying kmer length of same kmerID
+            for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
             {
-
-                if (mask_fwd & kmerID_fwd)
+                // new kmer combination, store possible combinations
+                TCombinePattern<TKmerID, TKmerLength> cp; // data set to 0?
+                // reset mask to highest bit (= PRIMER_MIN_LEN position)
+                uint64_t mask_fwd = ONE_LSHIFT_63;
+                while ((((mask_fwd << 1) - 1) & kmerID_fwd) >> (WORD_SIZE - LEN_MASK_SIZE))
                 {
-                    std::cout << "INFO: current k of kmerID_fwd = " << __builtin_clzl(mask_fwd)+PRIMER_MIN_LEN << std::endl;
-
-                    // window start position (inclusive)
-                    auto k_fwd = WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN;
-                    TRANSCRIPT_MIN_LEN << std::endl;
-                    uint64_t w_begin = idx_fwd + k_fwd + TRANSCRIPT_MIN_LEN;
-                    // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
-
-                    if (w_begin > reference.size() - 1)
-                        break;
-
-                    // window end position (exclusive)
-                    uint64_t w_end = std::min(reference.size(), idx_fwd + k_fwd + offset_max + 1);
-                    if (w_end < w_begin + TRANSCRIPT_MIN_LEN)
-                        break;
-
-
-                    std::cout << "\tINFO: search window = [" << w_begin << ", " << w_end << "], rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << " corresponding to " << (r1s.rank(w_end) - r1s.rank(w_begin)) << " candidate pairing mates\n";
-                    // iterate through kmers in reference sequence window [w_begin : w_end]
-                    for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
+                    if (mask_fwd & kmerID_fwd)
                     {
+                        std::cout << "INFO: current k of kmerID_fwd = " << __builtin_clzl(mask_fwd)+PRIMER_MIN_LEN << std::endl;
+                        // window start position (inclusive)
+
+                        std::cout << "\tINFO: search window = [" << w_begin << ", " << w_end << "], rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << " corresponding to " << (r1s.rank(w_end) - r1s.rank(w_begin)) << " candidate pairing mates\n";
+
                         // iterate through encoded lengths
-                        kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
-                        mask_rev = 1ULL << (WORD_SIZE - 1);
-                        TCombinePattern<TKmerID, TKmerLength> cp;
-                        while (mask_rev >= (1ULL << KMER_SIZE))
+                        TKmerID const kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
+                        uint64_t mask_rev = ONE_LSHIFT_63;
+                        // as long there are bits in length mask part of kmer_rev we continue shifting mask_rev
+                        while ((((mask_rev << 1) - 1) & kmerID_rev) >> (WORD_SIZE - LEN_MASK_SIZE))
                         {
                             if (mask_rev & kmerID_rev)
                             {
-                                std::cout << "\t\tINFO: current length pattern in kmerID_rev corresponding to k_rev = " << log2_asm(mask_rev) << std::endl;
+                                std::cout << "\t\tINFO: current length pattern in kmerID_rev corresponding to k_rev = " << (__builtin_clzl(mask_rev) + PRIMER_MIN_LEN) << std::endl;
                                 // TODO: add more filter here
-                                std::cout << "\t\tINFO: compute dTm(" << kmerID_fwd << ", " << (WORD_SIZE - 1 - log2_asm(mask_fwd) + PRIMER_MIN_LEN) << ", " << kmerID_rev << ", " << (WORD_SIZE - 1 - log2_asm(mask_rev) + PRIMER_MIN_LEN) << ") = " << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
+                                std::cout << "\t\tINFO: compute dTm(" << dna_decoder(kmerID_fwd, mask_fwd) << ", " << dna_decoder(kmerID_rev, mask_rev) << ") = ";
+                                std::cout << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= primer_cfg.primer_melt_diff)
                                 {
                                     std::cout << "\t\tINFO: dTm in range, set combination bit\n";
@@ -456,18 +444,30 @@ void combine2(primer_cfg_type const & primer_cfg, TReferences const & references
                                 else
                                     std::cout << "\t\tINFO: dTm outside of range, no bit setting\n";
                             }
-                            mask_rev >>= 1ULL;
-                        }
-                        if (cp.data[0] | cp.data[1])
-                            pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
+                            mask_rev >>= 1ULL; // does not affect search window, since starting position is fixed
+                        } // length mask_rev
                     }
+                    // update mask and dependent search window boundaries
+                    mask_fwd >>= 1ULL;
+                    ++w_begin;
+                    // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
+                    // window end position (exclusive)
+                    // continue with next kmer combination since we are outside of search window
+                    if ((w_begin > reference.size() - 1) || (w_end < w_begin + TRANSCRIPT_MIN_LEN))
+                        break;
+                } // length mask_fwd
+                if (cp.is_set())
+                {
+                    std::cout << "\t\tINFO: push back combination pattern\n";
+                    pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
                 }
-                mask_fwd >>= 1ULL;
-            }
-        }
+                else
+                    std::cout << "\t\tINFO: did NOT push back combination pattern\n";
+            } // kmerID rev
+        } // kmerID fwd
         std::cout << "next reference\n";
     }
-    std::cout << "leaving combine2\n";
+    std::cout << "leaving combine\n";
 }
 
 }  // namespace priset

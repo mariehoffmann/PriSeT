@@ -25,28 +25,39 @@ namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
-extern inline float dTm(TKmerID kmerID1, TKmerID const mask1, TKmerID kmerID2, TKmerID const mask2)
+extern inline float dTm(TKmerID const kmerID1_, TKmerID const mask1, TKmerID const kmerID2_, TKmerID const mask2)
 {
+    if (!(kmerID1_ & mask1) || !(kmerID2_ & mask2))
+    {
+        std::cout << "Error: target mask bit not set\n";
+        exit(0);
+    }
+    // remove length mask
+    TKmerID kmerID1 = (kmerID1_ << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+    TKmerID kmerID2 = (kmerID2_ << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+
+    auto enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(kmerID1)) >> 1; // encoded length
+    auto mask_l1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;      // selected length
+    kmerID1 >>= (enc_l1 - mask_l1) << 1;   // string correction
+
+    auto enc_l2 = (WORD_SIZE - 1 - __builtin_clzl(kmerID2)) >> 1; // encoded length
+    auto mask_l2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;      // selected length
+    kmerID2 >>= (enc_l2 - mask_l2) << 1;   // string correction
+
+    //std::cout << "corrected kmerID1 = " << dna_decoder(kmerID1) << std::endl;
+    //std::cout << "corrected kmerID2 = " << dna_decoder(kmerID2) << std::endl;
     int8_t ctr_AT = 0;
     int8_t ctr_CG = 0;
-    TKmerLength k1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;
-    TKmerLength k2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;
-
-    // remove length mask
-    kmerID1 = (kmerID1 << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
-    kmerID2 = (kmerID2 << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
-
-    // truncate encoded kmerID if length given by mask is below encoded one
-    TKmerID kmerID1_total_len = (WORD_SIZE - (__builtin_clzl(kmerID1) + 1)) >> 1;
-    TKmerID kmerID2_total_len = (WORD_SIZE - (__builtin_clzl(kmerID2) + 1)) >> 1;
-
-    std::cout << "complete len = " << kmerID1_total_len << ", left-shift to correct: " << ((kmerID1_total_len - k1) << 1) << std::endl;
-    kmerID1 >>= ((kmerID1_total_len - k1) << 1);
-    kmerID2 >>= ((kmerID2_total_len - k2) << 1);
-
-    std::cout << "corrected kmerID1[1:" << k1 << "] = " << kmerID1 << std::endl;
-    std::cout << "corrected kmerID2[1:" << k2 << "] = " << kmerID2 << std::endl;
-
+    if (!(__builtin_clzl(kmerID1) % 2))
+    {
+        std::cout << "ERROR: expected odd number of leading zeros\n";
+        exit(0);
+    }
+    if (!(__builtin_clzl(kmerID2) % 2))
+    {
+        std::cout << "ERROR: expected odd number of leading zeros\n";
+        exit(0);
+    }
     while (kmerID1 != 1)
     {
         if (!(kmerID1 & 3) || (kmerID1 & 3) == 3)  // 'A' (00) or 'T' (11)
@@ -63,7 +74,7 @@ extern inline float dTm(TKmerID kmerID1, TKmerID const mask1, TKmerID kmerID2, T
             --ctr_CG;
         kmerID2 >>= 2;
     }
-    return std::abs((ctr_AT << 1) + (ctr_CG << 2));
+    return (std::abs(ctr_AT) << 1) + (abs(ctr_CG) << 2);
 }
 
 //!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.
@@ -192,7 +203,7 @@ extern inline bool filter_repeats_runs(TKmerID kmer_ID)
             if (aux[0] == ifx[0] && aux[1] == ifx[1])
             {
                 ++repeat;
-                if (repeat >= 4)
+                if (repeat > 4)
                     return false;
             }
             else
@@ -211,6 +222,52 @@ extern inline bool filter_repeats_runs(TKmerID kmer_ID)
         }
     }
     return true;
+}
+
+extern inline TKmerID filter_repeats_runs2(TKmerID kmerID_)
+{
+    uint64_t const A5 = (1 << 8) - 1;
+
+    uint64_t mask = (kmerID_ >> (64 - LEN_MASK_SIZE)) << (64 - LEN_MASK_SIZE);
+
+    TKMerID kmerID = code_trunc(kmerID_, 1 << (63 - __builtin_clzl(kmerID_)));
+    uint64_t current_k = 1 << (63 - LEN_MASK_SIZE );
+    for (uint8_t i = 0; i < (63 - __builtin_clzl(kmerID))/2 - 4); ++i) // up-to four, i.e. 8 bits consecutive characters permitted
+    {
+        // XOR tail with A_5, C_5, G_5, T_5
+        if (!(kmerID ^ 0b0000000000) || !(kmerID ^ 0b0101010101) || !(kmerID ^ 0b1010101010) || !(kmerID ^ 0b1111111111))
+        {
+            // delete all k bits ≥ current_k
+            mask = (mask >> (63 - __builtin_clzl(current_k))) << (63 - __builtin_clzl(current_k));
+        }
+        // at least 10 characters left to test for di-nucleotide repeats of length 5
+        if (((63 - __builtin_clzl(kmerID))) > 18)
+        {
+            // AT_5, TA_5, AC_5, CA_5, AG_5, GA_5, CG_5, GC_5, CT_5, TC_5, GT_5, TG_5
+            if (!(kmerID ^ 0b00110011001100110011) || !(kmerID ^ 0b11001100110011001100) ||
+                !(kmerID ^ 0b00010001000100010001) || !(kmerID ^ 0b01000100010001000100) ||
+                !(kmerID ^ 0b00100010001000100010) || !(kmerID ^ 0b10001000100010001000) ||
+                !(kmerID ^ 0b01100110011001100110) || !(kmerID ^ 0b10011001100110011001) ||
+                !(kmerID ^ 0b01110111011101110111) || !(kmerID ^ 0b11011101110111011101) ||
+                !(kmerID ^ 0b10111011101110111011) || !(kmerID ^ 0b11101110111011101110)
+            )
+            {
+                // delete all k bits ≥ current_k
+                mask = (mask >> (63 - __builtin_clzl(current_k))) << (63 - __builtin_clzl(current_k));
+            }
+        }
+
+        if (!mask)
+            break;
+
+        kmerID >>= 1;
+        if (current_k < ONE_LSHIFT_63)
+            current_k <<= 1;
+
+    }
+
+    return mask + ((kmerID_ << LEN_MASK_SIZE) >> LEN_MASK_SIZE);
+
 }
 
 /* Helper function for computing the convolution of two sequences. For each overlap

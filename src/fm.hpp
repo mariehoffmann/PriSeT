@@ -76,7 +76,7 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLoc
     TLocations loc_per_K;
     using TKLocationsKey = typename TKLocations::key_type;
     using TKLocationsValue = typename TKLocations::mapped_type;
-    for (auto K = primer_cfg.get_primer_length_range().first; K <= primer_cfg.get_primer_length_range().second; ++K)
+    for (auto K = PRIMER_MIN_LEN; K <= PRIMER_MAX_LEN; ++K)
     {
         std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
         std::cout << "INFO: K = " << K << std::endl;

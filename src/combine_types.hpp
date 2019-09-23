@@ -8,7 +8,8 @@
 namespace priset
 {
 
-static inline uint64_t log2_asm(uint64_t const x);
+template<typename uint_type>
+std::string bits2str(uint_type i);
 
 // Store enumerated length combinations of two kmers in two 64 bit unsigned integers.
 // Enumerations follow lexicographical ordering. Since a kmerID may store up to
@@ -21,15 +22,25 @@ static inline uint64_t log2_asm(uint64_t const x);
 template<typename TKmerID, typename TKmerLength>
 struct TCombinePattern
 {
+private:
     // TODO: use union type for mask when doing SIMD vectorization
     std::uint64_t data[2]; // or std::bitset<100> ? or union with SIMD 128
 
+public:
+
+    // return true if at least one combination bit is set.
+    inline bool is_set()
+    {
+        return (data[0] | data[1]);
+    }
     // set a kmer combination by its lengths given the maximal length difference
     inline void set(TKmerID const mask1, TKmerID const mask2) noexcept
     {
         auto idx = __builtin_clzl(mask1) * LEN_MASK_SIZE + __builtin_clzl(mask2); // in [0:l_max^2[
-        std::cout << "computed index for bit set in cp: " << idx << std::endl;
+    //    std::cout << "computed index for bit set in cp: " << idx << std::endl;
         data[idx >> 6] += 1 << (WORD_SIZE - 1 - (idx % WORD_SIZE));
+
+        //std::cout << "DEBUG: set data at position " << (idx >> 6) << std::endl;
     }
 
     // unset bit if length combination doesn't pass a filter anymore
@@ -43,17 +54,19 @@ struct TCombinePattern
     // return all enumerated length combinations translated into kmer lengths
     void get_combinations(std::vector<std::pair<TKmerLength, TKmerLength>> & combinations)
     {
-        combinations.resize((PRIMER_MAX_LEN - PRIMER_MIN_LEN) * (PRIMER_MAX_LEN - PRIMER_MIN_LEN));
-        for (uint64_t i = 0; i < 100; ++i)
+        combinations.clear();
+        for (uint8_t i = 0; i < 2; ++i)
         {
-            std::pair<TKmerLength, TKmerLength> pair{0, 0};
-            uint64_t mask = 1 << (63 - (i % 64));
-            if (data[i >> 6] & mask)
+            uint64_t data_part = data[i];
+            while (data_part)
             {
-                pair.first = PRIMER_MIN_LEN + i/10 - 1;
-                pair.second = PRIMER_MIN_LEN + (i % 10);
+                auto c = i * WORD_SIZE + __builtin_clzl(data_part); // combination index
+                if (64 == c)
+                    break;
+                std::pair<TKmerLength, TKmerLength> pair{c / LEN_MASK_SIZE + PRIMER_MIN_LEN, (c % LEN_MASK_SIZE) + PRIMER_MIN_LEN};
+                combinations.push_back(pair);
+                data_part &= ((1 << (WORD_SIZE - c - 1)) - 1); // delete leading bit
             }
-            combinations[i] = pair;
         }
     }
 };
