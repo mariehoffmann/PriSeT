@@ -24,6 +24,8 @@
 namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
+std::string dna_decoder(uint64_t code, uint64_t const mask);
+
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
 extern inline float dTm(TKmerID const kmerID1_, TKmerID const mask1, TKmerID const kmerID2_, TKmerID const mask2)
 {
@@ -183,91 +185,106 @@ extern inline bool filter_CG_clamp(/*primer_cfg_type const & primer_cfg, */seqan
  * For both the maximum is 4 consecutive di-nucleotides, and 4bp, respectively.
  * Needs to be called with non-ambigous kmerID, i.e. an ID encoding a length-variable kmer sequence.
  */
-extern inline bool filter_repeats_runs(TKmerID kmer_ID)
+extern inline bool filter_repeats_runs(TKmerID kmerID)
 {
-    TSeq seq = dna_decoder(kmer_ID);
-    if (seqan::length(seq) > 4)
+    for (uint64_t mask = ONE_LSHIFT_63; mask >= (1ULL << 53); mask >>= 1)
     {
-        uint8_t repeat_even = 1;
-        uint8_t repeat_odd = 1;
-        //uint8_t & repeat;
-        TSeq ifx_even = seqan::infixWithLength(seq, 0, 2); // even start positions
-        TSeq ifx_odd = seqan::infixWithLength(seq, 1, 2); // odd start positions
-        //TSeq & ifx;
-        TSeq aux;
-        for (uint8_t i = 3; i < seqan::length(seq); ++i)
+        if (mask & kmerID)
         {
-            aux = seqan::infixWithLength(seq, i - 1, 2);
-            TSeq & ifx = (i % 2) ? ifx_even : ifx_odd;
-            uint8_t & repeat = (i % 2) ? repeat_even : repeat_odd;
-            if (aux[0] == ifx[0] && aux[1] == ifx[1])
+            TSeq seq = dna_decoder(kmerID, mask);
+            if (seqan::length(seq) > 4)
             {
-                ++repeat;
-                if (repeat > 4)
-                    return false;
-            }
-            else
-            {
-                repeat = 1;
-                ifx = aux;
-            }
-        }
+                uint8_t repeat_even = 1;
+                uint8_t repeat_odd = 1;
+                //uint8_t & repeat;
+                TSeq ifx_even = seqan::infixWithLength(seq, 0, 2); // even start positions
+                TSeq ifx_odd = seqan::infixWithLength(seq, 1, 2); // odd start positions
+                //TSeq & ifx;
+                TSeq aux;
+                for (uint8_t i = 3; i < seqan::length(seq); ++i)
+                {
+                    aux = seqan::infixWithLength(seq, i - 1, 2);
+                    TSeq & ifx = (i % 2) ? ifx_even : ifx_odd;
+                    uint8_t & repeat = (i % 2) ? repeat_even : repeat_odd;
+                    if (aux[0] == ifx[0] && aux[1] == ifx[1])
+                    {
+                        ++repeat;
+                        if (repeat > 4)
+                            return false;
+                    }
+                    else
+                    {
+                        repeat = 1;
+                        ifx = aux;
+                    }
+                }
 
-        seqan::Finder<TSeq> finder(seq);
-        for (char c : std::vector<char>{'A', 'C', 'G', 'T'})
-        {
-            seqan::Pattern<TSeq, Horspool> pattern(std::string(5, c));
-            if (seqan::find(finder, pattern))
-                return false;
+                seqan::Finder<TSeq> finder(seq);
+                for (char c : std::vector<char>{'A', 'C', 'G', 'T'})
+                {
+                    seqan::Pattern<TSeq, Horspool> pattern(std::string(5, c));
+                    if (seqan::find(finder, pattern))
+                        return false;
+                }
+            }
         }
     }
     return true;
 }
 
-extern inline TKmerID filter_repeats_runs2(TKmerID kmerID_)
+uint64_t code_prefix(uint64_t const code_, uint64_t mask);
+
+template<typename uint_type>
+std::string bits2str(uint_type i);
+
+std::string code2str(TKmerID kmerID);
+
+extern inline TKmerID filter_repeats_runs2(TKmerID const kmerID_)
 {
-    uint64_t const A5 = (1 << 8) - 1;
-
-    uint64_t mask = (kmerID_ >> (64 - LEN_MASK_SIZE)) << (64 - LEN_MASK_SIZE);
-
-    TKMerID kmerID = code_trunc(kmerID_, 1 << (63 - __builtin_clzl(kmerID_)));
-    uint64_t current_k = 1 << (63 - LEN_MASK_SIZE );
-    for (uint8_t i = 0; i < (63 - __builtin_clzl(kmerID))/2 - 4); ++i) // up-to four, i.e. 8 bits consecutive characters permitted
+    std::cout << "Enter filter_repeats_runs2\n";
+    uint64_t mask = kmerID_ & MASK_SELECTOR;
+    TKmerID kmerID = code_prefix(kmerID_, 0); // trim to true length
+    std::cout << "head-less sequence: " << code2str(kmerID) << " and head = " << bits2str(mask>>54) << std::endl;
+    uint64_t len_selector = 1ULL << (64 - LEN_MASK_SIZE );
+    std::cout << "Initially leading zeros (after head removal, expect 21): " << __builtin_clzl(kmerID) << std::endl;
+    uint64_t kmer_len = (63 - __builtin_clzl(kmerID)) >> 1;
+    for (uint64_t i = 0; i < kmer_len - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {
-        // XOR tail with A_5, C_5, G_5, T_5
-        if (!(kmerID ^ 0b0000000000) || !(kmerID ^ 0b0101010101) || !(kmerID ^ 0b1010101010) || !(kmerID ^ 0b1111111111))
-        {
-            // delete all k bits ≥ current_k
-            mask = (mask >> (63 - __builtin_clzl(current_k))) << (63 - __builtin_clzl(current_k));
-        }
-        // at least 10 characters left to test for di-nucleotide repeats of length 5
-        if (((63 - __builtin_clzl(kmerID))) > 18)
-        {
-            // AT_5, TA_5, AC_5, CA_5, AG_5, GA_5, CG_5, GC_5, CT_5, TC_5, GT_5, TG_5
-            if (!(kmerID ^ 0b00110011001100110011) || !(kmerID ^ 0b11001100110011001100) ||
-                !(kmerID ^ 0b00010001000100010001) || !(kmerID ^ 0b01000100010001000100) ||
-                !(kmerID ^ 0b00100010001000100010) || !(kmerID ^ 0b10001000100010001000) ||
-                !(kmerID ^ 0b01100110011001100110) || !(kmerID ^ 0b10011001100110011001) ||
-                !(kmerID ^ 0b01110111011101110111) || !(kmerID ^ 0b11011101110111011101) ||
-                !(kmerID ^ 0b10111011101110111011) || !(kmerID ^ 0b11101110111011101110)
-            )
+        //if (len_selector & kmerID_)
+        //{
+            // XOR tail with A_5, C_5, G_5, T_5
+            if (!(kmerID ^ 0b0000000000) || !(kmerID ^ 0b0101010101) || !(kmerID ^ 0b1010101010) || !(kmerID ^ 0b1111111111))
             {
-                // delete all k bits ≥ current_k
-                mask = (mask >> (63 - __builtin_clzl(current_k))) << (63 - __builtin_clzl(current_k));
+                // delete all k bits ≥ len_selector
+                mask = (mask >> (54 + std::min(i, 9ULL))) << (54 + std::min(i, 9ULL));
             }
-        }
-
+            // at least 10 characters left to test for di-nucleotide repeats of length 5
+            if (kmer_len - i > 9)
+            {
+                // AT_5, TA_5, AC_5, CA_5, AG_5, GA_5, CG_5, GC_5, CT_5, TC_5, GT_5, TG_5
+                if ( (kmerID & 0b00110011001100110011) || (kmerID & 0b11001100110011001100) ||
+                     (kmerID & 0b00010001000100010001) || (kmerID & 0b01000100010001000100) ||
+                     (kmerID & 0b00100010001000100010) || (kmerID & 0b10001000100010001000) ||
+                     (kmerID & 0b01100110011001100110) || (kmerID & 0b10011001100110011001) ||
+                     (kmerID & 0b01110111011101110111) || (kmerID & 0b11011101110111011101) ||
+                     (kmerID & 0b10111011101110111011) || (kmerID & 0b11101110111011101110))
+                {
+                    std::cout << "DEBUG: match for di-nucl run in tail: " << dna_decoder(kmerID, 0) << std::endl;
+                    // delete all k bits ≥ len_selector
+                    mask = (mask >> (54 + std::min(i, 9ULL))) << (54 + std::min(i, 9ULL));
+                    std::cout << "DEBUG: new bit mask = " << bits2str<uint64_t>(mask >> 54) << std::endl;
+                }
+            }
+        //}
         if (!mask)
             break;
 
-        kmerID >>= 1;
-        if (current_k < ONE_LSHIFT_63)
-            current_k <<= 1;
+        kmerID >>= 2;
+        //if (len_selector < ONE_LSHIFT_63)
+        //    len_selector <<= 1;
 
     }
-
-    return mask + ((kmerID_ << LEN_MASK_SIZE) >> LEN_MASK_SIZE);
-
+    return mask + (kmerID_ & ~MASK_SELECTOR);
 }
 
 /* Helper function for computing the convolution of two sequences. For each overlap
@@ -315,11 +332,13 @@ extern inline float gibbs_free_energy(seqan::String<priset::dna> const & s, seqa
 /* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
  * Returns true if ΔG ≥ -5kcal/mol
  */
-extern inline bool filter_cross_dimerization(TKmerID kmer_ID1, TKmerID kmer_ID2)
+extern inline bool filter_cross_dimerization(TKmerID kmerID1, TKmerID kmerID2)
 {
-//    std::cout << "enter filter_cross_dimerization with kmer_ID1 = " << kmer_ID1 << " and kmer_ID2 = " << kmer_ID2 << std::endl;
-    TSeq seq1 = dna_decoder(kmer_ID1);
-    TSeq seq2 = dna_decoder(kmer_ID2);
+//    std::cout << "enter filter_cross_dimerization with kmerID1 = " << kmerID1 << " and kmerID2 = " << kmerID2 << std::endl;
+    // Approximate: check for smallest encoded kmer
+    // TODO: do check exact and avoid String conversion
+    TSeq seq1 = dna_decoder(kmerID1, __builtin_clzl(kmerID1) + PRIMER_MIN_LEN);
+    TSeq seq2 = dna_decoder(kmerID2, __builtin_clzl(kmerID2) + PRIMER_MIN_LEN);
 
     float dG = gibbs_free_energy(seq1, seq2);
     //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;

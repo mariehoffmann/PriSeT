@@ -148,23 +148,10 @@ void test_dna_decoder()
     std::cout << dna_decoder(kmerID, mask >> 4) << " of length " << length(dna_decoder(kmerID, mask >> 4)) << std::endl;
 }
 
-void test_dTM()
-{
-    TKmerID kmerID1 = 1513342761473819536;
-    uint64_t mask1 = ONE_LSHIFT_63 >> 3;
-    TKmerID kmerID2 = 288235407220622179;
-    uint64_t mask2 = ONE_LSHIFT_63 >> 5;
-    std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << dTm(kmerID1, mask1, kmerID2, mask2) << std::endl;
-    mask1 >>= 2;
-    std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << dTm(kmerID1, mask1, kmerID2, mask2) << std::endl;
-    mask1 >>= 2;
-    std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << dTm(kmerID1, mask1, kmerID2, mask2) << std::endl;
-}
-
 int main()
 {
-    test_filter_and_transform();
-//    test_combine();
+//    test_filter_and_transform();
+    test_combine();
 //    test_dna_decoder();
 //    test_dTM();
     return 0;

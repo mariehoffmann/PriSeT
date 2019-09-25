@@ -72,57 +72,82 @@ struct primer_cfg_type;
  * bit [|seq|]          closure symbol 'C'
  * bits [60:64]         lower sequence length bound in case of variable length
  */
-seqan::String<priset::dna> dna_decoder(uint64_t code, uint64_t const mask);
-
-TKmerID
+std::string dna_decoder(uint64_t code, uint64_t const mask);
 
 uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 {
      uint64_t code = 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
+         std::cout << "char at pos i = " << i << char(seqan::getValue(seq, i)) << std::endl;
+         code <<= 1;
          switch (char(seqan::getValue(seq, i))) //char(seq[i]))
          {
-             case 'C': code |=  1ULL << (i << 1ULL); break;
-             case 'G': code |=  2ULL << (i << 1ULL); break;
-             case 'T': code |=  3ULL << (i << 1ULL);
+             case 'C': code += 1ULL; break;
+             case 'G': code += 2ULL; break;
+             case 'T': code += 3ULL;
          }
      }
+     std::cout << "code by encoder = " << code << std::endl;
      return code;
 }
 
-// correct encoded length given mask and remove length information in head
-uint64_t code_trunc(uint64_t const code_, uint64_t const mask = 0)
+// Correct encoded length to length indicated by the mask and remove length information.
+// If no mask is given (mask = 0), the code is truncated to its largest length encoded in head,
+// otherwise it's truncated to the length given by the mask (same format like code head).
+// A leading bit ('C') remains in the code to signal the end.
+uint64_t code_prefix(uint64_t const code_, uint64_t mask = 0)
 {
-    uint64_t code = (code_t << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
-    if (mask)
+    //std::cout << "Enter code_prefix\n";
+    if (!(code_ & MASK_SELECTOR))
     {
-        auto enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
-        auto mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
-        std::cout << "encoded length = " << enc_l << ", target length = " << mask_l << std::endl;
-        code >>= (enc_l - mask_l) << 1;   // string correction
+        std::cout << "Error: code has no heading bits\n" << std::endl;
+        exit(0);
     }
+    uint64_t code = (code_ << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+    if (!mask) // get largest encoded length
+    {
+    //    std::cout << "ffsl(" << bits2str(code_ >> 54) << ") = " << ffsl(code_ >> 54) << std::endl;
+        mask = 1ULL << (ffsl(code_ >> 54) + 53); // find first significat bit (1-based) or 0
+    //    std::cout << "shift one by " << (ffsl(code_ >> 54) + 53) << " positions: " << mask << std::endl;
+    //    std::cout << "mask = " << bits2str(mask >> 54) << std::endl;
+    }
+    //std::cout << "mask with least significant length bit = " << bits2str(mask >> 54) << std::endl;
+    auto enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
+    auto mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
+    //std::cout << "encoded length = " << enc_l << ", target length = " << mask_l << std::endl;
+    code >>= (enc_l - mask_l) << 1;   // kmer length correction
     return code;
 }
 
 // return full length sequence, ignore variable length info in leading bits.
-seqan::String<priset::dna> dna_decoder(uint64_t code, uint64_t const mask = 0)
+std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
 {
+    //std::cout << "Enter dna_decoder with (code = " << code_ << ", mask = " << mask << ")\n";
     // note that assert converted to nop due to seqan's #define NDEBUG
-    if (code == 0ULL)
+    if (code_ == 0ULL)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
-    code = prefix_code(code);
+    uint64_t code = code_;
+    if (MASK_SELECTOR & code)
+        code = code_prefix(code_, mask);
+    //std::cout << "exit code_prefix with code = " << code << std::endl;
+
     std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
-    seqan::String<priset::dna> d = "";
+    std::string d = "";
+
     while (code != 1)
     {
+    //    std::cout << "DEBUG: current code: " << code << std::endl;
         d += sigmas[3 & code];
         code >>= 2;
     }
     return d;
 }
 
-
+std::string code2str(TKmerID kmerID)
+{
+    return bits2str((kmerID >> 54) << 54) + dna_decoder(kmerID);
+}
 
 extern inline void dna_decoder(uint64_t code, std::vector<TSeq> & decodes)
 {

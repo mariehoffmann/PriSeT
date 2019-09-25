@@ -28,11 +28,14 @@ namespace priset
 // Maximal possible length is 64 - KMER_SIZE.
 #define LEN_MASK_SIZE 10
 
+// Mask selection, i.e. 10 leading bits and rest 0 or ~(1 << 54) - 1)
+#define MASK_SELECTOR 18428729675200069632ULL
+
 // The minimal primer length (or a kmer).
 #define PRIMER_MIN_LEN 16
 
 // The maximal primer length (or a kmer).
-#define PRIMER_MAX_LEN 27
+#define PRIMER_MAX_LEN 16
 
 // The minimal transcript length.
 #define TRANSCRIPT_MIN_LEN 30
