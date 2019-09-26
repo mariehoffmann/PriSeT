@@ -32,7 +32,7 @@ namespace priset
 #define MASK_SELECTOR 18428729675200069632ULL
 
 // The minimal primer length (or a kmer).
-#define PRIMER_MIN_LEN 16
+#define PRIMER_MIN_LEN 16ULL
 
 // The maximal primer length (or a kmer).
 #define PRIMER_MAX_LEN 16

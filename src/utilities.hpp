@@ -80,7 +80,7 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
     uint64_t code(0);
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
-         std::cout << "char at pos i = " << i << char(seqan::getValue(seq, i)) << std::endl;
+         //std::cout << "char at pos i = " << i << char(seqan::getValue(seq, i)) << std::endl;
          switch (char(seqan::getValue(seq, i))) //char(seq[i]))
          {
              case 'C': code += 1ULL; break;
@@ -136,17 +136,17 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
     if (MASK_SELECTOR & code)
         code = code_prefix(code_, mask);
     //std::cout << "exit code_prefix with code = " << code << std::endl;
-
-    std::array<std::string, 4> sigmas = {"A", "C", "G", "T"};
-    std::string d = "";
-
-    while (code != 1)
+    // TODO: use global
+    std::array<char, 4> sigmas = {'A', 'C', 'G', 'T'};
+    uint8_t n = (63 - __builtin_clzl(code)) >> 1;
+    std::cout << "encoded length = " << int(n) << std::endl;
+    char seq[n];
+    for (uint8_t i = 1; i <= n; ++i, code >>= 2)
     {
     //    std::cout << "DEBUG: current code: " << code << std::endl;
-        d += sigmas[3 & code];
-        code >>= 2;
+        seq[n - i] = sigmas[3 & code];
     }
-    return d;
+    return std::string(seq);
 }
 
 std::string code2str(TKmerID kmerID)

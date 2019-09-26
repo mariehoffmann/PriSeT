@@ -139,20 +139,10 @@ void test_combine()
     print_combinations<TPairList>(su.kmerIDs, pairs);
 }
 
-void test_dna_decoder()
-{
-    TKmerID kmerID = 1513342761473819536; // 19,21,23
-    uint64_t mask = ONE_LSHIFT_63 >> 3;
-    std::cout << dna_decoder(kmerID, mask) << " of length " << length(dna_decoder(kmerID, mask)) << std::endl;
-    std::cout << dna_decoder(kmerID, mask >> 2) << " of length " << length(dna_decoder(kmerID, mask >> 2)) << std::endl;
-    std::cout << dna_decoder(kmerID, mask >> 4) << " of length " << length(dna_decoder(kmerID, mask >> 4)) << std::endl;
-}
-
 int main()
 {
 //    test_filter_and_transform();
     test_combine();
-//    test_dna_decoder();
 //    test_dTM();
     return 0;
 }

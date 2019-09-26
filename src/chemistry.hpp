@@ -79,6 +79,10 @@ extern inline float dTm(TKmerID const kmerID1_, TKmerID const mask1, TKmerID con
     return (std::abs(ctr_AT) << 1) + (abs(ctr_CG) << 2);
 }
 
+//TAACGTAACGTACGTACGT, TAGCTAACTACATAGCTACGA
+// AT = 11              13
+// CG =  8              8
+
 //!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.
 extern inline float primer_melt_wallace(TKmerID code)
 {
@@ -243,35 +247,45 @@ extern inline TKmerID filter_repeats_runs2(TKmerID const kmerID_)
 {
     std::cout << "Enter filter_repeats_runs2\n";
     uint64_t mask = kmerID_ & MASK_SELECTOR;
+    uint64_t const tail_selector_10 = (1 << 10) - 1;
+    uint64_t const tail_selector_20 = (1 << 20) - 1;
     TKmerID kmerID = code_prefix(kmerID_, 0); // trim to true length
     std::cout << "head-less sequence: " << code2str(kmerID) << " and head = " << bits2str(mask>>54) << std::endl;
     //uint64_t len_selector = 1ULL << (64 - LEN_MASK_SIZE );
-    std::cout << "Initially leading zeros (after head removal, expect 21): " << __builtin_clzl(kmerID) << std::endl;
-    uint64_t kmer_len = (63 - __builtin_clzl(kmerID)) >> 1;
-    for (uint64_t i = 0; i < kmer_len - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
+    uint64_t const k = (63 - __builtin_clzl(kmerID)) >> 1;
+    for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {
         //if (len_selector & kmerID_)
         //{
+            uint64_t tail_10 = tail_selector_10 & kmerID;
             // XOR tail with A_5, C_5, G_5, T_5
-            if (!(kmerID ^ 0b0000000000) || !(kmerID ^ 0b0101010101) || !(kmerID ^ 0b1010101010) || !(kmerID ^ 0b1111111111))
+            if ((tail_10 == 0b0000000000) || (tail_10 == 0b0101010101) || (tail_10 == 0b1010101010) || (tail_10 == 0b1111111111))
             {
+                // note that (x >> 64) won't be executed
+                uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
                 // delete all k bits ≥ len_selector
-                mask = (mask >> (54 + std::min(i, 9ULL))) << (54 + std::min(i, 9ULL));
+                mask = (offset == 64) ? 0 : (mask >> offset) << offset;
+
+            //    std::cout << "DEBUG: found 5X, shifted mask by " << int(offset) << " bits for removing len bits\n";
+            //    std::cout << bits2str(mask >> 54) << std::endl;
             }
             // at least 10 characters left to test for di-nucleotide repeats of length 5
-            if (kmer_len - i > 9)
+            if (k - i > 9)
             {
+                uint64_t tail_20 = kmerID & tail_selector_20;
                 // AT_5, TA_5, AC_5, CA_5, AG_5, GA_5, CG_5, GC_5, CT_5, TC_5, GT_5, TG_5
-                if ( (kmerID & 0b00110011001100110011) || (kmerID & 0b11001100110011001100) ||
-                     (kmerID & 0b00010001000100010001) || (kmerID & 0b01000100010001000100) ||
-                     (kmerID & 0b00100010001000100010) || (kmerID & 0b10001000100010001000) ||
-                     (kmerID & 0b01100110011001100110) || (kmerID & 0b10011001100110011001) ||
-                     (kmerID & 0b01110111011101110111) || (kmerID & 0b11011101110111011101) ||
-                     (kmerID & 0b10111011101110111011) || (kmerID & 0b11101110111011101110))
+                if ( (tail_20 == 0b00110011001100110011) || (tail_20 == 0b11001100110011001100) ||
+                     (tail_20 == 0b00010001000100010001) || (tail_20 == 0b01000100010001000100) ||
+                     (tail_20 == 0b00100010001000100010) || (tail_20 == 0b10001000100010001000) ||
+                     (tail_20 == 0b01100110011001100110) || (tail_20 == 0b10011001100110011001) ||
+                     (tail_20 == 0b01110111011101110111) || (tail_20 == 0b11011101110111011101) ||
+                     (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
                 {
                     std::cout << "DEBUG: match for di-nucl run in tail: " << dna_decoder(kmerID, 0) << std::endl;
                     // delete all k bits ≥ len_selector
-                    mask = (mask >> (54 + std::min(i, 9ULL))) << (54 + std::min(i, 9ULL));
+                    uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
+                    // delete all k bits ≥ len_selector
+                    mask = (offset == 64) ? 0 : (mask >> offset) << offset;
                     std::cout << "DEBUG: new bit mask = " << bits2str<uint64_t>(mask >> 54) << std::endl;
                 }
             }
