@@ -256,12 +256,11 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             }
 
             references[seqNo_cx][seqPos] = 1;
-            auto K_store_offset = K - PRIMER_MIN_LEN;
-            std::cout << "DEBUG: K_store_offset = " << K_store_offset << ", K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << std::endl;
-            if (K_store_offset > (PRIMER_MAX_LEN - PRIMER_MIN_LEN + 1))
+            std::cout << "DEBUG: K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << ", PRIMER_MAX_LEN = " << PRIMER_MAX_LEN << std::endl;
+            if (uint64_t(K) > PRIMER_MAX_LEN)
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
             uint64_t loc_key = location_encode(seqNo, seqPos);
-            uint64_t loc_val = 1ULL << (WORD_SIZE - 1 - K_store_offset);
+            uint64_t loc_val = ONE_LSHIFT_63 >> (K - PRIMER_MIN_LEN);
             // locations filled for K_min to K_max
             if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 loc_and_ks.insert({loc_key, loc_val});
@@ -306,11 +305,16 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             TKmerLength k = PRIMER_MIN_LEN + LEN_MASK_SIZE - 1;
             while (!(k_pattern_cpy & 1) && k--)
                 k_pattern_cpy >>= 1;
-            std::cout << "here4\n";
+            std::cout << "here4, seqNo = " << seqNo << std::endl;
             // lookup sequence in corpus and encode
             seqan::DnaString seq = seqan::valueById(text, seqNo);
+            std::cout << "here4a: seq = " << seq << ", seqPos = " << seqPos << ", k = " << k << std::endl;
+
             TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k);
+            std::cout << "here4b, kmer_str = " << kmer_str << std::endl;
             TKmerID kmerID = dna_encoder(kmer_str);
+            std::cout << "here4c\n";
+
             TKmerID kmerID_trim = kmerID;
             kmerID |= kmerID_head;
             TKmerID trim_offset = 0;

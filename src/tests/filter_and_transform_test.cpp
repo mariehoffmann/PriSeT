@@ -25,7 +25,7 @@
 namespace fs = std::experimental::filesystem;
 using namespace priset;
 
-// g++ ../PriSeT/src/test_filter_and_transform.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o test_filter_and_transform
+// g++ ../PriSeT/src/tests/filter_and_transform_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o filter_and_transform_test
 
 struct setup
 {
@@ -81,17 +81,13 @@ struct setup
  * tests interfaces between fm_map and filter_and_transform
  * Passes chemical filter for Tm, CG content and runs for length 23, 21, 19
  *
- * kmer 1-3 at position 10: "(C)AACGTAACGTAACGTACGTACGT"      133286677332880
- * head = (1 << (63-3)) + (1 << (63-5)) + (1 << (63-7)) + 1513209474796486656
- *                                                        -------------------
- * head + seq_27                                        = 1513342761473819536
+ * kmer 1-3 at position 10: "(C)AACGTAACGTAACGTACGTACGT"
+ * head = (1 << (63-3)) + (1 << (63-5)) + (1 << (63-7)) = 288238240355526424
  *
- * kmer 2 at position 90: "TAGCTAACTACATAGCTACGA"               5031068910435
- * head = (1 << (63 - (21-16)))                          + 288230376151711744
- *                                                         ------------------
- *                                                       = 288235407220622179
-
-    dTm(1513342761473819536, 19, 288235407220622179, 21) = 12
+ * kmer 2 at position 90: "TAGCTAACTACATAGCTACGA"
+ * head = (1 << (63 - (21-16)))                          = 288238240355526424
+ *
+    dTm(1513281700780251931, 19, 288238240355526424, 21) = 12
 
     AACGTAACGTAACGTACGT         AT_cnt = 11 CG_cnt = 8 => 11*2 + 8*4 = 54 degrees
     TAGCTAACTACATAGCTACGA       AT_cnt = 13 CG_cnt = 8 => 26 + 32 = 58 degrees
@@ -117,8 +113,8 @@ void test_filter_and_transform()
         std::cout << std::endl;
     }
 
-    TKmerID expect1 = 1513342761473819536;
-    TKmerID expect2 = 288235407220622179;
+    TKmerID expect1 = dna_encoder("AACGTAACGTAACGTACGTACGT") + (ONE_LSHIFT_63 >> 3) + (ONE_LSHIFT_63 >> 5) + (ONE_LSHIFT_63 >> 7);
+    TKmerID expect2 = dna_encoder("TAGCTAACTACATAGCTACGA") + (ONE_LSHIFT_63 >> 5);
     if (!su.kmerIDs.size() || su.kmerIDs[0].size() != 2 || su.kmerIDs[0][0] != expect1 || su.kmerIDs[0][1] != expect2)
         std::cout << "ERROR: expect kmerID1 = " << expect1 << " and kmerID2 = " << expect2 << ", but got nothing or a wrong kmerID\n";
     else
@@ -129,7 +125,6 @@ void test_combine()
 {
     setup su{};
     filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
-
     //using TPair = TPair;
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
@@ -141,8 +136,7 @@ void test_combine()
 
 int main()
 {
-//    test_filter_and_transform();
+    test_filter_and_transform();
     test_combine();
-//    test_dTM();
     return 0;
 }

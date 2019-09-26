@@ -64,55 +64,60 @@ void test_filter_repeats_runs()
 {
     // |ACGTAAAAACGTACGT| = 16   0000000000000000000000000000000100011011000000000001101100011011
 
-    TKmerID kmerID1 = ONE_LSHIFT_63 + dna_encoder("ACGTAAAAACGTACGT");
-    std::cout << "ACGTAAAAACGTACGT to bits with head bit:\t" << bits2str(kmerID1) << std::endl;
+    TKmerID kmerID = ONE_LSHIFT_63 + dna_encoder("ACGTAAAAACGTACGT");
+    TKmerID kmerID_ref = kmerID - ONE_LSHIFT_63;
+    std::cout << "ACGTAAAAACGTACGT to bits with head bit:\t" << bits2str(kmerID) << std::endl;
     // head should be 0 after return
-    TKmerID kmerID1_f = filter_repeats_runs2(kmerID1);
-    std::cout << "ACGTAAAAACGTACGT to bits after head rem:\t" << bits2str(kmerID1) << std::endl;
+    TKmerID kmerID_res = filter_repeats_runs2(kmerID);
+    std::cout << "ACGTAAAAACGTACGT to bits after head rem:\t" << bits2str(kmerID) << std::endl;
 
-    if (MASK_SELECTOR & kmerID1_f)
+    if (kmerID_ref != kmerID_res)
     {
-        std::cout << "ERROR: expect 0 header, got " << bits2str((MASK_SELECTOR & kmerID1_f) >> 54) << std::endl;
+        std::cout << "ERROR: expect 0 header, got " << bits2str((MASK_SELECTOR & kmerID_res) >> 54) << std::endl;
         exit(0);
     }
-
-    exit(0);
     // |TTTTTCGTAAAAGACGTACGT| = 21
-    TKmerID kmerID2 = (ONE_LSHIFT_63 >> 5) + dna_encoder("TTTTTCGTAAAAGACGTACGT");
-    TKmerID kmerID2_f = filter_repeats_runs2(kmerID2);
-    if (MASK_SELECTOR & kmerID2_f)
+    kmerID = (ONE_LSHIFT_63 >> 5) + dna_encoder("TTTTTCGTAAAAGACGTACGT");
+    kmerID_ref = kmerID - (ONE_LSHIFT_63 >> 5);
+    kmerID_res = filter_repeats_runs2(kmerID);
+    if (kmerID_ref != kmerID_res)
     {
-        std::cout << "ERROR: expect zero header, got: " << bits2str((MASK_SELECTOR & kmerID2_f) >> 54) << std::endl;
+        std::cout << "ERROR: expect zero header, got: " << bits2str((MASK_SELECTOR & kmerID_res) >> 54) << std::endl;
         exit(0);
     }
     std::cout << "INFO: Success, 5Xs filtered\n";
 
     // case: multiple lengths, only largest filtered out |ACGTACGTACGTAAAA| = 16, |ACGTACGTACGTAAAAATTTT| = 21
-//    TKmerID kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 5) + dna_encoder("ACGTACGTACGTAAAAATTTT");
-
-    //uint64_t kmerID_f = filter_repeats_runs2(kmerID);
-
-
-    /*if (kmerID_f != kmerID_s)
+    kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 5) + dna_encoder("ACGTACGTACGTAAAAATTTT");
+    kmerID_ref = ONE_LSHIFT_63 + dna_encoder("ACGTACGTACGTAAAAATTTT");
+    kmerID_res = filter_repeats_runs2(kmerID);
+    if (kmerID_res != kmerID_ref)
     {
-        std::cout << "ERROR: kmerID_f is 1000000000 ? " << bits2str((MASK_SELECTOR & kmerID_f) >> 54);
+        std::cout << "ERROR: kmerID_f is 1000000000 ? " << bits2str((MASK_SELECTOR & kmerID_res) >> 54);
         std::cout << " or tail different\n";
     }
     else
         std::cout << "INFO: Success, 5As filtered\n";
 
     // case: multiple lengths, only largest filtered out |ACGTACGTACGTATATATAT| = 20, |ACGTACGTACGTATATATATA| = 21
-                                                                     //0  ACGTACGTACGTATATATATA
-    kmerID = ((0b0000100000ULL + 0b0000010000ULL) << 54) + dna_encoder("ACGTACGTACGTATATATATA");
-    //       0000110000000000000001001100110011001100111001001110010011100100
-    //09876543210987654321098765432109876543210987654321098765432109876543210
-    std::cout << "kmerID in: " << std::bitset<64>(kmerID) << " as string " << code2str(kmerID) << std::endl;
-    uint64_t kmerID_f2 = filter_repeats_runs2(kmerID);
-    if (!((MASK_SELECTOR & kmerID_f2) & (0b0000100000ULL << 54)))
-        std::cout << "ERROR: kmerID_f head should be 0b0000100000, but is: " << bits2str((MASK_SELECTOR & kmerID_f2) >> 54) << std::endl;
+    kmerID = (ONE_LSHIFT_63 >> 4) + (ONE_LSHIFT_63 >> 5) + dna_encoder("ACGTACGTACGTATATATATA");
+    kmerID_ref = kmerID - (ONE_LSHIFT_63 >> 5);
+    //std::cout << "kmerID in: " << std::bitset<64>(kmerID) << " as string " << code2str(kmerID) << std::endl;
+    kmerID_res = filter_repeats_runs2(kmerID);
+
+    if (kmerID_ref != kmerID_res)
+        std::cout << "ERROR: kmerID_f head should be 0b0000100000, but is: " << bits2str((MASK_SELECTOR & kmerID_res) >> 54) << std::endl;
     else
         std::cout << "INFO: Success, 5TAs filtered\n";
-*/
+
+    kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 7) + dna_encoder("CGCGCGCGCGACGTACGTACGTACGT"); // 26
+    kmerID_ref = (kmerID - ONE_LSHIFT_63 - (ONE_LSHIFT_63 >> 7)) >> 6; // result trimmed to initially encoded length
+    kmerID_res = filter_repeats_runs2(kmerID);
+    if (kmerID_ref != kmerID_res)
+        std::cout << "ERROR: kmerID_f head should be 0b0000100000, but is: " << bits2str((MASK_SELECTOR & kmerID_res) >> 54) << std::endl;
+    else
+        std::cout << "INFO: Success, 5TAs filtered\n";
+
 }
 
 int main()

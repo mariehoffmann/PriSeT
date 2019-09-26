@@ -35,7 +35,7 @@ namespace priset
 #define PRIMER_MIN_LEN 16ULL
 
 // The maximal primer length (or a kmer).
-#define PRIMER_MAX_LEN 16
+#define PRIMER_MAX_LEN 25ULL
 
 // The minimal transcript length.
 #define TRANSCRIPT_MIN_LEN 30
