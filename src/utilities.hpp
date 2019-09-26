@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -76,19 +77,23 @@ std::string dna_decoder(uint64_t code, uint64_t const mask);
 
 uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 {
-     uint64_t code = 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
+    uint64_t code(0);
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
          std::cout << "char at pos i = " << i << char(seqan::getValue(seq, i)) << std::endl;
-         code <<= 1;
          switch (char(seqan::getValue(seq, i))) //char(seq[i]))
          {
              case 'C': code += 1ULL; break;
              case 'G': code += 2ULL; break;
              case 'T': code += 3ULL;
          }
+         code <<= 2;
+
      }
+     code >>= 2;
+     code += 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
      std::cout << "code by encoder = " << code << std::endl;
+     std::cout << "code by encoder as bitstr = " << std::bitset<64>(code) << std::endl;
      return code;
 }
 

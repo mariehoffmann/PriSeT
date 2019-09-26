@@ -245,7 +245,7 @@ extern inline TKmerID filter_repeats_runs2(TKmerID const kmerID_)
     uint64_t mask = kmerID_ & MASK_SELECTOR;
     TKmerID kmerID = code_prefix(kmerID_, 0); // trim to true length
     std::cout << "head-less sequence: " << code2str(kmerID) << " and head = " << bits2str(mask>>54) << std::endl;
-    uint64_t len_selector = 1ULL << (64 - LEN_MASK_SIZE );
+    //uint64_t len_selector = 1ULL << (64 - LEN_MASK_SIZE );
     std::cout << "Initially leading zeros (after head removal, expect 21): " << __builtin_clzl(kmerID) << std::endl;
     uint64_t kmer_len = (63 - __builtin_clzl(kmerID)) >> 1;
     for (uint64_t i = 0; i < kmer_len - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
