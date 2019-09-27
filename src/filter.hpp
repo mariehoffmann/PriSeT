@@ -22,70 +22,6 @@
 
 namespace priset
 {
-/*
- * Filter kmers based on their chemical properties regardless of their pairing.
- * Constraints that are checked: melting tempaerature, CG content
- */
-bool chemical_filter_single(primer_cfg_type const & primer_cfg, TKmerID const & kmerID)
-{
-    assert(kmerID > 0);
-
-    float Tm = get_Tm(primer_cfg, kmerID);
-
-    // Filter by melting temperature
-    if (Tm >= primer_cfg.get_min_Tm() && Tm <= primer_cfg.get_max_Tm())
-    {
-        // Filter for CG content.
-        if (filter_CG(primer_cfg, kmerID))
-        {
-            // Filter if Gibb's free energy is below -6 kcal/mol
-            if (filter_self_dimerization(kmerID))
-            {
-                if (filter_repeats_runs(kmerID))
-                    return true;
-            }
-
-        }
-    }
-
-/*
-    for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
-    {
-
-        // TODO: optimize - drop kmer when computing Tm in sequence lookup fct
-        kmerID = kmer_locations[i].get_kmer_ID1();
-        //std::cout << "kmerID = " << kmerID << std::endl;
-        auto Tm = primer_melt_wallace(kmerID);
-    //    std::cout << "Tm = " << Tm << std::endl;
-        // filter by melting temperature
-        if (Tm >= Tm_min && Tm <= Tm_max)
-        {
-            // filter by CG content
-    //        std::cout << "call filter_CG ...\n";
-            if (filter_CG(primer_cfg, kmerID))
-            {
-
-                // Filter if Gibb's free energy is below -6 kcal/mol
-                if (filter_self_dimerization(kmerID))
-                {
-                    if (filter_repeats_runs(kmerID))
-                        mask.set(i);
-                }
-            }
-        }
-    }
-
-    // Delete all masked out entries (mask_i = 0).
-    for (int32_t i = kmer_locations.size() - 1; i >= 0; --i)
-    {
-        if (!mask[i])
-            kmer_locations.erase(kmer_locations.begin() + i);
-    }
-*/
-    return false;
-}
-
-
 // TODO: kmer_location is the transformed to reference bit vector
 // pre-filter and sequence fetch
 // 1. filter candidates by number of occurences only independent of their chemical suitability
@@ -298,50 +234,33 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             if (loc_and_ks.find(loc_key) == loc_and_ks.end())
                 throw std::invalid_argument("ERROR: " + std::to_string(loc_key) + " not in loc_and_ks dictionary.");
 
-            TKmerID kmerID_head = loc_and_ks[loc_key]; // tail not filled yet & KMER_SIZEgth_mask;
-            TKmerID k_pattern = kmerID_head >> (WORD_SIZE - LEN_MASK_SIZE);
-            TKmerID k_pattern_cpy{k_pattern};
-            // TODO: identify highest set bit in head
-            TKmerLength k = PRIMER_MIN_LEN + LEN_MASK_SIZE - 1;
-            while (!(k_pattern_cpy & 1) && k--)
-                k_pattern_cpy >>= 1;
+            TKmerID kmerID_prefix = loc_and_ks[loc_key]; // tail not filled yet & KMER_SIZEgth_mask;
+            //TKmerID k_pattern = kmerID_prefix >> (WORD_SIZE - LEN_MASK_SIZE);
+            //TKmerID k_pattern_cpy{k_pattern};
+            // identify lowest set bit in head
+            TKmerLength k_max = PRIMER_MAX_LEN - ffsll(kmerID_prefix >> 54) + 1;
+
             std::cout << "here4, seqNo = " << seqNo << std::endl;
             // lookup sequence in corpus and encode
             seqan::DnaString seq = seqan::valueById(text, seqNo);
-            std::cout << "here4a: seq = " << seq << ", seqPos = " << seqPos << ", k = " << k << std::endl;
+            std::cout << "here4a: seq = " << seq << ", seqPos = " << seqPos << ", k_max = " << k_max << std::endl;
 
-            TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k);
+            TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k_max);
             std::cout << "here4b, kmer_str = " << kmer_str << std::endl;
-            TKmerID kmerID = dna_encoder(kmer_str);
-            std::cout << "here4c\n";
+            TKmerID kmerID = kmerID_prefix + dna_encoder(kmer_str);
 
-            TKmerID kmerID_trim = kmerID;
-            kmerID |= kmerID_head;
-            TKmerID trim_offset = 0;
-            k_pattern_cpy = k_pattern; // reset copy
             std::cout << "here5\n";
-            while (!k_pattern)
-            {
-                if (k_pattern & 1)
-                {
-                    // erase bit in head
-                    if (!chemical_filter_single(primer_cfg, kmerID_trim))
-                    {
-                        kmerID ^= 1 << (KMER_SIZE + trim_offset);
-                    }
-                    else
-                        stats[KMER_COUNTS::FILTER1_CNT]++;
-                }
-                kmerID_trim >>= 2;
-                k_pattern >>= 1;
-                ++trim_offset;
-            }
+            // erase those length bit in prefix corresponding to kmers not passing the filter
+            chemical_filter_single_pass(primer_cfg, kmerID);
             std::cout << "here6\n";
-            // do not store Kmer and reset bit if for no length the filter was passed
-            if (!(kmer_length_mask & kmerID))
+            // do not store Kmer and reset bit in reference
+            if (!(MASK_SELECTOR & kmerID))
                 references[i][seqPos] = 0;
             else
+            {
+                stats[KMER_COUNTS::FILTER1_CNT] += __builtin_popcountll(kmerID >> 54);
                 kmerIDs[i].push_front(kmerID);
+            }
         }
     }
     // TODO: delete references with no more bits, or too inefficient w.r.t. possible space gain?

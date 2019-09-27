@@ -26,19 +26,19 @@ struct setup
     fs::path idx_zip = work_dir + "/index.zip";
     fs::path tmp_dir = work_dir + "/tmp";
 
-    setup()
+    up()
     {
         // unzip index.zip into same named directory
         //std::system(("unzip -n -d " + work_dir + " " + idx_zip.string()).c_str());
         // create tmp dir
-        if (!fs::create_directory(tmp_dir))
+        if (!fs::exists(temp_dir) && !fs::create_directory(tmp_dir))
             std::cout << "ERROR: could not create tmp_dir = " << tmp_dir << std::endl;
         std::cout << "lib_dir in setup = " << lib_dir << std::endl;
         std::cout << "work_dir in setup = " << work_dir << std::endl;
 
     }
 
-    void cleanup()
+    void down()
     {
         // delete index dir
         if (fs::remove_all(idx_dir))

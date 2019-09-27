@@ -30,7 +30,13 @@ struct setup
     {
         // unzip index.zip into same named directory
         std::system(("unzip -n -d " + work_dir + " " + idx_zip.string()).c_str());
-        // create tmp dir
+        // clear and create tmp dir
+        std::cout << "tmpdir exists: " << fs::exists(tmp_dir) << std::endl;
+        if (fs::exists(tmp_dir))
+        {
+            std::cout << "tmp_dir exists, delete it\n";
+            fs::remove_all(tmp_dir);
+        }
         if (!fs::create_directory(tmp_dir))
             std::cout << "ERROR: could not create tmp_dir = " << tmp_dir << std::endl;
         std::cout << "lib_dir in setup = " << lib_dir << std::endl;
@@ -38,7 +44,7 @@ struct setup
 
     }
 
-    void cleanup()
+    void down()
     {
         // delete index dir
         if (fs::remove_all(idx_dir))
@@ -68,6 +74,7 @@ void timeit()
             '\t' << runtimes[priset::TIMEIT::TRANSFORM] << '\t' << runtimes[priset::TIMEIT::FILTER1] <<
             '\t' << runtimes[priset::TIMEIT::COMBINER] << '\t' << runtimes[priset::TIMEIT::FILTER2] <<
             "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
+
 }
 
 

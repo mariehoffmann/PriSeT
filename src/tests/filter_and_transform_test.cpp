@@ -14,13 +14,13 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "argument_parser.hpp"
-#include "combine_types.hpp"
-#include "filter.hpp"
-#include "gui.hpp"
-#include "primer_cfg_type.hpp"
-#include "types.hpp"
-#include "utilities.hpp"
+#include "../argument_parser.hpp"
+#include "../combine_types.hpp"
+#include "../filter.hpp"
+#include "../gui.hpp"
+#include "../primer_cfg_type.hpp"
+#include "../types.hpp"
+#include "../utilities.hpp"
 
 namespace fs = std::experimental::filesystem;
 using namespace priset;
@@ -55,8 +55,15 @@ struct setup
         std::system(("unzip -n -d " + work_dir + " " + idx_zip.string()).c_str());
 
         // create tmp dir
+        if (fs::exists(tmp_dir))
+        {
+            std::cout << "tmp_dir exists, delete it\n";
+            fs::remove_all(tmp_dir);
+        }
         if (!fs::create_directory(tmp_dir))
             std::cout << "ERROR: could not create tmp_dir = " << tmp_dir << std::endl;
+        std::cout << "tmp_dir in setup = " << tmp_dir << std::endl;
+
         std::cout << "lib_dir in setup = " << lib_dir << std::endl;
         std::cout << "work_dir in setup = " << work_dir << std::endl;
 
@@ -137,6 +144,6 @@ void test_combine()
 int main()
 {
     test_filter_and_transform();
-    test_combine();
+    //test_combine();
     return 0;
 }
