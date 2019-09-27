@@ -110,7 +110,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     TReferences references;
     TKmerIDs kmerIDs;
     TSeqNoMap seqNoMap;
-    pre_filter_main(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
+    filter_and_transform(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();

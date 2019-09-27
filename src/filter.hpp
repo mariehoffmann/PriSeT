@@ -22,64 +22,9 @@
 
 namespace priset
 {
-// TODO: kmer_location is the transformed to reference bit vector
-// pre-filter and sequence fetch
-// 1. filter candidates by number of occurences only independent of their chemical suitability
-// 2. fetch sequence and check chemical constraints that need to hold for a single primer
-/*void frequency_filter(priset::io_cfg_type const & io_cfg, TKLocations & locations, TKmerLocations & kmer_locations, TSeqNo const cutoff)
-{
-    // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
-    assert(length(locations));
-
-    // load corpus
-    seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
-    fs::path text_path = io_cfg.get_index_txt_path();
-    std::cout << "text_path: " << text_path << std::endl;
-    seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-
-    TKmerID kmer_ID;
-    std::vector<TLocation> fwd;
-    for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
-    {
-        // not enough k-mer occurences => continue
-        // Note: getOccurrences and resetLimits in genmap lead to less kmers occurences than countOccurrences
-        if ((it->second).first.size() < cutoff)
-            continue;
-
-        const auto & [seqNo, seqPos, K] = (it->first);
-
-        // use symmetry and lexicographical ordering of locations to skip already seen ones
-        if (it->second.first.size() && seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)
-            continue;
-        // invariant: cutoff is always ≥ 2
-        for (TLocation pair : it->second.first)
-        {
-            fwd.push_back(pair);
-        }
-        // encode dna sequence
-        seqan::DnaString seq = seqan::valueById(text, seqNo);
-        auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
-
-        kmer_ID = dna_encoder(kmer_str);
-        // replace kmer_ID
-        kmer_locations.push_back(TKmerLocation{kmer_ID, K, fwd});
-        // TODO: same for reverse?
-        fwd.clear();
-    }
-    locations.clear();
-}
-*/
-// helper for dna sequence extraction
-/*template<typename TText>
-TKmerID encode_wrapper(TText const & text, TSeqNo const seqNo, TSeqPos const seqPos, TKmerLength const K)
-{
-    seqan::DnaString seq = seqan::valueById(text, seqNo);
-    auto const & kmer_str = seqan::infixWithLength(seq, seqPos, K);
-    return dna_encoder(kmer_str);
-};*/
-
+    
 // Filter of single kmers and transform of references to bit vectors.
-void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TSeqNo const cutoff, TKmerCounts & stats)
+void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & stats)
 {
     //filter_stats stats{};
     //std::cout << "Enter filter_and_transform ...\n";
@@ -88,7 +33,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
 
     references.clear();
     kmerIDs.clear();
-
     // load corpus for dna to 64 bit conversion
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
@@ -106,7 +50,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     {
     //    std::cout << "iterate through locations\n";
         // cleanup in mapper may lead to undercounting kmer occurrences
-        if ((it->second).first.size() < cutoff)
+        if ((it->second).first.size() < CUTOFF)
             continue;
 
         const auto & [seqNo, seqPos, K] = (it->first);
@@ -162,7 +106,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // cleanup in mapper may lead to undercounting kmer occurrences
-        if ((it->second).first.size() < cutoff)
+        if ((it->second).first.size() < CUTOFF)
             continue;
         const auto & [seqNo, seqPos, K] = (it->first);
         std::cout << "CURRENT K = " << K << std::endl;
@@ -278,25 +222,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     std::cout << "leaving filter and transform\n";
 }
 
-// post-filter candidates fulfilling chemical constraints by their relative frequency
-/*void post_frequency_filter(TKmerLocations kmer_locations, TSeqNo occurrence_freq)
-{
-
-}*/
-
-// filter k-mers by frequency and chemical properties
-void pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & kmerCounts)
-{
-    using TSeqNo = typename seqan::Value<typename TLocations::key_type, 1>::Type;
-
-    // scale to be lower frequency bound for filters
-    TSeqNo cutoff = primer_cfg.cutoff;
-    // continue here
-    std::cout << "INFO: Cut-off frequency = " << cutoff << std::endl;
-    // frequency filter and sequence fetching
-    filter_and_transform(io_cfg, primer_cfg, locations, references, kmerIDs, seqNoMap, primer_cfg.cutoff, kmerCounts);
-}
-
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
  * Chemical suitability will be tested by a different function. First position indicates,
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
@@ -364,7 +289,7 @@ void combine(primer_cfg_type const & primer_cfg, TReferences const & references,
                                 // TODO: add more filter here
                                 std::cout << "\t\tINFO: compute dTm(" << dna_decoder(kmerID_fwd, mask_fwd) << ", " << dna_decoder(kmerID_rev, mask_rev) << ") = ";
                                 std::cout << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
-                                if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= primer_cfg.primer_melt_diff)
+                                if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
                                     std::cout << "\t\tINFO: dTm in range, set combination bit\n";
                                     cp.set(mask_fwd, mask_rev);
