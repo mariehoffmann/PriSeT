@@ -104,7 +104,7 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 uint64_t code_prefix(uint64_t const code_, uint64_t mask = 0)
 {
     //std::cout << "Enter code_prefix\n";
-    if (!(code_ & MASK_SELECTOR))
+    if (!(code_ & PREFIX_SELECTOR))
     {
         std::cout << "Error: code has no heading bits\n" << std::endl;
         exit(0);
@@ -133,7 +133,7 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
     if (code_ == 0ULL)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
     uint64_t code = code_;
-    if (MASK_SELECTOR & code)
+    if (PREFIX_SELECTOR & code)
         code = code_prefix(code_, mask);
     //std::cout << "exit code_prefix with code = " << code << std::endl;
     // TODO: use global
@@ -149,7 +149,7 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
     return std::string(seq);
 }
 
-std::string code2str(TKmerID kmerID)
+std::string kmerID2str(TKmerID kmerID)
 {
     return bits2str((kmerID >> 54) << 54) + dna_decoder(kmerID);
 }

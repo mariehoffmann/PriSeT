@@ -22,14 +22,14 @@ namespace priset
 #define WORD_SIZE 64
 
 // The number of tailing bits reserved in a KmerID for holding the integer compression of a kmer DNA sequence.
-#define KMER_SIZE 52
+#define CODE_SIZE 52
 
 // The number of leading bits reserved in a KmerID to store kmer lengths (= primer_max_length - primer_min_length + 1).
-// Maximal possible length is 64 - KMER_SIZE.
-#define LEN_MASK_SIZE 10
+// Maximal possible length is 64 - CODE_SIZE.
+#define PREFIX_SIZE 10
 
 // Mask selection, i.e. 10 leading bits and rest 0 or ~(1 << 54) - 1)
-#define MASK_SELECTOR 18428729675200069632ULL
+#define PREFIX_SELECTOR 18428729675200069632ULL
 
 // The minimal primer length (or a kmer).
 #define PRIMER_MIN_LEN 16ULL

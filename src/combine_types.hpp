@@ -36,7 +36,7 @@ public:
     // set a kmer combination by its lengths given the maximal length difference
     inline void set(TKmerID const mask1, TKmerID const mask2) noexcept
     {
-        auto idx = __builtin_clzl(mask1) * LEN_MASK_SIZE + __builtin_clzl(mask2); // in [0:l_max^2[
+        auto idx = __builtin_clzl(mask1) * PREFIX_SIZE + __builtin_clzl(mask2); // in [0:l_max^2[
     //    std::cout << "computed index for bit set in cp: " << idx << std::endl;
         data[idx >> 6] += 1 << (WORD_SIZE - 1 - (idx % WORD_SIZE));
 
@@ -48,7 +48,7 @@ public:
     {
         uint16_t const l1 = k1 - k_min;
         uint16_t const l2 = k2 - k_min;
-        data[(l1 * LEN_MASK_SIZE + l2) >> 6] -= 1 << ((WORD_SIZE - 1) - ((l1 * LEN_MASK_SIZE + l2) % WORD_SIZE));
+        data[(l1 * PREFIX_SIZE + l2) >> 6] -= 1 << ((WORD_SIZE - 1) - ((l1 * PREFIX_SIZE + l2) % WORD_SIZE));
     }
 
     // return all enumerated length combinations translated into kmer lengths
@@ -63,7 +63,7 @@ public:
                 auto c = i * WORD_SIZE + __builtin_clzl(data_part); // combination index
                 if (64 == c)
                     break;
-                std::pair<TKmerLength, TKmerLength> pair{c / LEN_MASK_SIZE + PRIMER_MIN_LEN, (c % LEN_MASK_SIZE) + PRIMER_MIN_LEN};
+                std::pair<TKmerLength, TKmerLength> pair{c / PREFIX_SIZE + PRIMER_MIN_LEN, (c % PREFIX_SIZE) + PRIMER_MIN_LEN};
                 combinations.push_back(pair);
                 data_part &= ((1 << (WORD_SIZE - c - 1)) - 1); // delete leading bit
             }
