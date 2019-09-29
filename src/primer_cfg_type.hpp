@@ -47,7 +47,7 @@ namespace priset
 #define PRIMER_MIN_TM 50.0
 
 // The maximal primer melting temperature.
-#define PRIMER_MAX_TM 62.0
+#define PRIMER_MAX_TM 64.0
 
 // Maximal permitted temperature difference [Kelvin] of primers.
 // Differences above 5 Kelvin can lead to no amplification.
@@ -62,8 +62,8 @@ namespace priset
 // The minimal distance (bp) between two identical kmers on same reference.
 #define TRAP_DIST 400
 
-// Frequency cutoff, i.e. all kmer occurences below will be dropped.
-#define CUTOFF 10
+// Lower kmer frequency cutoff, i.e. all kmer occurences below will be dropped.
+#define FREQ_MIN 10
 
 struct primer_cfg_type
 {
@@ -92,12 +92,6 @@ private:
 
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
     size_type E{0};
-
-    // Method for computing melting temperature of primer.
-    TMeltMethod primer_melt_method{TMeltMethod::WALLACE};
-
-    // Molar Natrium concentration for salt-adjusted primer_melt_method.
-    float Na{.0};
 
 public:
     // Constructors, destructor and assignment
@@ -135,18 +129,6 @@ public:
     constexpr taxid_type get_root_taxid() const noexcept
     {
         return root_taxid;
-    }
-
-    // Set method for computing primer melting temperature.
-    void set_primer_melt_method(enum TMeltMethod method_)
-    {
-        primer_melt_method = method_;
-    }
-
-    // Get method for computing primer melting temperature.
-    enum TMeltMethod get_primer_melt_method() const noexcept
-    {
-        return primer_melt_method;
     }
 
     // Set primer error number (E parameter for genmap's mapping).

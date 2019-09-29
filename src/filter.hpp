@@ -24,7 +24,7 @@ namespace priset
 {
 
 // Filter of single kmers and transform of references to bit vectors.
-void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & stats)
+void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & stats)
 {
     //filter_stats stats{};
     //std::cout << "Enter filter_and_transform ...\n";
@@ -38,10 +38,10 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     fs::path text_path = io_cfg.get_index_txt_path();
     //std::cout << "text_path = " << text_path << std::endl;
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-    std::cout << "text length = " << seqan::length(text) << std::endl;
-    for (auto ss : text)
+    //std::cout << "text length = " << seqan::length(text) << std::endl;
+    /*for (auto ss : text)
         std::cout << ss << ", ";
-    std::cout << std::endl;
+    std::cout << std::endl;*/
 
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
     // to have a compressed representation.
@@ -50,7 +50,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     {
     //    std::cout << "iterate through locations\n";
         // cleanup in mapper may lead to undercounting kmer occurrences
-        if ((it->second).first.size() < CUTOFF)
+        if ((it->second).first.size() < FREQ_MIN)
             continue;
 
         const auto & [seqNo, seqPos, K] = (it->first);
@@ -76,11 +76,11 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     // (ii) Create bit vectors in the length of largest kmer occurences, and set
     // bits for kmer occurrences. Collect also kmer lengths encoded in final kmer
     // code of type uint64_t. Final sequence lookup and encoding is done in next step.
-    std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
-    for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
+    //std::cout << "max positions for sequences: \nseqNo\tmax(seqPos)\n";
+    /*for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
         if (seqNo2maxPos[i])
             std::cout << i << "\t->\t" << seqNo2maxPos[i] << std::endl;
-
+    */
     seqNoMap.clear();
 
     unsigned i_cx = 0;
@@ -89,7 +89,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     {
         if (!seqNo2maxPos[i])
             continue;
-        std::cout << "seqNoMap, insert: " << i << " -> " << seqNo2maxPos[i] << std::endl;
+        //std::cout << "seqNoMap, insert: " << i << " -> " << seqNo2maxPos[i] << std::endl;
         seqNoMap[i] = i_cx++;
         sdsl::bit_vector bv(seqNo2maxPos[i] + 1, 0);
         references.push_back(bv);
@@ -106,10 +106,10 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // cleanup in mapper may lead to undercounting kmer occurrences
-        if ((it->second).first.size() < CUTOFF)
+        if ((it->second).first.size() < FREQ_MIN)
             continue;
         const auto & [seqNo, seqPos, K] = (it->first);
-        std::cout << "CURRENT K = " << K << std::endl;
+        //std::cout << "CURRENT K = " << K << std::endl;
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
@@ -136,7 +136,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             }
 
             references[seqNo_cx][seqPos] = 1;
-            std::cout << "DEBUG: K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << ", PRIMER_MAX_LEN = " << PRIMER_MAX_LEN << std::endl;
+            //std::cout << "DEBUG: K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << ", PRIMER_MAX_LEN = " << PRIMER_MAX_LEN << std::endl;
             if (uint64_t(K) > PRIMER_MAX_LEN)
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
             uint64_t loc_key = location_encode(seqNo, seqPos);
@@ -151,23 +151,19 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         }
     }
 
-    std::cout << "INFO: dropped kmers due to close repetetion: ";
-    for (auto ctr : debug_drop_kmer_repeats)
-        std::cout << ctr << " " << std::endl;
+    //for (auto ctr : debug_drop_kmer_repeats) std::cout << ctr << " " << std::endl;
 
     // (iii) lookup kmer sequences, filter and encode as 64 bit integers.
     // inverse reference ID map
     // todo: use one bit vector instead with rank support
-    std::cout << "here1\n";
     std::unordered_map<TSeqNo, TSeqNo> seqNoMap_inv;
     for (auto it = seqNoMap.begin(); it != seqNoMap.end(); ++it)
         seqNoMap_inv.insert({it->second, it->first});
     kmerIDs.resize(references.size());
-    std::cout << "here2\n";
-    uint64_t const kmer_length_mask = ~((1ULL << CODE_SIZE) - 1ULL);
+    //uint64_t const kmer_length_mask = ~((1ULL << CODE_SIZE) - 1ULL);
     for (unsigned i = 0; i < references.size(); ++i)
     {
-        std::cout << "here3 loop start\n";
+        //std::cout << "here3 loop start\n";
         sdsl::rank_support_v5<1> r1s(&references[i]); // check if once initialized modification of references[i] does not invalidate rank support
         sdsl::select_support_mcl<1,1> s1s(&references[i]);
         for (unsigned r = r1s.rank(references[i].size()); r > 0; --r)
@@ -184,19 +180,15 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             // identify lowest set bit in head
             TKmerLength k_max = PRIMER_MAX_LEN - ffsll(kmerID_prefix >> 54) + 1;
 
-            std::cout << "here4, seqNo = " << seqNo << std::endl;
             // lookup sequence in corpus and encode
             seqan::DnaString seq = seqan::valueById(text, seqNo);
-            std::cout << "here4a: seq = " << seq << ", seqPos = " << seqPos << ", k_max = " << k_max << std::endl;
 
             TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k_max);
-            std::cout << "here4b, kmer_str = " << kmer_str << std::endl;
             TKmerID kmerID = kmerID_prefix + dna_encoder(kmer_str);
 
-            std::cout << "here5\n";
             // erase those length bit in prefix corresponding to kmers not passing the filter
-            chemical_filter_single_pass(primer_cfg, kmerID);
-            std::cout << "here6\n";
+            // TODO: kmerID trimmed to maximal encoded length?
+            chemical_filter_single_pass(kmerID);
             // do not store Kmer and reset bit in reference
             if (!(PREFIX_SELECTOR & kmerID))
                 references[i][seqPos] = 0;
@@ -208,7 +200,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
         }
     }
     // TODO: delete references with no more bits, or too inefficient w.r.t. possible space gain?
-    std::cout << "here7\n";
+    //std::cout << "here7\n";
     for (auto kmerID_list : kmerIDs)
     {
         for (auto kmerID : kmerID_list)
@@ -219,7 +211,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, primer_cfg_type const & pr
             }
     }
     locations.clear();
-    std::cout << "leaving filter and transform\n";
+    //std::cout << "leaving filter and transform\n";
 }
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
@@ -233,21 +225,22 @@ template<typename TPairList>
 void combine(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
 {
     pairs.clear();
+    auto cp_ctr = 0ULL;
     for (uint64_t i = 0; i < references.size(); ++i)
     {
-        std::cout << "DEBUG: reference ID = " << i << std::endl;
+        std::cout << "DEBUG: reference ID = " << (i+1) << "/" << references.size() << std::endl;
 
         sdsl::bit_vector reference;
         sdsl::util::assign(reference, references.at(i));
         sdsl::rank_support_v5<1, 1> r1s(&references.at(i)); // replace after bugfix with
         sdsl::select_support_mcl<1> s1s(&reference);
 
-        std::cout << "DEBUG: iterate over " << r1s.rank(reference.size()) << " kmer IDs\n";
+        //std::cout << "DEBUG: iterate over " << r1s.rank(reference.size()) << " kmer IDs\n";
         for (uint64_t r_fwd = 1; r_fwd < r1s.rank(reference.size()); ++r_fwd)
         {
             // text position of r-th k-mer
             uint64_t idx_fwd = s1s.select(r_fwd);
-            std::cout << "DEBUG: text index of r_fwd = " << r_fwd << " is " << idx_fwd << std::endl;
+            //std::cout << "DEBUG: text index of r_fwd = " << r_fwd << " is " << idx_fwd << std::endl;
             TKmerID const kmerID_fwd = kmerIDs[i][r_fwd - 1];
             if (!(kmerID_fwd >> CODE_SIZE))
             {
@@ -268,47 +261,49 @@ void combine(primer_cfg_type const & primer_cfg, TReferences const & references,
                 TCombinePattern<TKmerID, TKmerLength> cp; // data set to 0?
                 // reset mask to highest bit (= PRIMER_MIN_LEN position)
                 uint64_t mask_fwd = ONE_LSHIFT_63;
-                while ((((mask_fwd << 1) - 1) & kmerID_fwd) >> (WORD_SIZE - PREFIX_SIZE))
+                // as long there are length bits in prefix of kmerID_fwd, we continue right shift of mask_fwd
+                //std::cout << "(((mask_fwd - 1) << 1) & kmerID_fwd) >> 54 = " << bits2str((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54) << std::endl;
+                while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
-                    if (mask_fwd & kmerID_fwd)
+                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd))
                     {
-                        if (!filter_CG_clamp(kmerID_fwd, mask_fwd, '+'))
-                            continue;
-                        std::cout << "INFO: current k of kmerID_fwd = " << __builtin_clzl(mask_fwd)+PRIMER_MIN_LEN << std::endl;
+                        //std::cout << "INFO: current k of kmerID_fwd = " << __builtin_clzl(mask_fwd)+PRIMER_MIN_LEN << std::endl;
                         // window start position (inclusive)
-
-                        std::cout << "\tDEBUG: search window = [" << w_begin << ", " << w_end << "], rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << " corresponding to " << (r1s.rank(w_end) - r1s.rank(w_begin)) << " candidate pairing mates\n";
-
+                        //std::cout << "\tDEBUG: search window = [" << w_begin << ", " << w_end << "], rank(w_begin) = " << r1s.rank(w_begin) << ", rank(w_end) = " << r1s.rank(w_end) << " corresponding to " << (r1s.rank(w_end) - r1s.rank(w_begin)) << " candidate pairing mates\n";
                         // iterate through encoded lengths
                         TKmerID const kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
                         uint64_t mask_rev = ONE_LSHIFT_63;
-                        // as long there are bits in length mask part of kmer_rev we continue shifting mask_rev
-                        while ((((mask_rev << 1) - 1) & kmerID_rev) >> (WORD_SIZE - PREFIX_SIZE))
+                        // as long there are length bits in prefix of kmerID_rev, we continue right shift of mask_rev
+                        while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
-                            if (mask_rev & kmerID_rev)
+                            cp_ctr++;
+                            //std::cout << "INFO: combination counter = " << cp_ctr << std::endl;
+                            if (cp_ctr == 1ULL << 63)
+                            {
+                                std::cout << "cp_ctr reached 1 << 63, exit\n";
+                                exit(0);
+                            }
+                            if ((mask_rev & kmerID_rev) && filter_CG_clamp(kmerID_rev, '-'))
                             {
 
-                                std::cout << "\t\tDEBUG: current length pattern in kmerID_rev corresponding to k_rev = " << (__builtin_clzl(mask_rev) + PRIMER_MIN_LEN) << std::endl;
-                                // TODO: add more filter here
-                                if (!filter_CG_clamp(kmerID_rev, mask_rev, '-'))
-                                    continue;
-
-                                std::cout << "\t\tINFO: compute dTm(" << dna_decoder(kmerID_fwd, mask_fwd) << ", " << dna_decoder(kmerID_rev, mask_rev) << ") = ";
-                                std::cout << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
+                                //std::cout << "\t\tDEBUG: current length pattern in kmerID_rev corresponding to k_rev = " << (__builtin_clzl(mask_rev) + PRIMER_MIN_LEN) << std::endl;
+                                //std::cout << "filter_CG_clamp returns false for " << kmerID2str(kmerID_rev) << " and length mask = " << bits2str(mask_rev >> 54) << std::endl;
+                                //std::cout << "\t\tINFO: compute dTm(" << dna_decoder(kmerID_fwd, mask_fwd) << ", " << dna_decoder(kmerID_rev, mask_rev) << ") = ";
+                                //std::cout << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
-                                    std::cout << "\t\tINFO: dTm in range, set combination bit\n";
+                                    //std::cout << "\t\tINFO: dTm in range, set combination bit\n";
                                     cp.set(mask_fwd, mask_rev);
                                     ++stats[KMER_COUNTS::COMBINER_CNT];
                                 }
-                                else
-                                    std::cout << "\t\tINFO: dTm outside of range, no bit setting\n";
+                                //else
+                                //    std::cout << "\t\tINFO: dTm outside of range, no bit setting\n";
                             }
-                            mask_rev >>= 1ULL; // does not affect search window, since starting position is fixed
+                            mask_rev >>= 1; // does not affect search window, since starting position is fixed
                         } // length mask_rev
                     }
                     // update mask and dependent search window boundaries
-                    mask_fwd >>= 1ULL;
+                    mask_fwd >>= 1;
                     ++w_begin;
                     // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
                     // window end position (exclusive)
@@ -318,14 +313,13 @@ void combine(primer_cfg_type const & primer_cfg, TReferences const & references,
                 } // length mask_fwd
                 if (cp.is_set())
                 {
-                    std::cout << "\t\tINFO: push back combination pattern\n";
+                    //std::cout << "\t\tINFO: push back combination pattern\n";
                     pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
                 }
-                else
-                    std::cout << "\t\tINFO: did NOT push back combination pattern\n";
+                //else
+                //    std::cout << "\t\tINFO: did NOT push back combination pattern\n";
             } // kmerID rev
         } // kmerID fwd
-        std::cout << "next reference\n";
     }
     std::cout << "leaving combine\n";
 }

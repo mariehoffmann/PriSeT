@@ -35,8 +35,8 @@ extern inline float dTm(TKmerID const kmerID1_, TKmerID const mask1, TKmerID con
         exit(0);
     }
     // remove length mask
-    TKmerID kmerID1 = (kmerID1_ << PREFIX_SIZE) >> PREFIX_SIZE;
-    TKmerID kmerID2 = (kmerID2_ << PREFIX_SIZE) >> PREFIX_SIZE;
+    TKmerID kmerID1 = kmerID1_ & ~PREFIX_SELECTOR ;
+    TKmerID kmerID2 = kmerID2_ & ~PREFIX_SELECTOR;
 
     auto enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(kmerID1)) >> 1; // encoded length
     auto mask_l1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;      // selected length
@@ -79,30 +79,6 @@ extern inline float dTm(TKmerID const kmerID1_, TKmerID const mask1, TKmerID con
     return (std::abs(ctr_AT) << 1) + (abs(ctr_CG) << 2);
 }
 
-//TAACGTAACGTACGTACGT, TAGCTAACTACATAGCTACGA
-// AT = 11              13
-// CG =  8              8
-
-//!\brief Wallace rule to compute the melting temperature of a primer sequence given as 64 bit code.
-extern inline float primer_melt_wallace(TKmerID code)
-{
-    uint8_t ctr_AT = 0, ctr_CG = 0;
-    std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
-    code &= ~((1ULL << 52ULL) - 1ULL); // delete length mask
-    while (code != 1)
-    {
-        switch(decodes[3 & code])
-        {
-            case 'A':
-            case 'T': ++ctr_AT; break;
-            case 'C':
-            case 'G': ++ctr_CG;
-        }
-        code >>= 2;
-    }
-    return (ctr_AT << 1) + (ctr_CG << 2);
-}
-
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
 // input primer:string sequence, Na:float molar Natrium ion concentration
 extern inline float primer_melt_salt(TKmerID code, float const Na)
@@ -122,30 +98,6 @@ extern inline float primer_melt_salt(TKmerID code, float const Na)
     }
     return 100.5 + 41.0 * ctr_CG / seq_len - 820.0 / seq_len + 16.6 * std::log10(Na);
 }
-
-//!\brief Check if CG content is in range set by the primer configurator.
-// Returns false if constraint is violated.
-extern inline bool filter_CG(primer_cfg_type const & primer_cfg, TKmerID code)
-{
-    uint8_t ctr_CG = 0;
-    uint8_t seq_len = 0;
-    std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
-    while (code != 1)
-    {
-        switch(decodes[3 & code])
-        {
-            case 'C':
-            case 'G': ++ctr_CG; break;
-        }
-        code >>= 2;
-        ++seq_len;
-    }
-    // relative CG content
-    float CG = float(ctr_CG) / float(seq_len);
-    return (CG >= primer_cfg.get_min_CG_content() && CG <= primer_cfg.get_max_CG_content());
-}
-
-
 
 /* !\brief Check for low energy secondary structures.
  * Returns true if stability of a hairpin structure above the annealing temperature is improbable.
@@ -221,32 +173,38 @@ std::string bits2str(uint_type i);
 
 std::string kmerID2str(TKmerID kmerID);
 
-extern inline void filter_repeats_runs2(TKmerID & kmerID_)
+/*
+ * This filter is one of many filters applied sequentially. Therefore, it is
+ * possible that the prefix is reset completely by previous operations.
+ */
+extern inline void filter_repeats_runs2(TKmerID & kmerID)
 {
     //std::cout << "Enter filter_repeats_runs2\n";
-    uint64_t mask = kmerID_ & PREFIX_SELECTOR;
+    uint64_t prefix = kmerID & PREFIX_SELECTOR;
+    if (!prefix)
+        return;
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
-    TKmerID suffix = code_prefix(kmerID_, 0); // trim to true length
-    std::cout << "true length trimmed: " << bits2str(suffix) <<std::endl;
-    kmerID_ = suffix; // save trimmed kmer-code part
-    //std::cout << "head-less sequence: " << kmerID2str(kmerID) << " and head = " << bits2str(mask>>54) << std::endl;
-    uint64_t const k = (63 - __builtin_clzl(suffix)) >> 1;
+    uint64_t code = code_prefix(kmerID, 0); // trim to true length
+    //std::cout << "true length trimmed: " << bits2str(code) <<std::endl;
+    kmerID = code; // save trimmed kmer-code part
+    //std::cout << "head-less sequence: " << kmerID2str(kmerID) << " and head = " << bits2str(prefix>>54) << std::endl;
+    uint64_t const k = (63 - __builtin_clzl(code)) >> 1;
     for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {
-        uint64_t tail_10 = tail_selector_10 & suffix;
+        uint64_t tail_10 = tail_selector_10 & code;
         // XOR tail with A_5, C_5, G_5, T_5
         if ((tail_10 == 0b0000000000) || (tail_10 == 0b0101010101) || (tail_10 == 0b1010101010) || (tail_10 == 0b1111111111))
         {
             // note that (x >> 64) won't be executed
             uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
             // delete all k bits ≥ len_selector
-            mask = (offset == 64) ? 0 : (mask >> offset) << offset;
+            prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
         }
         // at least 10 characters left to test for di-nucleotide repeats of length 5
         if (k - i > 9)
         {
-            uint64_t tail_20 = suffix & tail_selector_20;
+            uint64_t tail_20 = code & tail_selector_20;
             // AT_5, TA_5, AC_5, CA_5, AG_5, GA_5, CG_5, GC_5, CT_5, TC_5, GT_5, TG_5
             if ( (tail_20 == 0b00110011001100110011) || (tail_20 == 0b11001100110011001100) ||
                  (tail_20 == 0b00010001000100010001) || (tail_20 == 0b01000100010001000100) ||
@@ -255,52 +213,52 @@ extern inline void filter_repeats_runs2(TKmerID & kmerID_)
                  (tail_20 == 0b01110111011101110111) || (tail_20 == 0b11011101110111011101) ||
                  (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
             {
-                //std::cout << "DEBUG: match for di-nucl run in tail: " << dna_decoder(suffix, 0) << std::endl;
+                //std::cout << "DEBUG: match for di-nucl run in tail: " << dna_decoder(code, 0) << std::endl;
                 // delete all k bits ≥ len_selector
                 uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
                 // delete all k bits ≥ len_selector
-                mask = (offset == 64) ? 0 : (mask >> offset) << offset;
-                //std::cout << "DEBUG: new bit mask = " << bits2str<uint64_t>(mask >> 54) << std::endl;
+                prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
+                //std::cout << "DEBUG: new bit prefix = " << bits2str<uint64_t>(prefix >> 54) << std::endl;
             }
         }
-        if (!mask)
+        if (!prefix)
             break;
-        suffix >>= 2;
+        code >>= 2;
     }
     // add updated prefix
-    kmerID_ += mask;
+    kmerID += prefix;
 }
 
 //  Check if not more than 3 out of the 5 last bases at the 3' end are CG.
 //  DNA sense/'+': 5' to 3', antisense/'-': 3' to 5'
 // Returns false if constraint is violated.
-extern inline bool filter_CG_clamp(TKmerID const kmerID, uint64_t const mask, char const sense)
+extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
     assert(seqan::length(sequence) < (1 << 8));
     assert(sense == '+' || sense == '-');
     //63 - 23 = 40/2
-    uint8_t encoded_len = (63 - __builtin_clzl((kmerID << LEN_MASK_SIZE) >> LEN_MASK_SIZE))/2;
+    uint8_t encoded_len = (63 - __builtin_clzl(kmerID & ~PREFIX_SELECTOR)) >> 1;
 
     uint8_t CG = 0;
-    uint64_t suffix = (kmerID << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+    uint64_t code = kmerID & ~PREFIX_SELECTOR;
     if (sense == '-')
     {
-        // l = 20, 23 , 1 << (63-23 - 2)
-        suffix >>= encoded_len - 10; // shift right to have prefix of length 10
+        // l = 17 , 1 << (63-23 - 2)
+        code >>= (encoded_len << 1) - 10; // shift right to have prefix of length 10
     }
     else
     {
         uint8_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask);
-        suffix >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
+        code >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
     }
     for (uint8_t i = 0; i < 5; ++i)
     {
-        switch(3 & suffix)
+        switch(3 & code)
         {
-            case 1;
+            case 1:
             case 2: ++CG; break;
         }
-        suffix >>= 2;
+        code >>= 2;
     }
     return (CG <= 3) ? true : false;
 }
@@ -314,41 +272,59 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, uint64_t const mask, ch
  * i.e. largest prefix bit corresponds to encoded string length. The last filter trims
  * again to the maximal encoded length.
  */
-void chemical_filter_single_pass(primer_cfg_type const & primer_cfg, TKmerID & kmerID_)
+void chemical_filter_single_pass(TKmerID & kmerID)
 {
-    assert(kmerID > 0);
-    TKmerID code = (kmerID_ << PREFIX_SIZE) >> PREFIX_SIZE;
-    float Tm = get_Tm(primer_cfg, kmerID);
-    uint8_t AT_ctr = 0;
-    uint8_t CG_ctr = 0;
+    TKmerID code = kmerID & ~PREFIX_SELECTOR;
+    assert(kmerID > 0 && code > 0);
+    uint8_t AT = 0; // counter 'A'|'T'
+    uint8_t CG = 0; // counter 'C'|'G'
     uint64_t length_bit_selector = ONE_LSHIFT_63;
-    while (kmerID != 1)
+    uint8_t l = 1; // current length
+    while (code != 1)
     {
+        //std::cout << "l = " << int(l) << std::endl;
         switch(3 & code)
         {
             case 1:
-            case 2: ++CG_ctr; break;
-            default: ++AT_ctr;
+            case 2: ++CG; break;
+            default: ++AT;
         }
-        if (kmerID_ & length_bit_selector)
+        if (l >= PRIMER_MIN_LEN)
         {
-            // reset bit if Tm out of range
-            // cmp asm cmds: abs((AT_ctr << 1) + (CG_ctr << 2) - (PRIMER_MAX_TM+PRIMER_MIN_TM)/2) <= (PRIMER_MAX_TM-PRIMER_MIN_TM)/2 vs.
-            if (((AT_ctr << 1) + (CG_ctr << 2) < PRIMER_MIN_TM) || ((AT_ctr << 1) + (CG_ctr << 2) > PRIMER_MAX_TM))
-                kmerID_ ^= length_bit_selector;
-            else
+            if (kmerID & length_bit_selector)
             {
-                // reset bit if CG content out of range
-                float CG = float(ctr_CG) / float(__builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN);
-                if (CG < CG_MIN_CONTENT || CG > CG_MAX_CONTENT)
-                    kmerID_ ^= length_bit_selector;
+                //std::cout << "kmerID & length_bit_selector true ...\t" << bits2str(length_bit_selector>>54) << std::endl;
+                // reset bit if Tm out of range
+                auto Tm = (AT << 1) + (CG << 2);
+                //std::cout << "Tm = " << Tm << std::endl;
+                // cmp asm cmds: abs((AT << 1) + (CG << 2) - (PRIMER_MAX_TM+PRIMER_MIN_TM)/2) <= (PRIMER_MAX_TM-PRIMER_MIN_TM)/2 vs.
+
+                if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
+                {
+                //    std::cout << "reset length bit ...\n";
+                    kmerID ^= length_bit_selector;
+                }
+                else
+                {
+                //    std::cout << "else test CG content\n";
+                    // reset bit if CG content out of range
+                    float CG_content = float(CG) / (float(__builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN));
+                //    std::cout << "CG_content = " << CG_content << std::endl;
+                    if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
+                    {
+                //        std::cout << "reset length bit ...\n";
+                        kmerID ^= length_bit_selector;
+                    }
+                }
+
             }
+            length_bit_selector = std::max(ONE_LSHIFT_63 >> 9, length_bit_selector >> 1);
         }
         code >>= 2;
-        length_bit_selector >>= 1;
+        ++l;
     }
     // Filter di-nucleotide repeats and
-    filter_repeats_runs2(kmerID_);
+    filter_repeats_runs2(kmerID);
 }
 
 /* Helper function for computing the convolution of two sequences. For each overlap

@@ -71,7 +71,7 @@ public:
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
         for (auto & p : fs::directory_iterator(lib_dir))
         {
-            std::cout << p << std::endl;
+            //std::cout << p << std::endl;
             if (p.path().extension().compare(ext_acc) == 0)
                 acc_file = p;
             else if (p.path().extension().compare(ext_fasta) == 0)

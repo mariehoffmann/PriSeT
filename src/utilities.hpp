@@ -92,8 +92,8 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
      }
      code >>= 2;
      code += 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
-     std::cout << "code by encoder = " << code << std::endl;
-     std::cout << "code by encoder as bitstr = " << std::bitset<64>(code) << std::endl;
+     //std::cout << "code by encoder = " << code << std::endl;
+     //std::cout << "code by encoder as bitstr = " << std::bitset<64>(code) << std::endl;
      return code;
 }
 
@@ -101,70 +101,72 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 // If no mask is given (mask = 0), the code is truncated to its largest length encoded in head,
 // otherwise it's truncated to the length given by the mask (same format like code head).
 // A leading bit ('C') remains in the code to signal the end.
-uint64_t code_prefix(uint64_t const code_, uint64_t mask = 0)
+uint64_t code_prefix(uint64_t const kmerID, uint64_t mask = 0)
 {
     //std::cout << "Enter code_prefix\n";
-    if (!(code_ & PREFIX_SELECTOR))
+    if (!(kmerID & PREFIX_SELECTOR))
     {
         std::cout << "Error: code has no heading bits\n" << std::endl;
         exit(0);
     }
-    uint64_t code = (code_ << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+    uint64_t code = kmerID & ~PREFIX_SELECTOR;
     if (!mask) // get largest encoded length
     {
-    //    std::cout << "ffsl(" << bits2str(code_ >> 54) << ") = " << ffsl(code_ >> 54) << std::endl;
-        mask = 1ULL << (ffsl(code_ >> 54) + 53); // find first significat bit (1-based) or 0
-    //    std::cout << "shift one by " << (ffsl(code_ >> 54) + 53) << " positions: " << mask << std::endl;
-    //    std::cout << "mask = " << bits2str(mask >> 54) << std::endl;
+        //std::cout << "ffsl(" << bits2str(kmerID >> 54) << ") = " << ffsl(kmerID >> 54) << std::endl;
+        mask = 1ULL << (ffsl(kmerID >> 54) + 53); // find first significat bit (1-based) or 0
+        //std::cout << "shift one by " << (ffsl(kmerID >> 54) + 53) << " positions: " << mask << std::endl;
+        //std::cout << "mask = " << bits2str(mask >> 54) << std::endl;
     }
-    //std::cout << "mask with least significant length bit = " << bits2str(mask >> 54) << std::endl;
-    auto enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
-    auto mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
-    //std::cout << "encoded length = " << enc_l << ", target length = " << mask_l << std::endl;
-    code >>= (enc_l - mask_l) << 1;   // kmer length correction
-    return code;
+    //std::cout << "\nmask with least significant length bit = " << bits2str(mask >> 54) << std::endl;
+    uint8_t enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
+    uint8_t mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
+    //std::cout << "encoded length = " << int(enc_l) << ", target length = " << int(mask_l) << std::endl;
+    return (enc_l == mask_l) ? code : code >> ((enc_l - mask_l) << 1);   // kmer length correction
 }
 
-// return full length sequence, ignore variable length info in leading bits.
+// return full length sequence, ignore variable length info in leading bits if present.
+// Note: kmer code is only length trimmed when a mask is given.
 std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
 {
-    //std::cout << "Enter dna_decoder with (code = " << code_ << ", mask = " << mask << ")\n";
     // note that assert converted to nop due to seqan's #define NDEBUG
     if (code_ == 0ULL)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
     uint64_t code = code_;
-    if (PREFIX_SELECTOR & code)
+    if (mask)
         code = code_prefix(code_, mask);
-    //std::cout << "exit code_prefix with code = " << code << std::endl;
+    else
+        code &= ~PREFIX_SELECTOR;
+    //std::cout << "code without prefix: " << bits2str(code) << std::endl;
+
     // TODO: use global
-    std::array<char, 4> sigmas = {'A', 'C', 'G', 'T'};
+    std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
     uint8_t n = (63 - __builtin_clzl(code)) >> 1;
-    std::cout << "encoded length = " << int(n) << std::endl;
+    //std::cout << "encoded length = " << int(n) << std::endl;
     char seq[n];
     for (uint8_t i = 1; i <= n; ++i, code >>= 2)
     {
-    //    std::cout << "DEBUG: current code: " << code << std::endl;
-        seq[n - i] = sigmas[3 & code];
+        //std::cout << "DEBUG: i = " << int(i) << ", 3 & code = " << (3 & code) << std::endl;
+        seq[n - i] = alphabet[3 & code];
     }
-    return std::string(seq);
+    return std::string(seq, n);
 }
 
 std::string kmerID2str(TKmerID kmerID)
 {
-    return bits2str((kmerID >> 54) << 54) + dna_decoder(kmerID);
+    return bits2str((kmerID & PREFIX_SELECTOR) >> 54) + "|" + dna_decoder(kmerID);
 }
 
-extern inline void dna_decoder(uint64_t code, std::vector<TSeq> & decodes)
+extern inline void dna_decoder(uint64_t kmerID, std::vector<TSeq> & decodes)
 {
     // note that assert converted to nop due to seqan's #define NDEBUG
-    if (code == 0ULL)
+    if (kmerID == 0ULL)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
     decodes.clear();
-    uint64_t kmer_length_mask = (code & ~((1ULL << 52ULL) - 1ULL)) >> 52ULL;
-    if (code == 0ULL)
+    uint64_t kmer_length_mask = (kmerID & ~((1ULL << 52ULL) - 1ULL)) >> 52ULL;
+    if (kmerID == 0ULL)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
     decodes.clear();
-    code = (code << LEN_MASK_SIZE) >> LEN_MASK_SIZE; // clear leading kmer length information
+    uint64_t code = kmerID & ~PREFIX_SELECTOR; // clear leading kmer length information
     TSeq decode = dna_decoder(code); // largest kmer
     uint64_t K = seqan::length(decode); //
     kmer_length_mask >>= PRIMER_MIN_LEN - K;
@@ -518,8 +520,8 @@ void unique_kmers(TKmerIDs const & kmerIDs, std::set<TKmerID> & set)
     {
         for (auto it_kmerID = it_ref->begin(); it_kmerID <= it_ref->end(); ++it_kmerID)
         {
-            TKmerID head = (*it_kmerID) >> (WORD_SIZE - LEN_MASK_SIZE);
-            TKmerID ID = ((*it_kmerID) << LEN_MASK_SIZE) >> LEN_MASK_SIZE;
+            TKmerID head = (*it_kmerID) >> (WORD_SIZE - PREFIX_SIZE);
+            TKmerID ID = (*it_kmerID) & ~PREFIX_SELECTOR;
             bool start_shift = false; // since kmer IDs represent only the longest kmer they encode and not necessarily the longest possible primer length, we start truncating the ID after we have seen the first length bit
             while (head)
             {
