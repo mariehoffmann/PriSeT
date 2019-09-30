@@ -7,12 +7,15 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <set>
 #include <stdexcept>
 #include <stdint.h>
 #include <string>
+#include <unistd.h>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 #include <seqan/basic.h>
@@ -101,26 +104,18 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 // If no mask is given (mask = 0), the code is truncated to its largest length encoded in head,
 // otherwise it's truncated to the length given by the mask (same format like code head).
 // A leading bit ('C') remains in the code to signal the end.
-uint64_t code_prefix(uint64_t const kmerID, uint64_t mask = 0)
+extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
 {
-    //std::cout << "Enter code_prefix\n";
     if (!(kmerID & PREFIX_SELECTOR))
     {
-        std::cout << "Error: code has no heading bits\n" << std::endl;
+        std::cout << "ERROR: code has no prefix" << std::endl;
         exit(0);
     }
     uint64_t code = kmerID & ~PREFIX_SELECTOR;
     if (!mask) // get largest encoded length
-    {
-        //std::cout << "ffsl(" << bits2str(kmerID >> 54) << ") = " << ffsl(kmerID >> 54) << std::endl;
         mask = 1ULL << (ffsl(kmerID >> 54) + 53); // find first significat bit (1-based) or 0
-        //std::cout << "shift one by " << (ffsl(kmerID >> 54) + 53) << " positions: " << mask << std::endl;
-        //std::cout << "mask = " << bits2str(mask >> 54) << std::endl;
-    }
-    //std::cout << "\nmask with least significant length bit = " << bits2str(mask >> 54) << std::endl;
     uint8_t enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
     uint8_t mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
-    //std::cout << "encoded length = " << int(enc_l) << ", target length = " << int(mask_l) << std::endl;
     return (enc_l == mask_l) ? code : code >> ((enc_l - mask_l) << 1);   // kmer length correction
 }
 
@@ -133,7 +128,7 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
     uint64_t code = code_;
     if (mask)
-        code = code_prefix(code_, mask);
+        code = get_code(code_, mask);
     else
         code &= ~PREFIX_SELECTOR;
     //std::cout << "code without prefix: " << bits2str(code) << std::endl;
@@ -218,7 +213,7 @@ void print_combinations(TKmerIDs const & kmerIDs, TPairList const & pairs) noexc
 
         for (auto lc : combinations)
         {
-            std::cout << "\t | \t\t\t |  \t\t\t | (kmerID_fwd[" << lc.first << ":], kmerID_rev[" << lc.second << "]) = (" << seqan::infixWithLength(kmer_fwd, 0, lc.first) << ", " << seqan::infixWithLength(kmer_rev, 0, lc.second) << ")\n";
+            std::cout << "\t | \t\t\t |  \t\t\t | (kmerID_fwd[" << lc.first << ":], kmerID_rev[" << lc.second << "]) = (" << seqan::infixWithLength(kmer_fwd, 0, lc.first + PRIMER_MIN_LEN) << ", " << seqan::infixWithLength(kmer_rev, 0, lc.second + PRIMER_MIN_LEN) << ")\n";
         }
     }
 }
@@ -254,36 +249,6 @@ void print_kmer_locations(TKmerLocations const & kmer_locations)
         std::cout << "]" << std::endl;
     }
 }*/
-
-void print_pairs(TKmerPairs const & kmer_pairs)
-{
-    std::set<TKmerID> legend;
-    std::cout << "\n(kmer ID1, kmer ID2) | reference ID | (pos1, pos2)\n";
-    std::cout << "-------------------------------------------------------\n";
-    if (!kmer_pairs.size())
-        std::cout << "<None>\n";
-    for (typename TKmerPairs::const_iterator it = kmer_pairs.begin(); it != kmer_pairs.end(); ++it)
-    {
-        std::cout << "(" << (*it).get_kmer_ID1() << ", " << (*it).get_kmer_ID2() << ")\t\t| ";
-        legend.insert((*it).get_kmer_ID1());
-        legend.insert((*it).get_kmer_ID2());
-        for (TKmerPairs::size_type i = 0; i < (*it).container_size(); ++i)
-            std::cout << (*it).accession_ID_at(i) << "\t\t| (" << (*it).kmer_pos_at(i, 1) << ", " << (*it).kmer_pos_at(i, 2) << ")\n";
-    }
-    if (kmer_pairs.size())
-    {
-        std::cout << "\n\nkmer ID\t | sequence(s)\n------------------------------\n";
-        std::vector<TSeq> decodes;
-        for (TKmerID kmer_ID : legend)
-        {
-            dna_decoder(kmer_ID, decodes);
-            std::cout << kmer_ID << "\t| ";
-            for (auto decode : decodes)
-                std::cout << decode << " " << std::endl;
-        }
-
-    }
-}
 
 /*
 // Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
@@ -538,6 +503,82 @@ void unique_kmers(TKmerIDs const & kmerIDs, std::set<TKmerID> & set)
     }
 }
 
+// Count non-unique kmers collected for all references.
+uint64_t get_num_kmers(TKmerIDs const & kmerIDs)
+{
+    uint64_t ctr = 0;
+    for (auto kmerIDs_per_reference : kmerIDs)
+    {
+        for (auto kmerID : kmerIDs_per_reference)
+            ctr += __builtin_popcountll(kmerID >> 54);
+    }
+    return ctr;
+}
+
+// Count pairs, i.e. sum of all combination pattern bits of each pair.
+template<typename TPairList>
+uint64_t get_num_pairs(TPairList const & pairs)
+{
+    uint64_t ctr = 0;
+    for (auto pair : pairs)
+        ctr += pair.cp.size();
+    return ctr;
+}
+
+// i,j are codes with no prefixes
+extern inline uint64_t hash_pair(uint64_t i, uint64_t j)
+{
+    return (i << __builtin_clzll(i + 1)) ^ j;
+}
+
+// Collect hash values of unique pairs and their frequencies.
+template<typename TPairList, typename TKmerIDs, typename TKmerLength>
+void unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, std::unordered_map<uint64_t, uint32_t> & code_pairs)
+{
+    for (auto pair : pairs)
+    {
+        std::vector<std::pair<uint8_t, uint8_t>> combinations;
+        pair.cp.get_combinations(combinations);
+        uint64_t code_fwd, code_rev;
+        for (std::pair<TKmerLength, TKmerLength> c : combinations)
+        {
+            code_fwd = get_code(kmerIDs[pair.reference][pair.r_fwd], ONE_LSHIFT_63 >> c.first);
+            code_rev = get_code(kmerIDs[pair.reference][pair.r_rev], ONE_LSHIFT_63 >> c.second);
+            uint64_t key = hash_pair(code_fwd, code_rev);
+            if (code_pairs.find(key) != code_pairs.end())
+                ++code_pairs[key];
+            else
+                code_pairs[key] = 1;
+        }
+    }
+
+}
+
+// Accumulate unique pair frequencies.
+template<typename TPairList, typename TKmerIDs, typename TKmerLength>
+void count_unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs)
+{
+    std::unordered_map<uint64_t, uint32_t> code_pairs;
+    unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
+    // count frequencies
+    std::map<uint64_t, uint64_t> freq_ctrs;
+    for (auto it = code_pairs.begin(); it != code_pairs.end(); ++it)
+    {
+        if (freq_ctrs.find(it->second) != freq_ctrs.end())
+            ++freq_ctrs[it->second];
+        else
+            freq_ctrs[it->second] = 1;
+    }
+    std::cout << "frequency:\t";
+    for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
+        std::cout << it->first << ",";
+    std::cout << "\ncount:\t";
+    for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
+        std::cout << it->second << ",";
+    std::cout << std::endl;
+}
+
+// TODO: put subsequent functions into util/io.hpp
 
 // Result output helper for writing primer infos.
 template<typename io_cfg_type, typename primer_cfg_type>
@@ -633,7 +674,7 @@ void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg
     accumulation_loop<TKmerLocations, io_cfg_type>(kmer_locations, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
 
     // collect kmer pair matches for bottom nodes
-    accumulation_loop<TKmerPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
+    accumulation_loop<TPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
     std::cout << "STATUS: table.csv written to\t" << io_cfg.get_result_file() << std::endl;
 
     // write primer info file

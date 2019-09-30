@@ -63,7 +63,10 @@ namespace priset
 #define TRAP_DIST 400
 
 // Lower kmer frequency cutoff, i.e. all kmer occurences below will be dropped.
-#define FREQ_MIN 10
+#define FREQ_KMER_MIN 10
+
+// Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
+#define FREQ_PAIR_MIN 5
 
 struct primer_cfg_type
 {
@@ -86,9 +89,6 @@ public:
 private:
     // Root taxonomic identifier below which references are sampled.
     TTaxid root_taxid{1};
-
-    // Default primer melting temperature formular (see chemistry.hpp for details)
-    TMeltMethod melt_method{TMeltMethod::WALLACE};
 
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
     size_type E{0};

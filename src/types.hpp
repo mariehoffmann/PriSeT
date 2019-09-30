@@ -41,13 +41,6 @@ enum KMER_COUNTS
 
 typedef std::array<uint64_t, 4> TKmerCounts;
 
-//!\brief Enums for computational methods for primer melting temperature.
-enum class TMeltMethod
-{
-    WALLACE,
-    SALT_ADJUSTED
-};
-
 //using dna = typename seqan::Dna5;
 typedef seqan::Dna5 dna;
 
@@ -128,7 +121,6 @@ typedef std::vector<std::deque<TKmerID>> TKmerIDs;
 // Background: some sequences may have no kmers and therefore no space should be reserved in bit vector set.
 typedef std::unordered_map<TSeqNo, TSeqNo> TSeqNoMap;
 
-// todo: TKmerLocation and TKmerPair inherit from same base struct.
 // vector type of k-mers and their locations
 struct TKmerLocation
 {
@@ -195,74 +187,6 @@ public:
 
 };
 
- // Type for storing kmer combinations by their IDs and spatial occurences.
-struct TKmerPair
-{
-    // The container type for storing a pair location, i.e. sequence ID, and start positions of fwd and rev primer.
-    using TKmerPairLocation = typename std::tuple<TSeqNo, TSeqPos, TSeqPos>;
-    using TKmerPairLocations = typename std::vector< TKmerPairLocation >;
-    using const_iterator = TKmerPairLocations::const_iterator;
-    using size_type = TKmerPairLocations::size_type;
-private:
-    // k-mer identifier for forward (5') primer sequence
-    TKmerID kmer_ID1{0};
-    // k-mer identifier for reverse (3') primer sequence
-    TKmerID kmer_ID2{0};
-    // absolute difference of their melting temperatures
-    float dTm;
-
-public:
-    // The container for storing pair locations.
-    // TODO: make private and provide push_back and at functions
-    TKmerPairLocations pair_locations;
-
-    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float dTm_) :
-        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, dTm{dTm_} {}
-
-    TKmerPair(TKmerID kmer_ID1_, TKmerID kmer_ID2_, float dTm_, TKmerPairLocation & pair_location_) :
-        kmer_ID1{kmer_ID1_}, kmer_ID2{kmer_ID2_}, dTm{dTm_}
-    {
-        pair_locations.push_back(pair_location_);
-        // .resize(pair_locations_.size());
-        //std::copy(pair_locations_.begin(), pair_locations.end(), pair_locations.begin());
-    }
-
-    TKmerID get_kmer_ID1() const
-    {
-        return kmer_ID1;
-    }
-
-    TKmerID get_kmer_ID2() const
-    {
-        return kmer_ID2;
-    }
-
-    float get_dTm() const noexcept
-    {
-        return dTm;
-    }
-
-    size_t container_size() const noexcept
-    {
-        return pair_locations.size();
-    }
-
-    TSeqNo accession_ID_at(size_t i) const noexcept
-    {
-        return std::get<0>(pair_locations[i]);
-    }
-
-    TSeqPos kmer_pos_at(size_type i, TKmerID kmerID = 1) const
-    {
-        if (kmerID == 1)
-            return std::get<1>(pair_locations[i]);
-        return std::get<2>(pair_locations[i]);
-    }
-};
-
-// List type of pairs.
-typedef std::vector<TKmerPair> TKmerPairs;
-
 // Result table output for app
 struct TResult
 {
@@ -311,60 +235,6 @@ struct TUpstreamKey
     TTaxid taxid;
     TKmerID fwd;
     TKmerID rev;
-};
-
-/*
-* Struct to associate a taxonomic identifier with a set of accession numbers and sequences.
-*/
-template<typename taxid_type=unsigned int, typename accession_type=std::string,  typename sequence_type=std::string>
-struct Reference
-{
-    //!\brief Taxonomic ID associated to the reference collection.
-    const taxid_type taxid;
-
-    //!\brief Default constructor.
-    constexpr Reference() : taxid(static_cast<taxid_type>(1)) {}
-    //!\brief Copy constructor.
-    constexpr Reference(Reference const &) = default;
-    //!\brief Copy construction via assignment.
-    constexpr Reference & operator=(Reference const &) = default;
-    //!\brief Move constructor.
-    constexpr Reference (Reference &&) = default;
-    //!\brief Move assignment.
-    constexpr Reference & operator=(Reference &&) = default;
-    //!\brief Use default deconstructor.
-    ~Reference() = default;
-
-    //!\brief Construct by taxid.
-    explicit constexpr Reference(taxid_type const _taxid) noexcept : taxid(_taxid) {}
-
-    void insert(accession_type const accession, sequence_type const sequence)
-    {
-        assert(accession.size() > 0 && sequence.size() > 0);
-        _accessions.push_back(accession);
-        _sequences.push_back(sequence);
-    }
-
-    //!\brief Erase a sequence given its accession.
-    bool erase(accession_type accession)
-    {
-        auto it = std::find(_accessions.begin(), _accessions.end(), accession);
-        if (it != _accessions.end())
-        {
-            size_t offset = it - _accessions.begin();
-            _accessions.erase(it);
-            _sequences.erase(_sequences.begin() + offset);
-        }
-        else
-            return false;
-        return true;
-    }
-
-private:
-    //!\brief Accessions associated to taxid.
-    std::vector<accession_type> _accessions;
-    //!\brief List of sequences associated to the accessions.
-    std::vector<sequence_type> _sequences;
 };
 
 } // priset

@@ -152,7 +152,6 @@ extern inline bool filter_repeats_runs(TKmerID kmerID)
                         ifx = aux;
                     }
                 }
-
                 seqan::Finder<TSeq> finder(seq);
                 for (char c : std::vector<char>{'A', 'C', 'G', 'T'})
                 {
@@ -166,7 +165,7 @@ extern inline bool filter_repeats_runs(TKmerID kmerID)
     return true;
 }
 
-uint64_t code_prefix(uint64_t const code_, uint64_t mask);
+uint64_t get_code(uint64_t const code_, uint64_t mask);
 
 template<typename uint_type>
 std::string bits2str(uint_type i);
@@ -185,7 +184,7 @@ extern inline void filter_repeats_runs2(TKmerID & kmerID)
         return;
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
-    uint64_t code = code_prefix(kmerID, 0); // trim to true length
+    uint64_t code = get_code(kmerID, 0); // trim to true length
     //std::cout << "true length trimmed: " << bits2str(code) <<std::endl;
     kmerID = code; // save trimmed kmer-code part
     //std::cout << "head-less sequence: " << kmerID2str(kmerID) << " and head = " << bits2str(prefix>>54) << std::endl;

@@ -24,48 +24,49 @@ struct TCombinePattern
 {
 private:
     // TODO: use union type for mask when doing SIMD vectorization
-    std::uint64_t data[2]; // or std::bitset<100> ? or union with SIMD 128
+    std::bitset<100> data;  //? or union with SIMD 128
 
 public:
+
+    using TOffset = uint8_t;
 
     // return true if at least one combination bit is set.
     inline bool is_set()
     {
-        return (data[0] | data[1]);
+        return data.any();
     }
     // set a kmer combination by its lengths given the maximal length difference
-    inline void set(TKmerID const mask1, TKmerID const mask2) noexcept
+    inline void set(uint64_t const prefix1, uint64_t const prefix2) noexcept
     {
-        auto idx = __builtin_clzl(mask1) * PREFIX_SIZE + __builtin_clzl(mask2); // in [0:l_max^2[
-    //    std::cout << "computed index for bit set in cp: " << idx << std::endl;
-        data[idx >> 6] += 1 << (WORD_SIZE - 1 - (idx % WORD_SIZE));
-
-        //std::cout << "DEBUG: set data at position " << (idx >> 6) << std::endl;
+        auto idx = __builtin_clzl(prefix1) * PREFIX_SIZE + __builtin_clzl(prefix2); // in [0:l_max^2[
+        data.set(idx);
     }
 
     // unset bit if length combination doesn't pass a filter anymore
-    inline void unset(TKmerLength const k1, TKmerLength const k2, TKmerLength const k_min) noexcept
+    // To be reset bit is expressed as offset w.r.t. PRIMER_MIN_LEN.
+    inline void reset(TOffset const k_offset1, TOffset const k_offset2)
     {
-        uint16_t const l1 = k1 - k_min;
-        uint16_t const l2 = k2 - k_min;
-        data[(l1 * PREFIX_SIZE + l2) >> 6] -= 1 << ((WORD_SIZE - 1) - ((l1 * PREFIX_SIZE + l2) % WORD_SIZE));
+        assert(k_offset1 <= PREFIX_SIZE && k_offset2 <= PREFIX_SIZE);
+        data.reset(k_offset1 * PREFIX_SIZE + k_offset2);
     }
 
-    // return all enumerated length combinations translated into kmer lengths
-    void get_combinations(std::vector<std::pair<TKmerLength, TKmerLength>> & combinations)
+    // The number of combinations stored in data.
+    uint64_t size()
+    {
+        return __builtin_popcountll(data[0]) + __builtin_popcountll(data[1]);
+    }
+
+    // Return all enumerated length combinations translated into kmer length offsets, i.e.
+    // the true kmer length can be retrieved by adding PRIMER_MIN_LEN.
+    void get_combinations(std::vector<std::pair<TOffset, TOffset>> & combinations)
     {
         combinations.clear();
-        for (uint8_t i = 0; i < 2; ++i)
+        for (uint8_t i = 0; i < PREFIX_SIZE * PREFIX_SIZE; ++i)
         {
-            uint64_t data_part = data[i];
-            while (data_part)
+            if (data[i])
             {
-                auto c = i * WORD_SIZE + __builtin_clzl(data_part); // combination index
-                if (64 == c)
-                    break;
-                std::pair<TKmerLength, TKmerLength> pair{c / PREFIX_SIZE + PRIMER_MIN_LEN, (c % PREFIX_SIZE) + PRIMER_MIN_LEN};
+                std::pair<TOffset, TOffset> pair{i / PREFIX_SIZE, (i % PREFIX_SIZE)};
                 combinations.push_back(pair);
-                data_part &= ((1 << (WORD_SIZE - c - 1)) - 1); // delete leading bit
             }
         }
     }

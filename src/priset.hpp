@@ -1,5 +1,3 @@
-#pragma once
-
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -117,12 +115,13 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
         runtimes->at(TIMEIT::FILTER1) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
+    std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
+
     // TODO: delete locations
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
-    //combine(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TKmerPairs2 & pairs)
 
     combine<TPairList>(primer_cfg, references, kmerIDs, pairs, kmerCounts);
     if (timeit_flag)
@@ -131,20 +130,25 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
         runtimes->at(TIMEIT::COMBINER) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
-    std::cout << "INFO: pairs combined = " << pairs.size() << std::endl;
+    std::cout << "INFO: pairs combined = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
-    // test chemical constraints of pairs and filter
+    // decomment for analysing unique kmer combinations
+//    count_unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs);
+
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
-    //post_filter_main(primer_cfg, kmerIDs, pairs);
+    // void filter_pairs(TKmerIDs const & kmerIDs, TPairList const & pairs, std::unordered_set<uint64_t> & frequent_pairs)
+    filter_pairs(references, kmerIDs, pairs);
+
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
         runtimes->at(TIMEIT::FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
-    std::cout << "INFO: pairs filtered = " << pairs.size() << std::endl;
+    std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
+
     if (!timeit_flag)
     {
         create_table(io_cfg, primer_cfg, references, kmerIDs, pairs);
