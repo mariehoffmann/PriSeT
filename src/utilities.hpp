@@ -549,9 +549,9 @@ void unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, std::unorde
                 ++code_pairs[key];
             else
                 code_pairs[key] = 1;
+
         }
     }
-
 }
 
 // Accumulate unique pair frequencies.

@@ -112,7 +112,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(TIMEIT::FILTER1) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::FILTER1_TRANSFORM) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
@@ -127,13 +127,13 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(TIMEIT::COMBINER) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::COMBINE_FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: pairs combined = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
-    // decomment for analysing unique kmer combinations
-//    count_unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs);
+    // Decomment the following line for analysing unique kmer combinations.
+    count_unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs);
 
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
@@ -144,7 +144,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
-        runtimes->at(TIMEIT::FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+        runtimes->at(TIMEIT::PAIR_FREQ) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;

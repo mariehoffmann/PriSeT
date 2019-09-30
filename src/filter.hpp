@@ -287,7 +287,6 @@ void combine(primer_cfg_type const & primer_cfg, TReferences const & references,
 template<typename TPairList>
 void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs)
 {
-    std::cout << "entering filter_pairs ...\n";
     std::unordered_map<uint64_t, uint32_t> code_pairs; // unique pairs and their freqs
     unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
     std::unordered_set<uint64_t> frequent_pairs;
@@ -308,7 +307,6 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
         {
             assert(kmer_fwd & PREFIX_SELECTOR);
             assert(kmer_rev & PREFIX_SELECTOR);
-            std::cout << "call get_code ...\n";
             uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
             uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
             uint64_t h = hash_pair(code_fwd, code_rev);

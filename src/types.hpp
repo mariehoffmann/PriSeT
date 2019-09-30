@@ -24,10 +24,9 @@ namespace priset
 
 enum TIMEIT {
     MAP, // mappability computation
-    TRANSFORM, //
-    FILTER1, // chemical filter
-    COMBINER, // kmer combiner
-    FILTER2, // match chemical properties
+    FILTER1_TRANSFORM, //
+    COMBINE_FILTER2, // kmer combiner
+    PAIR_FREQ, // Pair frequency cutoff
     SIZE
 };
 

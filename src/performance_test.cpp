@@ -14,7 +14,7 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/src/performance_test.cpp -Wno-write-strings -std=c++20 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o performance_test
+// g++ ../PriSeT/src/performance_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o performance_test
 
 struct setup
 {
@@ -69,10 +69,10 @@ void timeit()
     priset_main(argc, argv, &runtimes);
     std::cout << "MESSAGE: ... done." << std::endl;
 
-    std::cout << "K\tMAP\t\tTRANSFORM\tFILTER1\tCOMBINER\tFILTER2\t|\tSUM [μs]\n" << std::string(100, '_') << "\n";
+    std::cout << "K\tMAP\t\tFILTER1_TRANSFORM\tCOMBINE_FILTER2\tPAIR_FREQ\t|\tSUM [μs]\n" << std::string(100, '_') << "\n";
     std::cout << "[" << 16 << ":" << 25 << "]\t" << runtimes[priset::TIMEIT::MAP] << "\t" <<
-            '\t' << runtimes[priset::TIMEIT::TRANSFORM] << '\t' << runtimes[priset::TIMEIT::FILTER1] <<
-            '\t' << runtimes[priset::TIMEIT::COMBINER] << '\t' << runtimes[priset::TIMEIT::FILTER2] <<
+            '\t' << runtimes[priset::TIMEIT::FILTER1_TRANSFORM] <<
+            '\t' << runtimes[priset::TIMEIT::COMBINE_FILTER2] << '\t' << runtimes[priset::TIMEIT::PAIR_FREQ] <<
             "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
 
 }
