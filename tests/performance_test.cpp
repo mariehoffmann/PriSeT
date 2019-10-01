@@ -9,18 +9,18 @@
 #include <unistd.h>
 #include <vector>
 
-#include "priset.hpp"
-#include "types.hpp"
+#include "../src/priset.hpp"
+#include "../src/types.hpp"
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/src/performance_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o performance_test
+// g++ ../PriSeT/tests/performance_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o performance_test
 
 struct setup
 {
-    std::string lib_dir = fs::canonical("../PriSeT/src/tests/library/3041").string();
+    std::string lib_dir = fs::canonical("../PriSeT/tests/library/3041").string();
     //std::cout << "lib_dir = " << lib_dir << std::endl;
-    std::string work_dir = fs::canonical("../PriSeT/src/tests/work/3041").string();
+    std::string work_dir = fs::canonical("../PriSeT/tests/work/3041").string();
 
     fs::path idx_dir = work_dir + "/index";
     fs::path idx_zip = work_dir + "/index.zip";

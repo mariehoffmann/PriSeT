@@ -14,15 +14,15 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "../combine_types.hpp"
-#include "../filter.hpp"
-#include "../primer_cfg_type.hpp"
-#include "../types.hpp"
-#include "../utilities.hpp"
+#include "../src/combine_types.hpp"
+#include "../src/filter.hpp"
+#include "../src/primer_cfg_type.hpp"
+#include "../src/types.hpp"
+#include "../src/utilities.hpp"
 
 using namespace priset;
 
-// g++ ../PriSeT/src/tests/types_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -I .. -o types_test
+// g++ ../PriSeT/tests/types_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -I .. -o types_test
 
 void test_TCombinePattern()
 {

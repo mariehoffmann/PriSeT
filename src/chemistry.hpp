@@ -114,57 +114,6 @@ extern inline float primer_melt_salt(TKmerID code, float const Na)
     return true;
 }*/
 
-/*
- * Filter di-nucleotide repeats, like ATATATAT, and runs, i.e. series of same nucleotides.
- * For both the maximum is 4 consecutive di-nucleotides, and 4bp, respectively.
- * Needs to be called with non-ambigous kmerID, i.e. an ID encoding a length-variable kmer sequence.
- */
-extern inline bool filter_repeats_runs(TKmerID kmerID)
-{
-    for (uint64_t mask = ONE_LSHIFT_63; mask >= (1ULL << 53); mask >>= 1)
-    {
-        if (mask & kmerID)
-        {
-            TSeq seq = dna_decoder(kmerID, mask);
-            if (seqan::length(seq) > 4)
-            {
-                uint8_t repeat_even = 1;
-                uint8_t repeat_odd = 1;
-                //uint8_t & repeat;
-                TSeq ifx_even = seqan::infixWithLength(seq, 0, 2); // even start positions
-                TSeq ifx_odd = seqan::infixWithLength(seq, 1, 2); // odd start positions
-                //TSeq & ifx;
-                TSeq aux;
-                for (uint8_t i = 3; i < seqan::length(seq); ++i)
-                {
-                    aux = seqan::infixWithLength(seq, i - 1, 2);
-                    TSeq & ifx = (i % 2) ? ifx_even : ifx_odd;
-                    uint8_t & repeat = (i % 2) ? repeat_even : repeat_odd;
-                    if (aux[0] == ifx[0] && aux[1] == ifx[1])
-                    {
-                        ++repeat;
-                        if (repeat > 4)
-                            return false;
-                    }
-                    else
-                    {
-                        repeat = 1;
-                        ifx = aux;
-                    }
-                }
-                seqan::Finder<TSeq> finder(seq);
-                for (char c : std::vector<char>{'A', 'C', 'G', 'T'})
-                {
-                    seqan::Pattern<TSeq, Horspool> pattern(std::string(5, c));
-                    if (seqan::find(finder, pattern))
-                        return false;
-                }
-            }
-        }
-    }
-    return true;
-}
-
 uint64_t get_code(uint64_t const code_, uint64_t mask);
 
 template<typename uint_type>
@@ -176,9 +125,9 @@ std::string kmerID2str(TKmerID kmerID);
  * This filter is one of many filters applied sequentially. Therefore, it is
  * possible that the prefix is reset completely by previous operations.
  */
-extern inline void filter_repeats_runs2(TKmerID & kmerID)
+extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
-    //std::cout << "Enter filter_repeats_runs2\n";
+    //std::cout << "Enter filter_repeats_runs\n";
     uint64_t prefix = kmerID & PREFIX_SELECTOR;
     if (!prefix)
         return;
@@ -233,33 +182,23 @@ extern inline void filter_repeats_runs2(TKmerID & kmerID)
 // Returns false if constraint is violated.
 extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
-    assert(seqan::length(sequence) < (1 << 8));
     assert(sense == '+' || sense == '-');
     //63 - 23 = 40/2
     uint8_t encoded_len = (63 - __builtin_clzl(kmerID & ~PREFIX_SELECTOR)) >> 1;
-
-    uint8_t CG = 0;
     uint64_t code = kmerID & ~PREFIX_SELECTOR;
     if (sense == '-')
-    {
-        // l = 17 , 1 << (63-23 - 2)
         code >>= (encoded_len << 1) - 10; // shift right to have prefix of length 10
-    }
     else
     {
         uint8_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask);
         code >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
     }
-    for (uint8_t i = 0; i < 5; ++i)
-    {
-        switch(3 & code)
-        {
-            case 1:
-            case 2: ++CG; break;
-        }
-        code >>= 2;
-    }
-    return (CG <= 3) ? true : false;
+
+    return  ((((code & 3) | ((code & 3) + 1)) == 3) +
+            ((((code >> 2) & 3) | (((code >> 2) & 3) + 1)) == 3) +
+            ((((code >> 4) & 3) | (((code >> 4) & 3) + 1)) == 3) +
+            ((((code >> 6) & 3) | (((code >> 6) & 3) + 1)) == 3) +
+            ((((code >> 8) & 3) | (((code >> 8) & 3) + 1)) == 3) <= 3) ? true : false;
 }
 
 /*
@@ -267,9 +206,9 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint6
  * This is a metafunction performing several single pass checks: melting tempaerature,
  * CG content, di-nucleotide repeats and consecutive runs.
  * Length bits in prefix of kmerID are reset in case of not passing.
- * This function only modifies the prefix. Precondition is that kmerID_ is trimmed,
- * i.e. largest prefix bit corresponds to encoded string length. The last filter trims
- * again to the maximal encoded length.
+ * This function only modifies the prefix.
+ * Precondition: kmerID_ trimmed to largest prefix encoded length
+ * Output: kmerID trimmed to largest length bit
  */
 void chemical_filter_single_pass(TKmerID & kmerID)
 {
@@ -300,22 +239,22 @@ void chemical_filter_single_pass(TKmerID & kmerID)
 
                 if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
                 {
-                //    std::cout << "reset length bit ...\n";
+                   std::cout << "reset length bit due to Tm out of range ...\n";
                     kmerID ^= length_bit_selector;
                 }
                 else
                 {
                 //    std::cout << "else test CG content\n";
                     // reset bit if CG content out of range
+                    std::cout << "CG = " << int(CG) << ", __builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN = " << __builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN << std::endl;
                     float CG_content = float(CG) / (float(__builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN));
                 //    std::cout << "CG_content = " << CG_content << std::endl;
                     if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
                     {
-                //        std::cout << "reset length bit ...\n";
+                        std::cout << "reset length bit due to CG content out of range ...\n";
                         kmerID ^= length_bit_selector;
                     }
                 }
-
             }
             length_bit_selector = std::max(ONE_LSHIFT_63 >> 9, length_bit_selector >> 1);
         }
@@ -323,7 +262,7 @@ void chemical_filter_single_pass(TKmerID & kmerID)
         ++l;
     }
     // Filter di-nucleotide repeats and
-    filter_repeats_runs2(kmerID);
+    filter_repeats_runs(kmerID);
 }
 
 /* Helper function for computing the convolution of two sequences. For each overlap

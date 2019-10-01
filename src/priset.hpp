@@ -123,7 +123,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
-    combine<TPairList>(primer_cfg, references, kmerIDs, pairs, kmerCounts);
+    combine<TPairList>(references, kmerIDs, pairs, kmerCounts);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();

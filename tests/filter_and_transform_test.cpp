@@ -14,24 +14,28 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "../argument_parser.hpp"
-#include "../combine_types.hpp"
-#include "../filter.hpp"
-#include "../gui.hpp"
-#include "../primer_cfg_type.hpp"
-#include "../types.hpp"
-#include "../utilities.hpp"
+// macro used in order to ignore frequency cutoff filter for this test
+#define PRISET_TEST
+
+#include "../src/argument_parser.hpp"
+#include "../src/combine_types.hpp"
+#include "../src/filter.hpp"
+#include "../src/gui.hpp"
+#include "../src/primer_cfg_type.hpp"
+#include "../src/types.hpp"
+#include "../src/utilities.hpp"
 
 namespace fs = std::experimental::filesystem;
 using namespace priset;
 
-// g++ ../PriSeT/src/tests/filter_and_transform_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o filter_and_transform_test
+
+// g++ ../PriSeT/tests/filter_and_transform_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o filter_and_transform_test
 
 struct setup
 {
     // TODO: make this runnable with arbitrarily located build folders
-    std::string lib_dir = (fs::canonical("../PriSeT/src/tests/library/one_seq")).string();
-    std::string work_dir = (fs::canonical("../PriSeT/src/tests/work/one_seq")).string();
+    std::string lib_dir = (fs::canonical("../PriSeT/tests/library/one_seq")).string();
+    std::string work_dir = (fs::canonical("../PriSeT/tests/work/one_seq")).string();
     io_cfg_type io_cfg{};
     primer_cfg_type primer_cfg{};
     TKLocations locations{};
@@ -84,26 +88,10 @@ struct setup
     }
 };
 
-/*
- * tests interfaces between fm_map and filter_and_transform
- * Passes chemical filter for Tm, CG content and runs for length 23, 21, 19
- *
- * kmer 1-3 at position 10: "(C)AACGTAACGTAACGTACGTACGT"
- * head = (1 << (63-3)) + (1 << (63-5)) + (1 << (63-7)) = 288238240355526424
- *
- * kmer 2 at position 90: "TAGCTAACTACATAGCTACGA"
- * head = (1 << (63 - (21-16)))                          = 288238240355526424
- *
-    dTm(1513281700780251931, 19, 288238240355526424, 21) = 12
-
-    AACGTAACGTAACGTACGT         AT_cnt = 11 CG_cnt = 8 => 11*2 + 8*4 = 54 degrees
-    TAGCTAACTACATAGCTACGA       AT_cnt = 13 CG_cnt = 8 => 26 + 32 = 58 degrees
- */
 void test_filter_and_transform()
 {
     setup su{};
-
-    filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
+    filter_and_transform(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     std::cout << "References:\n";
     for (TReference reference : su.references)
     {
@@ -120,8 +108,13 @@ void test_filter_and_transform()
         std::cout << std::endl;
     }
 
-    TKmerID expect1 = dna_encoder("AACGTAACGTAACGTACGTACGT") + (ONE_LSHIFT_63 >> 3) + (ONE_LSHIFT_63 >> 5) + (ONE_LSHIFT_63 >> 7);
-    TKmerID expect2 = dna_encoder("TAGCTAACTACATAGCTACGA") + (ONE_LSHIFT_63 >> 5);
+    // k = 23: AT = 13, CG = 10, Tm = 26 + 40 = 66!, CG_content = .43, no CG clamp
+    // k = 21: AT = 12, CG = 9, Tm = 24 + 36 = 60, CG_content = .42, no CG clamp
+    // k = 19: AT = 11, CG = 8, Tm = 22 + 32 = 54, CG_content = .42, no CG clamp
+    TKmerID expect1 = dna_encoder("AACGTAACGTAACGTACGTAC") + (ONE_LSHIFT_63 >> 3) + (ONE_LSHIFT_63 >> 5);
+    // k = 21: AT = 12, CG = 9, Tm = 24 + 36 = 60, CG_content = .43, no CG clamp
+    TKmerID expect2 = dna_encoder("TAGCTAACTACATAGCTACGC") + (ONE_LSHIFT_63 >> 5);
+
     if (!su.kmerIDs.size() || su.kmerIDs[0].size() != 2 || su.kmerIDs[0][0] != expect1 || su.kmerIDs[0][1] != expect2)
         std::cout << "ERROR: expect kmerID1 = " << expect1 << " and kmerID2 = " << expect2 << ", but got nothing or a wrong kmerID\n";
     else
@@ -131,13 +124,13 @@ void test_filter_and_transform()
 void test_combine()
 {
     setup su{};
-    filter_and_transform(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.cutoff, su.kmerCounts);
+    filter_and_transform(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     //using TPair = TPair;
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
     //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::primer_cfg_type&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::TCombinePattern<long long unsigned int, long long int> > >&)'
 //     print_combinations<>(su.primer_cfg, su.kmerIDs, pairs);
-    combine(su.primer_cfg, su.references, su.kmerIDs, pairs, su.kmerCounts);
+    combine(su.references, su.kmerIDs, pairs, su.kmerCounts);
     print_combinations<TPairList>(su.kmerIDs, pairs);
 }
 

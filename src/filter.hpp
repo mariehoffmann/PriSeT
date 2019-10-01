@@ -35,21 +35,27 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
     // to have a compressed representation.
     std::vector<TSeqPos> seqNo2maxPos(1 << 10);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // cleanup in mapper may lead to undercounting kmer occurrences
+        #if !defined(PRISET_TEST)
         if ((it->second).first.size() < FREQ_KMER_MIN)
+        {
+            std::cout << "continue because FREQ_KMER_MIN = " << FREQ_KMER_MIN << std::endl;
             continue;
-
+        }
+        #endif
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo || (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&  seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
+        {
+            std::cout << "WARNING: symmetry of location ordering not exploited! Fix this in mapper.\n";
             continue;
+        }
         // update largest kmer position
         if (seqNo >= seqNo2maxPos.size())
             seqNo2maxPos.resize(seqNo + 1);
@@ -92,16 +98,19 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // cleanup in mapper may lead to undercounting kmer occurrences
+        // TODO: move kmer frequency cutoff completely into mapper
         if ((it->second).first.size() < FREQ_KMER_MIN)
-            continue;
+            std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
             (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&
             seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
+        {
+            std::cout << "WARNING: symmetry of location ordering not exploited! Fix this in mapper.\n";
             continue;
-
+        }
         // insert now unique occurrences listed in first vector (forward mappings)
         TSeqNo seqNo_prev{0};
         TSeqPos seqPos_prev{0};
@@ -199,7 +208,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
  * primer, i.e. (k1, k2) != (k2, k1).
  */
 template<typename TPairList>
-void combine(primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
+void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
 {
     pairs.clear();
     auto cp_ctr = 0ULL;

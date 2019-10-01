@@ -206,7 +206,7 @@ void print_combinations(TKmerIDs const & kmerIDs, TPairList const & pairs) noexc
         TKmerID kmerID_fwd = kmerIDs[pair.reference][pair.r_fwd - 1];
         TKmerID kmerID_rev = kmerIDs[pair.reference][pair.r_rev - 1];
         std::cout << pair.reference << "\t | " << kmerID_fwd << "\t | " << kmerID_rev << "\t| ";
-        std::vector<std::pair<TKmerLength, TKmerLength>> combinations;
+        std::vector<std::pair<uint8_t, uint8_t>> combinations;
         pair.cp.get_combinations(combinations);
         TSeq kmer_fwd = dna_decoder(kmerID_fwd);
         TSeq kmer_rev = dna_decoder(kmerID_rev);

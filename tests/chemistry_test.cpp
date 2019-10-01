@@ -68,7 +68,7 @@ void filter_repeats_runs_test()
     TKmerID kmerID_ref = kmerID - ONE_LSHIFT_63;
     std::cout << "ACGTAAAAACGTACGT to bits with head bit:\t" << bits2str(kmerID) << std::endl;
     // head should be 0 after return
-    filter_repeats_runs2(kmerID);
+    filter_repeats_runs(kmerID);
     std::cout << "ACGTAAAAACGTACGT to bits after head rem:\t" << bits2str(kmerID) << std::endl;
 
     if (kmerID_ref != kmerID)
@@ -79,7 +79,7 @@ void filter_repeats_runs_test()
     // |TTTTTCGTAAAAGACGTACGT| = 21
     kmerID = (ONE_LSHIFT_63 >> 5) + dna_encoder("TTTTTCGTAAAAGACGTACGT");
     kmerID_ref = kmerID - (ONE_LSHIFT_63 >> 5);
-    filter_repeats_runs2(kmerID);
+    filter_repeats_runs(kmerID);
     if (kmerID_ref != kmerID)
     {
         std::cout << "ERROR: expect zero header, got: " << bits2str((PREFIX_SELECTOR & kmerID) >> 54) << std::endl;
@@ -90,7 +90,7 @@ void filter_repeats_runs_test()
     // case: multiple lengths, only largest filtered out |ACGTACGTACGTAAAA| = 16, |ACGTACGTACGTAAAAATTTT| = 21
     kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 5) + dna_encoder("ACGTACGTACGTAAAAATTTT");
     kmerID_ref = ONE_LSHIFT_63 + dna_encoder("ACGTACGTACGTAAAAATTTT");
-    filter_repeats_runs2(kmerID);
+    filter_repeats_runs(kmerID);
     if (kmerID != kmerID_ref)
     {
         std::cout << "ERROR: kmerID_f is 1000000000 ? " << bits2str((PREFIX_SELECTOR & kmerID) >> 54);
@@ -103,7 +103,7 @@ void filter_repeats_runs_test()
     kmerID = (ONE_LSHIFT_63 >> 4) + (ONE_LSHIFT_63 >> 5) + dna_encoder("ACGTACGTACGTATATATATA");
     kmerID_ref = kmerID - (ONE_LSHIFT_63 >> 5);
     //std::cout << "kmerID in: " << std::bitset<64>(kmerID) << " as string " << kmerID2str(kmerID) << std::endl;
-    filter_repeats_runs2(kmerID);
+    filter_repeats_runs(kmerID);
 
     if (kmerID_ref != kmerID)
         std::cout << "ERROR: kmerID_f head should be 0b0000100000, but is: " << bits2str((PREFIX_SELECTOR & kmerID) >> 54) << std::endl;
@@ -112,7 +112,7 @@ void filter_repeats_runs_test()
 
     kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 7) + dna_encoder("CGCGCGCGCGACGTACGTACGTACGT"); // 26
     kmerID_ref = (kmerID - ONE_LSHIFT_63 - (ONE_LSHIFT_63 >> 7)) >> 6; // result trimmed to initially encoded length
-    filter_repeats_runs2(kmerID);
+    filter_repeats_runs(kmerID);
     if (kmerID_ref != kmerID)
         std::cout << "ERROR: kmerID_f head should be 0b0000100000, but is: " << bits2str((PREFIX_SELECTOR & kmerID) >> 54) << std::endl;
     else

@@ -15,11 +15,11 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "../combine_types.hpp"
-#include "../filter.hpp"
-#include "../primer_cfg_type.hpp"
-#include "../types.hpp"
-#include "../utilities.hpp"
+#include "../src/combine_types.hpp"
+#include "../src/filter.hpp"
+#include "../src/primer_cfg_type.hpp"
+#include "../src/types.hpp"
+#include "../src/utilities.hpp"
 
 namespace fs = std::experimental::filesystem;
 using namespace priset;
