@@ -124,6 +124,8 @@ std::string kmerID2str(TKmerID kmerID);
 /*
  * This filter is one of many filters applied sequentially. Therefore, it is
  * possible that the prefix is reset completely by previous operations.
+ * TODO: shorten di-nucleotide runs to at most 4 due to self-annealing
+ * Filters also a subset of self-annealing structures.
  */
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
@@ -203,8 +205,11 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint6
 
 /*
  * Filter kmers based on their chemical properties regardless of their pairing.
- * This is a metafunction performing several single pass checks: melting tempaerature,
- * CG content, di-nucleotide repeats and consecutive runs.
+ * This is a metafunction performing several single pass checks:
+ *   1. melting tempaerature
+ *   2. CG content
+ *   3. di-nucleotide repeats
+ *   4. consecutive runs
  * Length bits in prefix of kmerID are reset in case of not passing.
  * This function only modifies the prefix.
  * Precondition: kmerID_ trimmed to largest prefix encoded length
@@ -220,13 +225,13 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     uint8_t l = 1; // current length
     while (code != 1)
     {
-        //std::cout << "l = " << int(l) << std::endl;
         switch(3 & code)
         {
             case 1:
             case 2: ++CG; break;
             default: ++AT;
         }
+
         if (l >= PRIMER_MIN_LEN)
         {
             if (kmerID & length_bit_selector)
@@ -238,22 +243,13 @@ void chemical_filter_single_pass(TKmerID & kmerID)
                 // cmp asm cmds: abs((AT << 1) + (CG << 2) - (PRIMER_MAX_TM+PRIMER_MIN_TM)/2) <= (PRIMER_MAX_TM-PRIMER_MIN_TM)/2 vs.
 
                 if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
-                {
-                   std::cout << "reset length bit due to Tm out of range ...\n";
                     kmerID ^= length_bit_selector;
-                }
+
                 else
                 {
-                //    std::cout << "else test CG content\n";
-                    // reset bit if CG content out of range
-                    std::cout << "CG = " << int(CG) << ", __builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN = " << __builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN << std::endl;
                     float CG_content = float(CG) / (float(__builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN));
-                //    std::cout << "CG_content = " << CG_content << std::endl;
                     if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
-                    {
-                        std::cout << "reset length bit due to CG content out of range ...\n";
                         kmerID ^= length_bit_selector;
-                    }
                 }
             }
             length_bit_selector = std::max(ONE_LSHIFT_63 >> 9, length_bit_selector >> 1);
@@ -264,6 +260,16 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
 }
+
+/*
+ * Test for self-annealing.
+ *
+ */
+void chemical_filter_square(TKmerID & kmerID)
+{
+
+}
+
 
 /* Helper function for computing the convolution of two sequences. For each overlap
  *position the Gibb's free energy is computed and the minimum returned;

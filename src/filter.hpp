@@ -26,8 +26,21 @@ namespace priset
 // Filter of single kmers and transform of references to bit vectors.
 void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & stats)
 {
+    std::cout << "1\n";
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
+    std::cout << "2\n";
+    typename TKLocations::const_iterator it_aux = locations.begin();
+        std::cout << "3\n";
+    std::advance(it_aux, locations.size()/2);
+        std::cout << "4\n";
+    for (auto i = 0; i < 10 && it_aux != locations.end(); ++i, ++it_aux)
+    {
+        if (!it_aux->second.first.size())
+            std::cout << "WARNING: empty location vector\n";
+        else
+            std::cout << "(" << std::get<0>(it_aux->first) << ", " << std::get<1>(it_aux->first) << "): [(" << seqan::getValueI1<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ", "  << seqan::getValueI2<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ") ...]\n";
+    }
 
     references.clear();
     kmerIDs.clear();
@@ -40,20 +53,21 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     std::vector<TSeqPos> seqNo2maxPos(1 << 10);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        // cleanup in mapper may lead to undercounting kmer occurrences
-        #if !defined(PRISET_TEST)
+        // resetLimits in mapper may lead to empty kmer occurrences
         if ((it->second).first.size() < FREQ_KMER_MIN)
         {
             std::cout << "continue because FREQ_KMER_MIN = " << FREQ_KMER_MIN << std::endl;
             continue;
         }
-        #endif
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
-        // TODO: is this already shortcut fm mapper?
-        if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo || (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&  seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
+        // TODO: is this already shortcut fm mapper? TKLoc1 <= TLoc2?
+        if (it->second.first.size() && (std::get<0>(it->first) > it->second.first[0].i1 ||
+           (std::get<0>(it->first) == it->second.first[0].i1 && std::get<1>(it->first) > it->second.first[0].i2)))
         {
             std::cout << "WARNING: symmetry of location ordering not exploited! Fix this in mapper.\n";
+            std::cout << "current seqNo = " << seqNo << ", seqPos = " << seqPos << std::endl;
+            std::cout << "first entry: seqNo[0] = " << seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) << ", seqPos[0] = " << seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) << std::endl;
             continue;
         }
         // update largest kmer position
