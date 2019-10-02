@@ -111,13 +111,15 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     std::vector<uint32_t> debug_drop_kmer_repeats(references.size(), 0);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
+        std::cout << "1\n";
         // cleanup in mapper may lead to undercounting kmer occurrences
         // TODO: move kmer frequency cutoff completely into mapper
         if ((it->second).first.size() < FREQ_KMER_MIN)
-            std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
+            continue; //std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
+        std::cout << "2\n";
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
             (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&
             seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
@@ -128,6 +130,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
         // insert now unique occurrences listed in first vector (forward mappings)
         TSeqNo seqNo_prev{0};
         TSeqPos seqPos_prev{0};
+                std::cout << "3\n";
         for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
         {
             TSeqNo seqNo = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
@@ -142,11 +145,13 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
                 debug_drop_kmer_repeats[seqNo_cx]++;
                 continue;
             }
-
+            std::cout << "4\n";
             references[seqNo_cx][seqPos] = 1;
             //std::cout << "DEBUG: K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << ", PRIMER_MAX_LEN = " << PRIMER_MAX_LEN << std::endl;
+            std::cout << "5\n";
             if (uint64_t(K) > PRIMER_MAX_LEN)
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
+            std::cout << "6\n";
             uint64_t loc_key = location_encode(seqNo, seqPos);
             uint64_t loc_val = ONE_LSHIFT_63 >> (K - PRIMER_MIN_LEN);
             // locations filled for K_min to K_max

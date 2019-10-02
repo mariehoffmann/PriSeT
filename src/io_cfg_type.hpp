@@ -47,9 +47,9 @@ public:
     {
         lib_dir = fs::canonical(lib_dir_);
         work_dir = fs::canonical(work_dir_);
-
         if (!fs::exists(work_dir_))
         {
+            std::cout << "work dir does not exist, creating ...\n";
             if (!fs::exists(work_dir_.parent_path()))
                 fs::create_directory(work_dir_.parent_path());
             fs::create_directory(work_dir_);
@@ -61,11 +61,6 @@ public:
         mapping_dir = work_dir;
         // TODO: path to PriSeT git repos as argument
         genmap_bin = "~/git/PriSet_git2/PriSeT/submodules/genmap/bin/genmap";
-        std::cout << "genmap exists: " << fs::exists(genmap_bin) << std::endl;
-        std::cout << "current_path = " << fs::current_path() << std::endl;
-    //    /Users/troja/git/PriSet_git2/PriSeT/submodules/genmap/bin/
-        // parse library directory and assign paths to the .acc, .fasta, and .tax files
-//        std::cout << "current path: " << fs::current_path() << std::endl;
 
         if (!fs::exists(lib_dir))
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
