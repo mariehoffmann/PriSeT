@@ -15,6 +15,7 @@
 #include "fm.hpp"
 #include "gui.hpp"
 #include "io_cfg_type.hpp"
+#include "output.hpp"
 #include "primer_cfg_type.hpp"
 #include "taxonomy.hpp"
 #include "types.hpp"
@@ -97,7 +98,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     }
 
     // Do not modify or delete STATS lines, since they are captured for statistical analysis
-    std::cout << "INFO: kmers init = " << locations.size() << std::endl;
+    std::cout << "\nINFO: kmers init = " << locations.size() << std::endl;
 
     // filter k-mers by frequency and chemical properties
     // TODO: result structure for references and k-mer pairs: candidates/matches
@@ -115,7 +116,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
         runtimes->at(TIMEIT::FILTER1_TRANSFORM) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     }
 
-    std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
+    std::cout << "\nINFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
@@ -151,7 +152,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
 
     if (!timeit_flag)
     {
-        create_table(io_cfg, primer_cfg, references, kmerIDs, pairs);
+        create_table(io_cfg, primer_cfg, seqNoMap, references, kmerIDs, pairs);
         // create app script
         if (! gui::generate_app(io_cfg) && gui::compile_app(io_cfg))
             std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";

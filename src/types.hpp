@@ -95,20 +95,6 @@ typedef uint64_t TAccID;
 // The type of an accession
 typedef std::string TAcc;
 
-/*
- * Datatype to store a kmer as an alphabet sequence, a melting temperature and
- * a unique integer ID.
- */
- // TODO: delete after transforming, only used in combiner
-struct TKmer
-{
-    // Unique numerical identifier. Default 0 means unset.
-    TKmerID ID{static_cast<TKmerID>(0)};
-
-    // Melting temperature of k-mer sequence.
-    float Tm{0};
-};
-
 // A bit vector for each reference, with 1 indicating a kmer starting position.
 typedef sdsl::bit_vector TReference;
 typedef std::vector<TReference> TReferences;

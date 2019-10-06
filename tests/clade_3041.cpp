@@ -10,8 +10,15 @@
 #include <unistd.h>
 #include <vector>
 
+#include "../src/argument_parser.hpp"
+#include "../src/combine_types.hpp"
+#include "../src/filter.hpp"
+#include "../src/fm.hpp"
+#include "../src/io_cfg_type.hpp"
+#include "../src/primer_cfg_type.hpp"
 #include "../src/priset.hpp"
 #include "../src/types.hpp"
+#include "../src/utilities.hpp"
 
 namespace fs = std::experimental::filesystem;
 
@@ -80,13 +87,19 @@ int main(int argc, char ** argv)
 
     std::cout << "INFO: kmers init = " << locations.size() << std::endl;
 
+    /*for (auto it = locations.begin(); it != locations.end(); ++it)
+    {
+        std::cout << "(" << std::get<0>(it->first) << ", " << std::get<1>(it->first) << ", K = " << std::get<2>(it->first) << "): [";
+        if (it->second.first.size() > 1)
+            std::cout << "(" << it->second.first[0].i1 << ", " << it->second.first[0].i2 << "),(" << it->second.first[1].i1 << ", " << it->second.first[0].i2 << ")\n";
+    }*/
     TReferences references;
     TKmerIDs kmerIDs;
     TSeqNoMap seqNoMap;
     start = std::chrono::high_resolution_clock::now();
     filter_and_transform(io_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
-    std::cout << "Runtime filter_and_transform: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    std::cout << "Runtime filter_and_transform: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count()  << std::endl;
 
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
@@ -97,23 +110,19 @@ int main(int argc, char ** argv)
     start = std::chrono::high_resolution_clock::now();
     combine<TPairList>(references, kmerIDs, pairs, kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
-    std::cout << "Runtime combine: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    std::cout << "Runtime combine: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count()  << std::endl;
 
     std::cout << "INFO: pairs after combiner = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     filter_pairs(references, kmerIDs, pairs);
     finish = std::chrono::high_resolution_clock::now();
-    std::cout << "Runtime filter_pairs: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    std::cout << "Runtime filter_pairs: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count() << std::endl;
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
-    // write primers into file
-    fs::path primer_file = su.tmp_dir / "primers_3041.csv";
-
-    std::ofstream ofs;
-    ofs.open(primer_file);
-    ofs << "forward,reverse\n";
+    // collect unique primer sequences
+    std::unordered_set<uint64_t> kmers_unique;
 
     for (TPair<TCombinePattern<TKmerID, TKmerLength>> pair : pairs)
     {
@@ -124,12 +133,19 @@ int main(int argc, char ** argv)
 
             if (pair.cp[i])
             {
-                std::string fwd = dna_decoder(kmer_fwd, ONE_LSHIFT_63 >> (i/10));
-                std::string rev = dna_decoder(kmer_rev, ONE_LSHIFT_63 >> (i % 10));
-                ofs << fwd << "," << rev << "\n";
+                kmers_unique.insert(get_code(kmer_fwd, ONE_LSHIFT_63 >> (i/10)));
+                kmers_unique.insert(get_code(kmer_rev, ONE_LSHIFT_63 >> (i % 10)));
             }
         }
     }
+    // write primers into file
+    fs::path primer_file = su.tmp_dir / "primers_3041.csv";
+
+    std::ofstream ofs;
+    ofs.open(primer_file);
+    ofs << "primer\n";
+    for (auto primer : kmers_unique)
+        ofs << dna_decoder(primer) << "\n";
     ofs.close();
     return 0;
 }

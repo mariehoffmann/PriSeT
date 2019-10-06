@@ -25,58 +25,89 @@ namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
 std::string dna_decoder(uint64_t code, uint64_t const mask);
+std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
+
 
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
-extern inline float dTm(TKmerID const kmerID1_, TKmerID const mask1, TKmerID const kmerID2_, TKmerID const mask2)
+extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID const kmerID2, TKmerID const mask2)
 {
-    if (!(kmerID1_ & mask1) || !(kmerID2_ & mask2))
+    if (!(kmerID1 & mask1) || !(kmerID2 & mask2))
     {
         std::cout << "Error: target mask bit not set\n";
         exit(0);
     }
     // remove length mask
-    TKmerID kmerID1 = kmerID1_ & ~PREFIX_SELECTOR ;
-    TKmerID kmerID2 = kmerID2_ & ~PREFIX_SELECTOR;
+    TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR ;
+    TKmerID code2 = kmerID2 & ~PREFIX_SELECTOR;
 
-    auto enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(kmerID1)) >> 1; // encoded length
+    auto enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(code1)) >> 1; // encoded length
     auto mask_l1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;      // selected length
-    kmerID1 >>= (enc_l1 - mask_l1) << 1;   // string correction
+    code1 >>= (enc_l1 - mask_l1) << 1;   // string correction
 
-    auto enc_l2 = (WORD_SIZE - 1 - __builtin_clzl(kmerID2)) >> 1; // encoded length
+    auto enc_l2 = (WORD_SIZE - 1 - __builtin_clzl(code2)) >> 1; // encoded length
     auto mask_l2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;      // selected length
-    kmerID2 >>= (enc_l2 - mask_l2) << 1;   // string correction
+    code2 >>= (enc_l2 - mask_l2) << 1;   // string correction
 
-    //std::cout << "corrected kmerID1 = " << dna_decoder(kmerID1) << std::endl;
-    //std::cout << "corrected kmerID2 = " << dna_decoder(kmerID2) << std::endl;
+    //std::cout << "corrected code = " << dna_decoder(code1) << std::endl;
+    //std::cout << "corrected code2 = " << dna_decoder(code2) << std::endl;
     int8_t ctr_AT = 0;
     int8_t ctr_CG = 0;
-    if (!(__builtin_clzl(kmerID1) % 2))
+    if (!(__builtin_clzl(code1) % 2))
     {
         std::cout << "ERROR: expected odd number of leading zeros\n";
         exit(0);
     }
-    if (!(__builtin_clzl(kmerID2) % 2))
+    if (!(__builtin_clzl(code2) % 2))
     {
         std::cout << "ERROR: expected odd number of leading zeros\n";
         exit(0);
     }
-    while (kmerID1 != 1)
+    while (code1 != 1)
     {
-        if (!(kmerID1 & 3) || (kmerID1 & 3) == 3)  // 'A' (00) or 'T' (11)
+        if (!(code1 & 3) || (code1 & 3) == 3)  // 'A' (00) or 'T' (11)
             ++ctr_AT;
         else
             ++ctr_CG;
-        kmerID1 >>= 2;
+        code1 >>= 2;
     }
-    while (kmerID2 != 1)
+    while (code2 != 1)
     {
-        if (!(kmerID2 & 3) || (kmerID2 & 3) == 3)  // 'A' (00) or 'T' (11)
+        if (!(code2 & 3) || (code2 & 3) == 3)  // 'A' (00) or 'T' (11)
             --ctr_AT;
         else
             --ctr_CG;
-        kmerID2 >>= 2;
+        code2 >>= 2;
     }
     return (std::abs(ctr_AT) << 1) + (abs(ctr_CG) << 2);
+}
+
+// Compute melting temperature according to Wallace method, i.e. Tm = 2*|AT| + 4*|CG|.
+// If the kmer ID contains length information in the prefix, the code will be trimmed
+// to the encoded length, otherwise the Tm for the encoded length is taken.
+// It is assumed that at most one length bit is set!
+extern inline uint8_t Tm(TKmerID kmerID)
+{
+    auto [prefix, code] = split(kmerID);
+    if (prefix)
+    {
+        auto enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1;
+        auto target_l =  __builtin_clzll(prefix) + PRIMER_MIN_LEN;
+        code >>= (enc_l - target_l) << 1;
+    }
+    uint8_t AT = 0;
+    uint8_t CG = 0;
+    while (code != 1)
+    {
+        switch (code & 3)
+        {
+            case 0:
+            case 3: ++AT; break;
+            case 1:
+            case 2: ++CG;
+        }
+        code >>= 2;
+    }
+    return (std::abs(AT) << 1) + (abs(CG) << 2);
 }
 
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
@@ -265,11 +296,11 @@ void chemical_filter_single_pass(TKmerID & kmerID)
  * Test for self-annealing.
  *
  */
-void chemical_filter_square(TKmerID & kmerID)
+/*void chemical_filter_square(TKmerID & kmerID)
 {
 
 }
-
+*/
 
 /* Helper function for computing the convolution of two sequences. For each overlap
  *position the Gibb's free energy is computed and the minimum returned;

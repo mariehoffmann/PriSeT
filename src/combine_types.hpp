@@ -76,7 +76,7 @@ public:
         return data[pos];
     }
 
-    // Wrapper for bitset::none(), returns true if any bit is set, else false.
+    // Wrapper for bitset::none(), returns true if no bit is set, else false.
     bool none()
     {
         return data.none();

@@ -26,21 +26,27 @@ namespace priset
 // Filter of single kmers and transform of references to bit vectors.
 void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & stats)
 {
-    std::cout << "1\n";
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
-    std::cout << "2\n";
-    typename TKLocations::const_iterator it_aux = locations.begin();
-        std::cout << "3\n";
-    std::advance(it_aux, locations.size()/2);
-        std::cout << "4\n";
-    for (auto i = 0; i < 10 && it_aux != locations.end(); ++i, ++it_aux)
+    //typename TKLocations::const_iterator it_aux = locations.begin();
+
+    auto loc_fwd_empty = 0;
+    auto loc_fwd_rev_empty = 0;
+    auto kmer_less_10 = 0;
+    for (auto it = locations.begin(); it != locations.end(); ++it)
     {
-        if (!it_aux->second.first.size())
-            std::cout << "WARNING: empty location vector\n";
-        else
-            std::cout << "(" << std::get<0>(it_aux->first) << ", " << std::get<1>(it_aux->first) << "): [(" << seqan::getValueI1<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ", "  << seqan::getValueI2<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ") ...]\n";
+        if (!it->second.first.size())
+            ++loc_fwd_empty;
+        if (!it->second.first.size() && !it->second.second.size())
+            ++loc_fwd_rev_empty;
+        if (it->second.first.size() < FREQ_KMER_MIN && it->second.second.size() < FREQ_KMER_MIN)
+            ++kmer_less_10;
+//        else
+//            std::cout << "(" << std::get<0>(it_aux->first) << ", " << std::get<1>(it_aux->first) << "): [(" << seqan::getValueI1<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ", "  << seqan::getValueI2<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ") ...]\n";
     }
+    std::cout << loc_fwd_empty << " out of " << locations.size() << " fwd locations are empty\n";
+    std::cout << loc_fwd_rev_empty << " out of " << locations.size() << " fwd and rev locations are empty\n";
+    std::cout << kmer_less_10 << " have frequencies below 10\n";
 
     references.clear();
     kmerIDs.clear();
@@ -48,9 +54,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
+    std::cout << "text size = " << seqan::lengthSum(text) << std::endl;
+    if (!seqan::lengthSum(text))
+        throw std::length_error("Reference text size is 0!");
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
     // to have a compressed representation.
-    std::vector<TSeqPos> seqNo2maxPos(1 << 10);
+    std::map<TSeqNo, TSeqPos> seqNo2maxPos;
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // resetLimits in mapper may lead to empty kmer occurrences
@@ -59,7 +68,8 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             std::cout << "continue because FREQ_KMER_MIN = " << FREQ_KMER_MIN << std::endl;
             continue;
         }
-        const auto & [seqNo, seqPos, K] = (it->first);
+        const auto & [seqNo, seqPos, K] = it->first;
+        //exit(0);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper? TKLoc1 <= TLoc2?
         if (it->second.first.size() && (std::get<0>(it->first) > it->second.first[0].i1 ||
@@ -71,17 +81,16 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             continue;
         }
         // update largest kmer position
-        if (seqNo >= seqNo2maxPos.size())
-            seqNo2maxPos.resize(seqNo + 1);
-        seqNo2maxPos[seqNo] = std::max(seqNo2maxPos.at(seqNo), seqPos);
+
+        seqNo2maxPos[seqNo] = (seqNo2maxPos.find(seqNo) == seqNo2maxPos.end()) ? seqPos : std::max(seqNo2maxPos.at(seqNo), seqPos);
         // and also for other occurences
         for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
         {
             TSeqNo seqNo_fwd = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
             TSeqPos seqPos_fwd = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
-            if (seqNo_fwd >= seqNo2maxPos.size())
-                seqNo2maxPos.resize(seqNo_fwd + 1);
-            seqNo2maxPos[seqNo_fwd] = std::max(seqNo2maxPos.at(seqNo_fwd), seqPos_fwd);
+            //std::cout << "Accessing seqNo_fwd key in seqNo2maxPos ...\n";
+            seqNo2maxPos[seqNo_fwd] = (seqNo2maxPos.find(seqNo_fwd) == seqNo2maxPos.end()) ? seqPos_fwd : std::max(seqNo2maxPos.at(seqNo_fwd), seqPos_fwd);
+            //std::cout << "Success\n";
         }
     }
 
@@ -92,12 +101,10 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
 
     unsigned i_cx = 0;
     // reserve space for bit vectors
-    for (unsigned i = 0; i < seqNo2maxPos.size(); ++i)
+    for (auto it = seqNo2maxPos.begin(); it != seqNo2maxPos.end(); ++it)
     {
-        if (!seqNo2maxPos[i])
-            continue;
-        seqNoMap[i] = i_cx++;
-        sdsl::bit_vector bv(seqNo2maxPos[i] + 1, 0);
+        seqNoMap[it->first] = i_cx++;  // assign reference index to its compressed index
+        sdsl::bit_vector bv(it->second + 1, 0);
         references.push_back(bv);
     }
 
@@ -111,7 +118,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     std::vector<uint32_t> debug_drop_kmer_repeats(references.size(), 0);
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        std::cout << "1\n";
+        //std::cout << "1\n";
         // cleanup in mapper may lead to undercounting kmer occurrences
         // TODO: move kmer frequency cutoff completely into mapper
         if ((it->second).first.size() < FREQ_KMER_MIN)
@@ -119,7 +126,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
-        std::cout << "2\n";
+        //std::cout << "2\n";
         if (it->second.first.size() && (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) < seqNo ||
             (seqan::getValueI1<TSeqNo, TSeqPos>(it->second.first[0]) == seqNo &&
             seqan::getValueI2<TSeqNo, TSeqPos>(it->second.first[0]) < seqPos)))
@@ -130,11 +137,13 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
         // insert now unique occurrences listed in first vector (forward mappings)
         TSeqNo seqNo_prev{0};
         TSeqPos seqPos_prev{0};
-                std::cout << "3\n";
         for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
         {
+        //    std::cout << "a\n";
             TSeqNo seqNo = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
             TSeqPos seqPos = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
+            if (seqNoMap.find(seqNo) == seqNoMap.end())
+                std::cout << "ERROR: cannot find seqNo = " << seqNo << " in seqNoMap\n";
             auto seqNo_cx = seqNoMap.at(seqNo); // compressed sequence id
             // continue and delete previous bit if same kmer occurs within 400 bp
             if (it_loc_fwd > it->second.first.begin() && seqNo_prev == seqNo && seqPos_prev + TRAP_DIST < seqPos)
@@ -145,13 +154,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
                 debug_drop_kmer_repeats[seqNo_cx]++;
                 continue;
             }
-            std::cout << "4\n";
+        //    std::cout << "4\n";
             references[seqNo_cx][seqPos] = 1;
             //std::cout << "DEBUG: K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << ", PRIMER_MAX_LEN = " << PRIMER_MAX_LEN << std::endl;
-            std::cout << "5\n";
             if (uint64_t(K) > PRIMER_MAX_LEN)
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
-            std::cout << "6\n";
+        //    std::cout << "6\n";
             uint64_t loc_key = location_encode(seqNo, seqPos);
             uint64_t loc_val = ONE_LSHIFT_63 >> (K - PRIMER_MIN_LEN);
             // locations filled for K_min to K_max
@@ -341,9 +349,12 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
             if (frequent_pairs.find(h) == frequent_pairs.end())
             {
                 ctr_reset++;
-                auto s1 = it_pairs->cp.size();
+                //auto s1 = it_pairs->cp.size();
                 it_pairs->cp.reset(comb.first, comb.second);
-                assert(it_pairs->cp.size() < s1);
+                //assert(it_pairs->cp.size() < s1);
+                // deleting reference bit would have too many implications 
+                //if (cp.none()) // delete reference bit if there are no more combinations
+
             }
         }
     }

@@ -56,6 +56,12 @@ std::string exec(char const * cmd) {
     return result;
 }
 
+// Split prefix and code given a kmerID.
+extern inline std::pair<uint64_t, uint64_t> split(TKmerID kmerID)
+{
+    return std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR};
+}
+
 // forward declaration
 struct primer_cfg_type;
 
@@ -106,11 +112,6 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 // A leading bit ('C') remains in the code to signal the end.
 extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
 {
-    if (!(kmerID & PREFIX_SELECTOR))
-    {
-        std::cout << "ERROR: code has no prefix" << std::endl;
-        exit(0);
-    }
     uint64_t code = kmerID & ~PREFIX_SELECTOR;
     if (!mask) // get largest encoded length
         mask = 1ULL << (ffsl(kmerID >> 54) + 53); // find first significat bit (1-based) or 0
@@ -478,26 +479,26 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 // Build sorted set of unique encoded kmer IDs (unpacked and with null header),
 // such that real length is indicated by highest set '1' add an even bit position
 // between [2*primer_min_length : 2 : 2*primer_max_length].
-void unique_kmers(TKmerIDs const & kmerIDs, std::set<TKmerID> & set)
+template<typename TKmerIDs>
+void unique_kmers(TKmerIDs const & kmerIDs, std::set<uint64_t> & set)
 {
     //std::vector<std::deque<TKmerID>> TKmerIDs;
     for (auto it_ref = kmerIDs.begin(); it_ref < kmerIDs.end(); ++it_ref)
     {
         for (auto it_kmerID = it_ref->begin(); it_kmerID <= it_ref->end(); ++it_kmerID)
         {
-            TKmerID head = (*it_kmerID) >> (WORD_SIZE - PREFIX_SIZE);
-            TKmerID ID = (*it_kmerID) & ~PREFIX_SELECTOR;
+            auto [prefix, code] = split(*it_kmerID);
             bool start_shift = false; // since kmer IDs represent only the longest kmer they encode and not necessarily the longest possible primer length, we start truncating the ID after we have seen the first length bit
-            while (head)
+            while (prefix)
             {
-                if (head & 1)
+                if (prefix & 1)
                 {
                     start_shift = true;
-                    set.insert(ID);
+                    set.insert(code);
                 }
-                head >>= 1;
+                prefix >>= 1;
                 if (start_shift)
-                    ID >>= 2;
+                    code >>= 2;
             }
         }
     }
@@ -576,110 +577,6 @@ void count_unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs)
     for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
         std::cout << it->second << ",";
     std::cout << std::endl;
-}
-
-// TODO: put subsequent functions into util/io.hpp
-
-// Result output helper for writing primer infos.
-template<typename io_cfg_type, typename primer_cfg_type>
-void write_primer_info_file(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKmerIDs const & kmerIDs)
-{
-    std::ofstream primer_table;
-    primer_table.open(io_cfg.get_primer_info_file());
-    primer_table << "kmer_ID,kmer_sequence,Tm\n";
-    std::set<TKmerID> kmer_ordered_set;
-    unique_kmers(kmerIDs, kmer_ordered_set);
-    uint64_t i = 0;
-    for (TKmerID kmerID : kmer_ordered_set)
-    {
-        primer_table << (i++) << "," << dna_decoder(kmerID) << "," << get_Tm(primer_cfg, kmerID) << "\n";
-    }
-    primer_table.close();
-    std::cout << "STATUS: primer_info.csv written to\t" << io_cfg.get_primer_info_file() << std::endl;
-}
-
-/*
-    Write result table with columns: taxid, fwd, rev, matches, coverage, ID_list and
-    primer info file with columns kmer_id (1-based), sequence and melting temperature.
-*/
-template<typename io_cfg_type, typename primer_cfg_type, typename TPairList>
-void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TReferences const & references, TKmerIDs const & kmerIDs, TPairList const & pairs)
-{
-    std::set<TKmerID> kmer_ordered_set;
-    unique_kmers(kmerIDs, kmer_ordered_set);
-
-    std::cout << "STATUS: will write " << kmer_ordered_set.size() << " single primer results and " << pairs.size() << " primer pair results\n";
-/*
-    // TODO: check if unordered_map instead of map
-    // load id file for mapping reference IDs (1-based) to accession numbers and vice versa
-    std::unordered_map<TAccID, TAcc> accID2acc;
-    std::unordered_map<TAcc, TAccID> acc2accID;
-    create_accID2acc_map<io_cfg_type>(accID2acc, acc2accID, io_cfg);
-
-    // build dictionary for taxids and counter for assigned accessions
-    std::unordered_map<TAccID, TTaxid> accID2taxID;
-    std::unordered_set<TTaxid> taxid_set; // taxids with accessions
-    create_accID2taxID_map(accID2taxID, taxid_set, acc2accID, io_cfg);
-
-    // load taxonomy as map {taxid: p_taxid}, taxid is root if not in key set
-    std::unordered_map<TTaxid, TTaxid> tax_map;
-    create_tax_map(tax_map, io_cfg);
-
-    // collect single kmer matches for bottom nodes
-    std::unordered_map<TKmerID, std::vector<TSeqNo> > kmer2loc; // relates kmer IDs and location IDs
-    for (auto it = kmer_locations.begin(); it != kmer_locations.end(); ++it)
-    {
-        TKmerID kmer_ID = it->get_kmer_ID();
-        std::vector<TSeqNo> seq_IDs;
-        for (TKmerLocation::size_type i = 0; i < it->container_size(); ++i)
-            seq_IDs.push_back(it->accession_ID_at(i)); // seqan::getValueI1<TSeqNo, TSeqPos>(loc));
-        kmer2loc[kmer_ID] = seq_IDs;
-    }
-    // 0-based height, correct level info iff a taxonomic node is in the predecessor lineage of another one
-    std::unordered_map<TTaxid, uint16_t> leaves; //<taxid, height_from_bottom>
-
-    for (auto const & taxid : taxid_set)
-        leaves[taxid] = 0;
-    for (auto leaf_it = leaves.begin(); leaf_it != leaves.end(); ++leaf_it)
-    {
-        uint16_t level = leaf_it->second;
-        TTaxid p_taxid = leaf_it->first;
-        while (tax_map.find(p_taxid) != tax_map.end()) //auto tax_it{tax_map.find(p_taxid)} != tax_map.end())
-        {
-            ++level;
-            p_taxid = tax_map[p_taxid]; //tax_it.second; // set taxid to ancestor node
-
-            auto anc_it = leaves.find(p_taxid);
-            if (anc_it != leaves.end()) // && !(p_taxid < (*leaf_it).first)))
-            {
-                anc_it->second = std::max<uint16_t>((anc_it->second), level);
-            }
-        }
-    }
-
-    // taxids sorted by level to have correct upstreams stats
-    std::vector<std::pair<TTaxid, uint16_t>> leaves_srt_by_level(leaves.size());
-    std::copy(leaves.begin(), leaves.end(), leaves_srt_by_level.begin());
-    std::sort(leaves_srt_by_level.begin(), leaves_srt_by_level.end(), [](auto const & l1, auto const & l2){ return l1.second < l2.second; });
-
-    // write result table header
-    std::ofstream table;
-    table.open(io_cfg.get_result_file());
-    // taxid, fwd primer ID, rev primer ID, number of matches, coverage (ctr of nodes with accessions), accession list (comma separated string)
-    std::cout << "write header line\n";
-    table << "taxid,fwd,rev,matches,coverage,accession_list\n";
-    table.close();
-
-    // collect single kmer matches
-    accumulation_loop<TKmerLocations, io_cfg_type>(kmer_locations, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
-
-    // collect kmer pair matches for bottom nodes
-    accumulation_loop<TPairs>(kmer_pairs, leaves_srt_by_level, tax_map, accID2taxID, accID2acc, io_cfg);
-    std::cout << "STATUS: table.csv written to\t" << io_cfg.get_result_file() << std::endl;
-
-    // write primer info file
-    write_primer_info_file(io_cfg, primer_cfg, kmer_locations);
-    */
 }
 
 }  // namespace priset
