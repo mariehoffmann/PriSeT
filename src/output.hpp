@@ -51,9 +51,19 @@ void unfold_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, TPair2RefMa
     for (auto pair : pairs)
     {
         auto refID = pair.reference;
-        auto code1 = ~PREFIX_SELECTOR & kmerIDs.at(refID).at(pair.r_fwd);
-        auto code2 = ~PREFIX_SELECTOR & kmerIDs.at(refID).at(pair.r_rev);
+        auto code1 = ~PREFIX_SELECTOR & kmerIDs.at(refID).at(pair.r_fwd - 1);
+        auto code2 = ~PREFIX_SELECTOR & kmerIDs.at(refID).at(pair.r_rev - 1);
+        std::vector<std::pair<uint8_t, uint8_t>> combinations;
+        pair.cp.get_combinations(combinations);
+        for (auto combination : combinations)
+        {
+            uint64_t code1_trim = get_code(code1, ONE_LSHIFT_63 >> (combination.first));
+            uint64_t code2_trim = get_code(code2, ONE_LSHIFT_63 >> (combination.second));
+            auto key = std::pair<uint64_t, uint64_t>{code1_trim, code2_trim};
+            if (pair2refs.find(key) == pair2refs.end())
+                pair2refs[key] = std::vector<uint64_t>{refID};
 
+        }
     }
 }
 
@@ -76,7 +86,7 @@ void unfold_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, TPair2RefMa
     CG          CG content as float
 */
 template<typename io_cfg_type, typename primer_cfg_type, typename TPairList, typename TSeqNoMap, typename TReferences, typename TKmerIDs>
-void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TSeqNoMap const & seqNoMap, TReferences const & references, TKmerIDs const & kmerIDs, TPairList const & pairs)
+void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, /*TSeqNoMap const & seqNoMap,*/TReferences const & references, TKmerIDs const & kmerIDs, TPairList const & pairs)
 {
     //using TKmerID = typename TKmerIDs::value_type::value_type;
     //std::set<uint64_t> kmer_ordered_set;

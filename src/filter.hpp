@@ -54,7 +54,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
     seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-    std::cout << "text size = " << seqan::lengthSum(text) << std::endl;
     if (!seqan::lengthSum(text))
         throw std::length_error("Reference text size is 0!");
     // (i) collect distinct sequence identifiers and maximal position of kmer occurences
@@ -93,7 +92,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             //std::cout << "Success\n";
         }
     }
-
     // (ii) Create bit vectors in the length of largest kmer occurences, and set
     // bits for kmer occurrences. Collect also kmer lengths encoded in final kmer
     // code of type uint64_t. Final sequence lookup and encoding is done in next step.
@@ -217,7 +215,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
         }
     }
     // TODO: delete references with no more bits, or too inefficient w.r.t. possible space gain?
-    for (auto kmerID_list : kmerIDs)
+    /*for (auto kmerID_list : kmerIDs)
     {
         for (auto kmerID : kmerID_list)
             if (!kmerID)
@@ -225,8 +223,8 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
                 std::cout << "ERROR: kmerID = 0" << std::endl;
                 exit(0);
             }
-    }
-    locations.clear();
+    }*/
+//    locations.clear();
 }
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
@@ -235,7 +233,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
  * primer, i.e. (k1, k2) != (k2, k1).
  */
 template<typename TPairList>
-void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
+void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats, std::unordered_map<uint64_t, uint32_t> & pair2freq)
 {
     pairs.clear();
     auto cp_ctr = 0ULL;
@@ -293,6 +291,13 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
                                     //std::cout << "\t\tINFO: dTm in range, set combination bit\n";
+                                    auto code_fwd = get_code(kmerID_fwd, mask_fwd);
+                                    auto code_rev = get_code(kmerID_rev, mask_rev);
+                                    auto h = hash_pair(code_fwd, code_rev);
+                                    if (pair2freq.find(h) == pair2freq.end())
+                                        pair2freq[h] = 1;
+                                    else
+                                        pair2freq[h]++;
                                     cp.set(mask_fwd, mask_rev);
                                     ++stats[KMER_COUNTS::COMBINER_CNT];
                                 }
@@ -312,6 +317,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                 if (cp.is_set())
                 {
                     pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
+
                 }
             } // kmerID rev
         } // kmerID fwd
@@ -321,43 +327,35 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
 
 // Apply frequency cutoff for unique pair occurences
 template<typename TPairList>
-void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs)
+void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::unordered_map<uint64_t, uint32_t> & pair2freq)
 {
-    std::unordered_map<uint64_t, uint32_t> code_pairs; // unique pairs and their freqs
-    unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
-    std::unordered_set<uint64_t> frequent_pairs;
-    for (auto it = code_pairs.begin(); it != code_pairs.end(); ++it)
-    {
-        if (it->second > FREQ_PAIR_MIN)
-            frequent_pairs.insert(it->first);
-    }
+    std::cout << "Enter filter_pairs ...\n";
     // Reset bits of kmer prefixes if and in references if prefix is finally empty
     uint64_t ctr_reset = 0;
     for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
     {
-        TKmerID kmer_fwd = kmerIDs[it_pairs->reference][it_pairs->r_fwd];
-        TKmerID kmer_rev = kmerIDs[it_pairs->reference][it_pairs->r_rev];
+        TKmerID kmer_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
+        TKmerID kmer_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
         std::vector<std::pair<uint8_t, uint8_t>> combinations;
         it_pairs->cp.get_combinations(combinations);
         for (auto comb : combinations)
         {
-            assert(kmer_fwd & PREFIX_SELECTOR);
-            assert(kmer_rev & PREFIX_SELECTOR);
             uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
             uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
             uint64_t h = hash_pair(code_fwd, code_rev);
-            if (frequent_pairs.find(h) == frequent_pairs.end())
+            if (pair2freq.find(h) == pair2freq.end())
+            {
+                std::cout << "ERROR: unknown pair hash\n";
+                exit(0);
+            }
+            if (pair2freq.at(h) >= FREQ_PAIR_MIN)
             {
                 ctr_reset++;
-                //auto s1 = it_pairs->cp.size();
                 it_pairs->cp.reset(comb.first, comb.second);
-                //assert(it_pairs->cp.size() < s1);
-                // deleting reference bit would have too many implications 
-                //if (cp.none()) // delete reference bit if there are no more combinations
-
             }
         }
     }
+    std::cout << "Leaving filter_pairs\n";
 }
 
 }  // namespace priset

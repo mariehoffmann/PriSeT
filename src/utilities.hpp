@@ -59,6 +59,7 @@ std::string exec(char const * cmd) {
 // Split prefix and code given a kmerID.
 extern inline std::pair<uint64_t, uint64_t> split(TKmerID kmerID)
 {
+    //std::cout << "split: " << bits2str(kmerID) << std::endl;
     return std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR};
 }
 
@@ -108,15 +109,27 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 
 // Correct encoded length to length indicated by the mask and remove length information.
 // If no mask is given (mask = 0), the code is truncated to its largest length encoded in head,
-// otherwise it's truncated to the length given by the mask (same format like code head).
+// otherwise it's truncated to the largest length given by the mask (same format like code head).
 // A leading bit ('C') remains in the code to signal the end.
 extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
 {
-    uint64_t code = kmerID & ~PREFIX_SELECTOR;
-    if (!mask) // get largest encoded length
-        mask = 1ULL << (ffsl(kmerID >> 54) + 53); // find first significat bit (1-based) or 0
+    //std::cout << "Enter get_code with kmerID = " << kmerID << std::endl;
+    auto [prefix, code] = split(kmerID);
+    //std::cout << "Code after split = " << code << std::endl;
+    if (!code)
+    {
+        std::cout << "ERROR: expected kmerID not zero\n";
+        exit(0);
+    }
+
+    //std::cout << "Leading zero count = " << __builtin_clzl(code) << std::endl;
     uint8_t enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
+    if (!mask)
+        prefix = ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN);
+    //std::cout << "Encoded length = " << int(enc_l) << std::endl;
     uint8_t mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
+    //std::cout << "Target length = " << int(mask_l) << std::endl;
+
     return (enc_l == mask_l) ? code : code >> ((enc_l - mask_l) << 1);   // kmer length correction
 }
 
@@ -204,8 +217,8 @@ void print_combinations(TKmerIDs const & kmerIDs, TPairList const & pairs) noexc
     std::cout << "pairs.size = " << pairs.size() << std::endl;
     for (auto pair : pairs)
     {
-        TKmerID kmerID_fwd = kmerIDs[pair.reference][pair.r_fwd - 1];
-        TKmerID kmerID_rev = kmerIDs[pair.reference][pair.r_rev - 1];
+        TKmerID kmerID_fwd = kmerIDs.at(pair.reference).at(pair.r_fwd - 1);
+        TKmerID kmerID_rev = kmerIDs.at(pair.reference).at(pair.r_rev - 1);
         std::cout << pair.reference << "\t | " << kmerID_fwd << "\t | " << kmerID_rev << "\t| ";
         std::vector<std::pair<uint8_t, uint8_t>> combinations;
         pair.cp.get_combinations(combinations);
@@ -543,14 +556,15 @@ void unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, std::unorde
         uint64_t code_fwd, code_rev;
         for (std::pair<TKmerLength, TKmerLength> c : combinations)
         {
-            code_fwd = get_code(kmerIDs[pair.reference][pair.r_fwd], ONE_LSHIFT_63 >> c.first);
-            code_rev = get_code(kmerIDs[pair.reference][pair.r_rev], ONE_LSHIFT_63 >> c.second);
+        //    std::cout << "pair.reference = " << pair.reference << ", size kmerIDs of this reference = " << kmerIDs.at(pair.reference).size();
+        //    std::cout << ", try to access r_fwd = " << pair.r_fwd - 1 << ", r_rev = " << pair.r_rev - 1 << std::endl;
+            code_fwd = get_code(kmerIDs.at(pair.reference).at(pair.r_fwd - 1), ONE_LSHIFT_63 >> c.first);
+            code_rev = get_code(kmerIDs.at(pair.reference).at(pair.r_rev - 1), ONE_LSHIFT_63 >> c.second);
             uint64_t key = hash_pair(code_fwd, code_rev);
             if (code_pairs.find(key) != code_pairs.end())
                 ++code_pairs[key];
             else
                 code_pairs[key] = 1;
-
         }
     }
 }

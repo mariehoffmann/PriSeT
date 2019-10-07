@@ -77,9 +77,14 @@ public:
     }
 
     // Wrapper for bitset::none(), returns true if no bit is set, else false.
-    bool none()
+    constexpr bool none() const noexcept
     {
         return data.none();
+    }
+
+    constexpr std::string to_string() const noexcept
+    {
+        return data.to_string();
     }
 };
 

@@ -161,15 +161,16 @@ std::string kmerID2str(TKmerID kmerID);
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
     //std::cout << "Enter filter_repeats_runs\n";
-    uint64_t prefix = kmerID & PREFIX_SELECTOR;
+    auto [prefix, code] = split(kmerID);
+    if (!code)
+        throw std::invalid_argument("Expected kmerID non zero!");
     if (!prefix)
         return;
+
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
-    uint64_t code = get_code(kmerID, 0); // trim to true length
-    //std::cout << "true length trimmed: " << bits2str(code) <<std::endl;
+    //uint64_t code = get_code(code, 0); // trim to true length
     kmerID = code; // save trimmed kmer-code part
-    //std::cout << "head-less sequence: " << kmerID2str(kmerID) << " and head = " << bits2str(prefix>>54) << std::endl;
     uint64_t const k = (63 - __builtin_clzl(code)) >> 1;
     for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {

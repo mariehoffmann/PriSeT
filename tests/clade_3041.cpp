@@ -83,9 +83,9 @@ int main(int argc, char ** argv)
     start = std::chrono::high_resolution_clock::now();
     fm_map(io_cfg, primer_cfg, locations);
     finish = std::chrono::high_resolution_clock::now();
-    std::cout << "Runtime fm_map: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    std::cout << "Runtime fm_map: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count() << std::endl;
 
-    std::cout << "INFO: kmers init = " << locations.size() << std::endl;
+    std::cout << "INFO: kmers init = " << std::accumulate(locations.begin(), locations.end(), 0, [](unsigned ctr, auto & location){return ctr + location.second.first.size();}) << std::endl;
 
     /*for (auto it = locations.begin(); it != locations.end(); ++it)
     {
@@ -106,16 +106,20 @@ int main(int argc, char ** argv)
     // TODO: delete locations
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
+    // dictionary collecting (unique) pair frequencies
+    std::unordered_map<uint64_t, uint32_t> pair2freq;
 
     start = std::chrono::high_resolution_clock::now();
-    combine<TPairList>(references, kmerIDs, pairs, kmerCounts);
+    combine<TPairList>(references, kmerIDs, pairs, kmerCounts, pair2freq);
     finish = std::chrono::high_resolution_clock::now();
     std::cout << "Runtime combine: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count()  << std::endl;
 
     std::cout << "INFO: pairs after combiner = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
-    filter_pairs(references, kmerIDs, pairs);
+
+    filter_pairs(references, kmerIDs, pairs, pair2freq);
+
     finish = std::chrono::high_resolution_clock::now();
     std::cout << "Runtime filter_pairs: " << std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count() << std::endl;
 
@@ -124,15 +128,36 @@ int main(int argc, char ** argv)
     // collect unique primer sequences
     std::unordered_set<uint64_t> kmers_unique;
 
+    auto i = 0;
     for (TPair<TCombinePattern<TKmerID, TKmerLength>> pair : pairs)
     {
+        if (!i)
+        {
+            std::cout << "pair.reference =\t" << pair.reference << std::endl;
+            std::cout << "pair.r_fwd =\t" << pair.r_fwd << std::endl;
+            std::cout << "pair.r_rev =\t" << pair.r_rev << std::endl;
+            std::cout << "pair.cp =\t" << pair.cp.to_string() << std::endl;
+            std::cout << "kmer_fwd =\t" << kmerIDs[pair.reference][pair.r_fwd] << std::endl;
+            std::cout << "kmer_rev =\t" << kmerIDs[pair.reference][pair.r_rev] << std::endl;
+
+        }
+        TKmerID kmer_fwd = kmerIDs[pair.reference][pair.r_fwd];
+        TKmerID kmer_rev = kmerIDs[pair.reference][pair.r_rev];
         for (uint8_t i = 0; i < 100; ++i)
         {
-            TKmerID kmer_fwd = kmerIDs[pair.reference][pair.r_fwd];
-            TKmerID kmer_rev = kmerIDs[pair.reference][pair.r_rev];
-
             if (pair.cp[i])
             {
+                if (!kmer_fwd)
+                {
+                    std::cout << "ERROR: kmer_fwd = " << kmer_fwd << " is 0ULL\n";
+                    exit(0);
+                }
+                if (!kmer_rev)
+                {
+                    std::cout << "ERROR: kmer_fwd = " << kmer_rev << " is 0ULL\n";
+                    exit(0);
+                }
+
                 kmers_unique.insert(get_code(kmer_fwd, ONE_LSHIFT_63 >> (i/10)));
                 kmers_unique.insert(get_code(kmer_rev, ONE_LSHIFT_63 >> (i % 10)));
             }
@@ -147,5 +172,6 @@ int main(int argc, char ** argv)
     for (auto primer : kmers_unique)
         ofs << dna_decoder(primer) << "\n";
     ofs.close();
+    std::cout << "MESSAGE: output written to " << primer_file << std::endl;
     return 0;
 }

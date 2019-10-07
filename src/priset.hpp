@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <iostream>
 #include <unistd.h>
+#include <unordered_set>
 #include <vector>
 
 #include <seqan/basic.h>
@@ -121,10 +122,14 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     // TODO: delete locations
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
+
+    // dictionary collecting (unique) pair frequencies
+    std::unordered_map<uint64_t, uint32_t> pair2freq;
+
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
-    combine<TPairList>(references, kmerIDs, pairs, kmerCounts);
+    combine<TPairList>(references, kmerIDs, pairs, kmerCounts, pair2freq);
     if (timeit_flag)
     {
         finish = std::chrono::high_resolution_clock::now();
@@ -134,13 +139,13 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     std::cout << "INFO: pairs combined = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
     // Decomment the following line for analysing unique kmer combinations.
-    count_unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs);
+    //count_unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs);
 
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
     // void filter_pairs(TKmerIDs const & kmerIDs, TPairList const & pairs, std::unordered_set<uint64_t> & frequent_pairs)
-    filter_pairs(references, kmerIDs, pairs);
+    filter_pairs(references, kmerIDs, pairs, pair2freq);
 
     if (timeit_flag)
     {
@@ -150,6 +155,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
+/*
     if (!timeit_flag)
     {
         create_table(io_cfg, primer_cfg, seqNoMap, references, kmerIDs, pairs);
@@ -157,5 +163,44 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
         if (! gui::generate_app(io_cfg) && gui::compile_app(io_cfg))
             std::cout << "ERROR: gui::generate_app or gui::compile_app returned false\n";
     }
+*/
+
+    // collect unique primer sequences
+    std::unordered_set<uint64_t> kmers_unique;
+
+    for (TPair<TCombinePattern<TKmerID, TKmerLength>> pair : pairs)
+    {
+        TKmerID kmer_fwd = kmerIDs.at(pair.reference).at(pair.r_fwd - 1);
+        TKmerID kmer_rev = kmerIDs.at(pair.reference).at(pair.r_rev - 1);
+        for (uint8_t i = 0; i < 100; ++i)
+        {
+            if (pair.cp[i])
+            {
+                if (!get_code(kmer_fwd, ONE_LSHIFT_63 >> (i/10)))
+                {
+                    std::cout << "ERROR: kmer_fwd = " << kmer_fwd << " called with get_code(..., " << (ONE_LSHIFT_63 >> (i/10)) << ") is 0ULL\n";
+                    exit(0);
+                }
+                if (!get_code(kmer_rev, ONE_LSHIFT_63 >> (i % 10)))
+                {
+                    std::cout << "ERROR: kmer_fwd = " << kmer_rev << " called with get_code(..., 1<<(63 - " << (i % 10) << ") is 0ULL\n";
+                    exit(0);
+                }
+                kmers_unique.insert(get_code(kmer_fwd, ONE_LSHIFT_63 >> (i/10)));
+                kmers_unique.insert(get_code(kmer_rev, ONE_LSHIFT_63 >> (i % 10)));
+            }
+        }
+    }
+    // write primers into file
+    fs::path primer_file = "primers_3041_sub.csv";
+
+    std::ofstream ofs;
+    ofs.open(primer_file);
+    ofs << "primer\n";
+    for (auto primer : kmers_unique)
+        ofs << dna_decoder(primer) << "\n";
+    ofs.close();
+    std::cout << "MESSAGE: output written to " << primer_file << std::endl;
+
     return 0;
 }
