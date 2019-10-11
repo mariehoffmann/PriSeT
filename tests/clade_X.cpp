@@ -6,6 +6,9 @@
 #include <experimental/filesystem>
 #include <fstream>
 #include <numeric>
+#include <regex>
+#include <sstream>
+#include <string>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -22,13 +25,12 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/tests/clade_3041.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o clade_3041
-
+// g++ ../PriSeT/tests/clade_X.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o clade_X
+// ./clade_X <taxid> /Volumes/plastic_data/tactac/subset/<taxid> /Volumes/plastic_data/priset/work/<taxid>
 struct setup
 {
-    std::string lib_dir; // = "tactac/subset/3041").string();
-    //std::cout << "lib_dir = " << lib_dir << std::endl;
-    std::string work_dir; // = fs::canonical("/Volumes/plastic_data/priset//work/3041").string();
+    std::string lib_dir;
+    std::string work_dir;
 
     fs::path idx_dir;
     fs::path idx_zip;
@@ -46,17 +48,42 @@ struct setup
     }
 };
 
+template<typename TMatches>
+void init_primer_search(fs::path & primer_file, TMatches & matches)
+{
+    std::ifstream infile(primer_file);
+    std::string line;
+    std::pair<std::string, std::string> key;
+    while (std::getline(infile, line))
+    {
+        if (line.compare(0, 1, ">"))
+        {
+            std::cout << "ERROR: expect line starting with '>'\n";
+            break;
+        }
+        auto header = line;
+        if (!std::getline(infile, line))
+        {
+            std::cout << "ERROR: unexpected end of file\n";
+            break;
+        }
+        key = std::pair<std::string, std::string>{header.substr(1, header.size() - 1), line};
+        matches[key] = 0;
+    }
+    std::cout << "matches.size() = " << matches.size() << std::endl;
+}
+
 int main(int argc, char ** argv)
 {
-    if (argc != 3)
+    if (argc != 4)
     {
-        std::cout << "Give paths to lib and work dirs.\n";
+        std::cout << "Give taxid, and paths to lib and work dirs.\n";
         exit(-1);
     }
-    setup su{argv[1], argv[2]};
-
+    setup su{argv[2], argv[3]};
+    std::string taxid = argv[1];
     unsigned const priset_argc = 6;
-    char * const priset_argv[priset_argc] = {"priset", "-l", argv[1], "-w", argv[2], "-s"};
+    char * const priset_argv[priset_argc] = {"priset", "-l", argv[2], "-w", argv[3], "-s"};
     for (unsigned i = 0; i < priset_argc; ++i) std::cout << priset_argv[i] << " ";
     std::cout << std::endl;
 
@@ -125,53 +152,31 @@ int main(int argc, char ** argv)
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
-    // collect unique primer sequences
-    std::unordered_set<uint64_t> kmers_unique;
+    // get unique primers that are part of pairs into file
+    fs::path primer_file = su.tmp_dir / ("primers_" + taxid + ".csv");
+    std::unordered_set<std::string> kmers_unique;
+    write_primer_file<TKmerIDs, TPairList>(kmerIDs, pairs, primer_file, kmers_unique);
 
-    auto i = 0;
-    for (TPair<TCombinePattern<TKmerID, TKmerLength>> pair : pairs)
+    // file containing published primers as regular expression due to some ambiguous bps
+    fs::path primers_known = "/Users/troja/git/PriSet_git2/PriSeT/tests/ecology_primers_regex.fasta";
+    std::map<std::pair<std::string, std::string>, uint16_t> matches;
+    init_primer_search(primers_known, matches);
+
+    // Iterate over regex and unique kmer strings and report matches
+    for (auto it = matches.begin(); it != matches.end(); ++it)
     {
-        if (!i)
+        for (std::string const & kmer_str : kmers_unique)
         {
-            std::cout << "pair.reference =\t" << pair.reference << std::endl;
-            std::cout << "pair.r_fwd =\t" << pair.r_fwd << std::endl;
-            std::cout << "pair.r_rev =\t" << pair.r_rev << std::endl;
-            std::cout << "pair.cp =\t" << pair.cp.to_string() << std::endl;
-            std::cout << "kmer_fwd =\t" << kmerIDs[pair.reference][pair.r_fwd] << std::endl;
-            std::cout << "kmer_rev =\t" << kmerIDs[pair.reference][pair.r_rev] << std::endl;
-
+            std::regex const primer_rx(it->first.second);
+            bool found = std::regex_match(kmer_str, primer_rx);
+            if (found)
+                ++(it->second);
         }
-        TKmerID kmer_fwd = kmerIDs[pair.reference][pair.r_fwd];
-        TKmerID kmer_rev = kmerIDs[pair.reference][pair.r_rev];
-        for (uint8_t i = 0; i < 100; ++i)
-        {
-            if (pair.cp[i])
-            {
-                if (!kmer_fwd)
-                {
-                    std::cout << "ERROR: kmer_fwd = " << kmer_fwd << " is 0ULL\n";
-                    exit(0);
-                }
-                if (!kmer_rev)
-                {
-                    std::cout << "ERROR: kmer_fwd = " << kmer_rev << " is 0ULL\n";
-                    exit(0);
-                }
-
-                kmers_unique.insert(get_code(kmer_fwd, ONE_LSHIFT_63 >> (i/10)));
-                kmers_unique.insert(get_code(kmer_rev, ONE_LSHIFT_63 >> (i % 10)));
-            }
-        }
+        std::cout << "(" << it->first.first << ", " << it->first.second << "): " << it->second << std::endl;
     }
-    // write primers into file
-    fs::path primer_file = su.tmp_dir / "primers_3041.csv";
 
-    std::ofstream ofs;
-    ofs.open(primer_file);
-    ofs << "primer\n";
-    for (auto primer : kmers_unique)
-        ofs << dna_decoder(primer) << "\n";
-    ofs.close();
-    std::cout << "MESSAGE: output written to " << primer_file << std::endl;
+
+
+
     return 0;
 }

@@ -14,16 +14,16 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "../combine_types.hpp"
-#include "../filter.hpp"
-#include "../primer_cfg_type.hpp"
-#include "../types.hpp"
-#include "../utilities.hpp"
+#include "../src/combine_types.hpp"
+#include "../src/filter.hpp"
+#include "../src/primer_cfg_type.hpp"
+#include "../src/types.hpp"
+#include "../src/utilities.hpp"
 
 namespace fs = std::experimental::filesystem;
 using namespace priset;
 
-// g++ ../PriSeT/src/tests/chemistry_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -I .. -o chemistry_test
+// g++ ../PriSeT/tests/chemistry_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -I .. -o chemistry_test
 
 //seqan::String<priset::dna> dna_decoder(uint64_t code, uint64_t const mask);
 // called in combiner
@@ -146,6 +146,20 @@ void filter_CG_clamp_test()
     res = filter_CG_clamp(kmerID, '-');
     if (res)
         std::cout << "ERROR: expect false, got true.\n";
+    else
+        std::cout << "INFO: Success\n";
+    std::cout << "---------------------------------------------\n";
+    kmerID = (1ULL << 62) + dna_encoder("GAATGCCTAGTAAGCGC");
+    res = filter_CG_clamp(kmerID, '+');
+    if (res)
+        std::cout << "ERROR: expect false, got true.\n";
+    else
+        std::cout << "INFO: Success\n";
+
+    // now test kmer[0:16] which should pass test
+    res = filter_CG_clamp(kmerID, '+', ONE_LSHIFT_63);
+    if (!res)
+        std::cout << "ERROR: expect true, got false.\n";
     else
         std::cout << "INFO: Success\n";
 }

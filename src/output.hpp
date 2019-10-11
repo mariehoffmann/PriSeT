@@ -5,6 +5,7 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <unordered_set>
 
 #include "chemistry.hpp"
 #include "combine_types.hpp"
@@ -13,7 +14,12 @@
 #include "types.hpp"
 #include "utilities.hpp"
 
+namespace priset
+{
 // forward declaration
+uint64_t get_code(uint64_t const code_, uint64_t mask);
+std::string dna_decoder(uint64_t code, uint64_t const mask);
+
 //template<typename TKmerIDs>
 //void unique_kmers(TKmerIDs const & kmerIDs, std::set<uint64_t> & set);
 
@@ -30,10 +36,60 @@ void write_primer_info_file(io_cfg_type const & io_cfg, primer_cfg_type const & 
     uint64_t i = 0;
     for (TKmerID kmerID : kmer_ordered_set)
     {
-        primer_table << (i++) << "," << dna_decoder(kmerID) << "," << get_Tm(primer_cfg, kmerID) << "\n";
+        primer_table << (i++) << "," << dna_decoder(kmerID, 0) << "," << get_Tm(primer_cfg, kmerID) << "\n";
     }
     primer_table.close();
     std::cout << "STATUS: primer_info.csv written to\t" << io_cfg.get_primer_info_file() << std::endl;
+}
+
+/*
+ * Write sequences to file without further sequence information. A handle of the
+ * unique kmers allows further processing of the caller.
+*/
+template<typename TKmerIDs, typename TPairList>
+void write_primer_file(TKmerIDs const & kmerIDs, TPairList const & pairs, fs::path const & primer_file, std::unordered_set<std::string> & kmers_unique_str)
+{
+    std::unordered_set<uint64_t> kmers_unique;
+    // TPair<TCombinePattern<TKmerID, TKmerLength>>
+    for (auto pair : pairs)
+    {
+        uint64_t kmer_fwd = kmerIDs.at(pair.reference).at(pair.r_fwd - 1);
+        uint64_t kmer_rev = kmerIDs.at(pair.reference).at(pair.r_rev - 1);
+
+        for (uint8_t i = 0; i < 100; ++i)
+        {
+            if (pair.cp[i])
+            {
+                uint64_t code_fwd = get_code(kmer_fwd & ~PREFIX_SELECTOR, ONE_LSHIFT_63 >> (i/10));
+                uint64_t code_rev = get_code(kmer_rev & ~PREFIX_SELECTOR, ONE_LSHIFT_63 >> (i % 10));
+
+                if (!code_fwd)
+                {
+                    std::cout << "ERROR: kmer_fwd = " << kmer_fwd << " called with get_code(..., " << (ONE_LSHIFT_63 >> (i/10)) << ") is 0ULL\n";
+                    exit(0);
+                }
+                if (!code_rev)
+                {
+                    std::cout << "ERROR: kmer_fwd = " << kmer_rev << " called with get_code(..., 1<<(63 - " << (i % 10) << ") is 0ULL\n";
+                    exit(0);
+                }
+                kmers_unique.insert(code_fwd);
+                kmers_unique.insert(code_rev);
+            }
+        }
+    }
+
+    std::ofstream ofs(std::string(primer_file), std::ofstream::out);
+    ofs << "primer\n";
+    for (auto primer : kmers_unique)
+    {
+        auto primer_str = dna_decoder(primer, 0);
+        kmers_unique_str.insert(primer_str);
+        ofs << primer_str << "\n";
+    }
+    ofs.close();
+    std::cout << "MESSAGE: output written to " << primer_file << std::endl;
+
 }
 
 struct pair_hash
@@ -175,3 +231,5 @@ void create_table(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg
     write_primer_info_file(io_cfg, primer_cfg, kmer_locations);
     */
 }
+
+} // namespace priset

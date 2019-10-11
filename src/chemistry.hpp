@@ -211,23 +211,20 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
     kmerID += prefix;
 }
 
-//  Check if not more than 3 out of the 5 last bases at the 3' end are CG.
-//  DNA sense/'+': 5' to 3', antisense/'-': 3' to 5'
+// Check if not more than 3 out of the 5 last bases at the 3' end are CG.
+// DNA sense/'+': 5' to 3' tests last 5 bps, antisense/'-': 3' to 5' tests first 5 bps
 // Returns false if constraint is violated.
 extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
-    assert(sense == '+' || sense == '-');
-    //63 - 23 = 40/2
-    uint8_t encoded_len = (63 - __builtin_clzl(kmerID & ~PREFIX_SELECTOR)) >> 1;
-    uint64_t code = kmerID & ~PREFIX_SELECTOR;
+    auto [prefix, code] = split(kmerID);
+    uint64_t encoded_len = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
     if (sense == '-')
         code >>= (encoded_len << 1) - 10; // shift right to have prefix of length 10
     else
     {
-        uint8_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask);
+        uint64_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask ? mask : prefix);
         code >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
     }
-
     return  ((((code & 3) | ((code & 3) + 1)) == 3) +
             ((((code >> 2) & 3) | (((code >> 2) & 3) + 1)) == 3) +
             ((((code >> 4) & 3) | (((code >> 4) & 3) + 1)) == 3) +
