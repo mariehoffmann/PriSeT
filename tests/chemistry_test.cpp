@@ -215,11 +215,31 @@ void chemical_filter_single_pass_test()
         std::cout << "INFO: Success\n";
 }
 
+void chemical_debug()
+{
+    std::string s = "CAGCAGCCGCGGTAATTCC";
+    std::string t = "GCTTAATTTGACTCAACACGGG";
+    TKmerID kmer_s = dna_encoder(s) + (1ULL << 60);
+    TKmerID kmer_t = dna_encoder(t) + (1ULL << 57);
+    chemical_filter_single_pass(kmer_s);
+    if (!(PREFIX_SELECTOR & kmer_s))
+        std::cout << "ERROR: expect s to pass filter\n";
+    else
+        std::cout << "SUCCESS for s\n";
+
+    chemical_filter_single_pass(kmer_t);
+    if (!(PREFIX_SELECTOR & kmer_t))
+        std::cout << "ERROR: expect t to pass filter\n";
+    else
+        std::cout << "SUCCESS for t\n";
+}
+
 int main()
 {
 //    test_dTM();
 //    filter_repeats_runs_test();
-    filter_CG_clamp_test();
+//    filter_CG_clamp_test();
 //    chemical_filter_single_pass_test();
+chemical_debug();
     return 0;
 }

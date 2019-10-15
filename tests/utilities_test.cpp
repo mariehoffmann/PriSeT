@@ -31,7 +31,7 @@ void get_code_test()
     std::string s17 = "AAAACCCCAAAACCCCT";
     TKmerID kmerID = (3ULL << 62) + dna_encoder(s17);
     uint64_t code = get_code(kmerID, 1ULL << 63);
-    if (s17.compare(0, 16, dna_decoder(code, 1ULL << 63)) != 0)
+    /*if (s17.compare(0, 16, dna_decoder(code, 1ULL << 63)) != 0)
         std::cout << "ERROR: expect " << s17.substr(0, 16) << ", got " << dna_decoder(code, 1ULL << 63) << std::endl;
     else
         std::cout << "SUCCESS\n";
@@ -40,19 +40,38 @@ void get_code_test()
         std::cout << "ERROR: expect " << s17 << ", got " << dna_decoder(code, 1ULL << 62) << std::endl;
     else
         std::cout << "SUCCESS\n";
-
+*/
     code = get_code(kmerID, 0);
     if (code != dna_encoder(s17))
         std::cout << "ERROR: expect " << dna_encoder(s17) << ", got " << code << std::endl;
     else
         std::cout << "SUCCESS\n";
 
+    std::string s = "CAGCAGCCGCGGTAATTCC";
+    code = get_code(dna_encoder(s));
+    std::cout << "get_code(s) = " << code << std::endl;
+
+    std::string s2 = "CAGCAGCCGCGGTAATTCCG";
+    auto code2 = get_code(dna_encoder(s), 1ULL << (63-3));
+    if (code != code2)
+        std::cout << "ERROR: expect " << code << ", got " << code2 << std::endl;
+    else
+        std::cout << "SUCCESS\n";
 }
 
 int main()
 {
+    /*
+    kmerID =	16070356149012225618
+    get_code =	369306287669
+    dna_decode =	CCCTTTACCTGGTTGATCC
+    */
+    std::string s = "CAGCAGCCGCGGTAATTCCC";
+    uint64_t code = dna_encoder(s);
+    std::cout << "s = \t\t" << s << std::endl;
+    std::cout << "code = \t\t" << code << std::endl;
+    std::cout << "decode = \t" << dna_decoder(code, 1ULL << 60) << std::endl;
 
-    std::cout << "bitstring = " << bits2str(4611686052095991156ULL) << std::endl;
-    //    get_code_test();
+    //get_code_test();
     return 0;
 }

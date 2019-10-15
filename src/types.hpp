@@ -172,6 +172,14 @@ public:
 
 };
 
+struct TPrimerPair
+{
+    std::string name_fwd;
+    uint64_t code_fwd;
+    std::string name_rev;
+    uint64_t code_rev;
+};
+
 // Result table output for app
 struct TResult
 {

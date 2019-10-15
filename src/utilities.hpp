@@ -125,7 +125,8 @@ extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
     //std::cout << "Leading zero count = " << __builtin_clzl(code) << std::endl;
     uint8_t enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
     if (!mask)
-        prefix = ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN);
+        mask = ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN);
+
     //std::cout << "Encoded length = " << int(enc_l) << std::endl;
     uint8_t mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
     //std::cout << "Target length = " << int(mask_l) << std::endl;

@@ -46,7 +46,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     }
     std::cout << loc_fwd_empty << " out of " << locations.size() << " fwd locations are empty\n";
     std::cout << loc_fwd_rev_empty << " out of " << locations.size() << " fwd and rev locations are empty\n";
-    std::cout << kmer_less_10 << " have frequencies below 10\n";
 
     references.clear();
     kmerIDs.clear();
@@ -154,6 +153,8 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             }
         //    std::cout << "4\n";
             references[seqNo_cx][seqPos] = 1;
+            if (seqPos == 515 || seqPos == 1086)
+                std::cout << "DEBUG: reference bit set at pos = " << seqPos << std::endl;
             //std::cout << "DEBUG: K = " << K << ", PRIMER_MIN_LEN = " << PRIMER_MIN_LEN << ", PRIMER_MAX_LEN = " << PRIMER_MAX_LEN << std::endl;
             if (uint64_t(K) > PRIMER_MAX_LEN)
                 throw std::invalid_argument("ERROR: kmer length difference exceeds 12 + primer_min_length - 1 bp!");
@@ -199,11 +200,13 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             seqan::DnaString seq = seqan::valueById(text, seqNo);
 
             TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k_max);
+
             TKmerID kmerID = kmerID_prefix + dna_encoder(kmer_str);
 
             // erase those length bit in prefix corresponding to kmers not passing the filter
             // TODO: kmerID trimmed to maximal encoded length?
             chemical_filter_single_pass(kmerID);
+
             // do not store Kmer and reset bit in reference
             if (!(PREFIX_SELECTOR & kmerID))
                 references[i][seqPos] = 0;
@@ -214,17 +217,20 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             }
         }
     }
-    // TODO: delete references with no more bits, or too inefficient w.r.t. possible space gain?
-    /*for (auto kmerID_list : kmerIDs)
-    {
-        for (auto kmerID : kmerID_list)
-            if (!kmerID)
-            {
-                std::cout << "ERROR: kmerID = 0" << std::endl;
-                exit(0);
-            }
-    }*/
-//    locations.clear();
+    std::cout << "reference: " << references[0] << std::endl;
+    // ranking shifted by one, maybe first element misssing?
+    std::cout << "first kmerID = " << dna_decoder(kmerIDs[0][0]) << std::endl;
+    // TODO: can we now pair them with same logic as applied in combiner?
+    std::cout << "references[0][515] = " << references[0][515] << std::endl;
+    std::cout << "references[0][1086] = " << references[0][1086] << std::endl;
+    sdsl::rank_support_v5<1> r1s2(&references[0]); // check if once initialized modification of references[i] does not invalidate rank support
+    sdsl::select_support_mcl<1,1> s1s2(&references[0]);
+    std::cout << "rank at 515: " << r1s2.rank(515+1) << std::endl;
+    std::cout << "rank at 1086: " << r1s2.rank(1086+1) << std::endl;
+    auto r = r1s2.rank(1086+1);
+    std::cout << "reverse corresponds to " << dna_decoder(kmerIDs[0][r-1]) << std::endl;
+    std::cout << "forward corresponds to " << dna_decoder(kmerIDs[0][r1s2.rank(515+1)-1]) << std::endl;
+
 }
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
@@ -307,12 +313,12 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                     }
                     // update mask and dependent search window boundaries
                     mask_fwd >>= 1;
-                    ++w_begin;
+                    //++w_begin;
                     // Note: references are truncated to the last 1-bit, hence last window start position is reference.size()-1
                     // window end position (exclusive)
                     // continue with next kmer combination since we are outside of search window
-                    if ((w_begin > reference.size() - 1) || (w_end < w_begin + TRANSCRIPT_MIN_LEN))
-                        break;
+                    /*if ((w_begin > reference.size() - 1) || (w_end < w_begin + TRANSCRIPT_MIN_LEN))
+                        break;*/
                 } // length mask_fwd
                 if (cp.is_set())
                 {
