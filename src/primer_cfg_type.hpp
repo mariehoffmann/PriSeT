@@ -31,10 +31,10 @@ namespace priset
 // Mask selection, i.e. 10 leading bits and rest 0 or ~(1 << 54) - 1)
 #define PREFIX_SELECTOR 18428729675200069632ULL
 
-// The minimal primer length (or a kmer).
+// The minimal primer length (or a kmer). Recommended: 18.
 #define PRIMER_MIN_LEN 16ULL
 
-// The maximal primer length (or a kmer).
+// The maximal primer length (or a kmer). Recommended: 22.
 #define PRIMER_MAX_LEN 25ULL
 
 // The minimal transcript length.
@@ -43,27 +43,27 @@ namespace priset
 // The minimal transcript length.
 #define TRANSCRIPT_MAX_LEN 800
 
-// The minimal primer melting temperature.
-#define PRIMER_MIN_TM 59.0
+// The minimal primer melting temperature. Recommended 52.
+#define PRIMER_MIN_TM 46.0
 
-// The maximal primer melting temperature.
-#define PRIMER_MAX_TM 76.0
+// The maximal primer melting temperature. Recommended 58.
+#define PRIMER_MAX_TM 64.0
 
 // Maximal permitted temperature difference [Kelvin] of primers.
 // Differences above 5 Kelvin can lead to no amplification.
-#define PRIMER_DTM 22
+#define PRIMER_DTM 8
 
-// The lower bound for relative CG content.
-#define CG_MIN_CONTENT .34
+// The lower bound for relative CG content. Recommended: 0.4.
+#define CG_MIN_CONTENT .3
 
-// The upper bound for relative CG content.
+// The upper bound for relative CG content. Recommended: 0.6.
 #define CG_MAX_CONTENT .7
 
 // The minimal distance (bp) between two identical kmers on same reference.
 #define TRAP_DIST 400
 
 // Lower kmer frequency cutoff, i.e. all kmer occurences below will be dropped.
-#define FREQ_KMER_MIN 1
+#define FREQ_KMER_MIN 2
 
 // Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
 #define FREQ_PAIR_MIN 5

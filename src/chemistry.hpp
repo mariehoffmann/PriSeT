@@ -32,59 +32,54 @@ std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
 extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID const kmerID2, TKmerID const mask2)
 {
     if (!(kmerID1 & mask1) || !(kmerID2 & mask2))
-    {
-        std::cout << "Error: target mask bit not set\n";
-        exit(0);
-    }
+        std::cerr << "Error: target mask bit not set\n";
+
     // remove length mask
     TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR ;
     TKmerID code2 = kmerID2 & ~PREFIX_SELECTOR;
 
-    auto enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(code1)) >> 1; // encoded length
-    auto mask_l1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;      // selected length
-    code1 >>= (enc_l1 - mask_l1) << 1;   // string correction
+    uint8_t enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(code1)) >> 1; // encoded length
+    uint8_t mask_l1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;      // selected length
 
-    auto enc_l2 = (WORD_SIZE - 1 - __builtin_clzl(code2)) >> 1; // encoded length
-    auto mask_l2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;      // selected length
-    code2 >>= (enc_l2 - mask_l2) << 1;   // string correction
+    uint8_t enc_l2 = (WORD_SIZE - 1 - __builtin_clzl(code2)) >> 1; // encoded length
+    uint8_t mask_l2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;      // selected length
+
+    if (mask_l1 > enc_l1 || mask_l2 > enc_l2)
+        std::cerr << "ERROR: largest encoded kmer length undershoots target length!\n";
+
+    // trim kmer if overlong
+    code1 >>= (enc_l1 - mask_l1) << 1;
+    code2 >>= (enc_l2 - mask_l2) << 1;
+
+    //std::cout << "dTm: enc_l1 = " << enc_l1 << ", mask_l1 = " << mask_l1 << std::endl;
+    //std::cout << "dTm: enc_l2 = " << enc_l2 << ", mask_l2 = " << mask_l2 << std::endl;
 
     //std::cout << "corrected code = " << dna_decoder(code1) << std::endl;
     //std::cout << "corrected code2 = " << dna_decoder(code2) << std::endl;
-    int8_t ctr_AT = 0;
-    int8_t ctr_CG = 0;
+    int8_t AT = 0;
+    int8_t CG = 0;
+
     if (!(__builtin_clzl(code1) % 2))
-    {
-        std::cout << "ERROR: expected odd number of leading zeros\n";
-        exit(0);
-    }
+        std::cerr << "ERROR: expected odd number of leading zeros\n";
+
     if (!(__builtin_clzl(code2) % 2))
-    {
-        std::cout << "ERROR: expected odd number of leading zeros\n";
-        exit(0);
-    }
+        std::cerr << "ERROR: expected odd number of leading zeros\n";
+
     while (code1 != 1)
     {
-        if (!(code1 & 3) || (code1 & 3) == 3)  // 'A' (00) or 'T' (11)
-            ++ctr_AT;
-        else
-            ++ctr_CG;
+        // 'A' (00) or 'T' (11)
+        (!(code1 & 3) || (code1 & 3) == 3) ? ++AT : ++CG;
         code1 >>= 2;
     }
     while (code2 != 1)
     {
-        if (!(code2 & 3) || (code2 & 3) == 3)  // 'A' (00) or 'T' (11)
-            --ctr_AT;
-        else
-            --ctr_CG;
+        (!(code2 & 3) || (code2 & 3) == 3) ? --AT : --CG;
         code2 >>= 2;
     }
-    return (std::abs(ctr_AT) << 1) + (abs(ctr_CG) << 2);
+    return std::abs(2 * AT + 4 * CG);
 }
 
-// Compute melting temperature according to Wallace method, i.e. Tm = 2*|AT| + 4*|CG|.
-// If the kmer ID contains length information in the prefix, the code will be trimmed
-// to the encoded length, otherwise the Tm for the encoded length is taken.
-// It is assumed that at most one length bit is set!
+// Mumur formular Tm = 2AT + 4CG
 extern inline uint8_t Tm(TKmerID kmerID)
 {
     auto [prefix, code] = split(kmerID);
@@ -114,7 +109,7 @@ extern inline uint8_t Tm(TKmerID kmerID)
 // input primer:string sequence, Na:float molar Natrium ion concentration
 extern inline float primer_melt_salt(TKmerID code, float const Na)
 {
-    uint8_t ctr_CG = 0;
+    uint8_t CG = 0;
     uint8_t seq_len = 0;
     std::array<char, 4> decodes = {'A', 'C', 'G', 'T'};
     while (code != 1)
@@ -122,12 +117,12 @@ extern inline float primer_melt_salt(TKmerID code, float const Na)
         switch(decodes[3 & code])
         {
             case 'C':
-            case 'G': ++ctr_CG;
+            case 'G': ++CG;
         }
         code >>= 2;
         ++seq_len;
     }
-    return 100.5 + 41.0 * ctr_CG / seq_len - 820.0 / seq_len + 16.6 * std::log10(Na);
+    return 100.5 + 41.0 * CG / seq_len - 820.0 / seq_len + 16.6 * std::log10(Na);
 }
 
 /* !\brief Check for low energy secondary structures.
@@ -160,7 +155,6 @@ std::string kmerID2str(TKmerID kmerID);
  */
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
-    //std::cout << "Enter filter_repeats_runs\n";
     auto [prefix, code] = split(kmerID);
     if (!code)
         throw std::invalid_argument("Expected kmerID non zero!");
@@ -195,12 +189,11 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
                  (tail_20 == 0b01110111011101110111) || (tail_20 == 0b11011101110111011101) ||
                  (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
             {
-                //std::cout << "DEBUG: match for di-nucl run in tail: " << dna_decoder(code, 0) << std::endl;
+                //std::cout << "DEBUG: match for di-nucl run in tail!" << std::endl;
                 // delete all k bits ≥ len_selector
                 uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
                 // delete all k bits ≥ len_selector
                 prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
-                //std::cout << "DEBUG: new bit prefix = " << bits2str<uint64_t>(prefix >> 54) << std::endl;
             }
         }
         if (!prefix)
@@ -250,8 +243,8 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     assert(kmerID > 0 && code > 0);
     uint8_t AT = 0; // counter 'A'|'T'
     uint8_t CG = 0; // counter 'C'|'G'
-    uint64_t length_bit_selector = ONE_LSHIFT_63;
-    uint8_t l = 1; // current length
+
+    // sum CG, AT content for longest kmer
     while (code != 1)
     {
         switch(3 & code)
@@ -260,31 +253,38 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             case 2: ++CG; break;
             default: ++AT;
         }
+        code >>= 2;
+    }
+    code = kmerID & ~PREFIX_SELECTOR;
+    // start with largest kmer
+    uint64_t tailing_zeros = ffsll((kmerID & PREFIX_SELECTOR) >> 54) - 1;
+    uint64_t mask = 1ULL << (54 + tailing_zeros);
+    for (uint8_t i = 0; i < 10 - tailing_zeros; ++i)
+    {
 
-        if (l >= PRIMER_MIN_LEN)
+        if (kmerID & mask)
         {
-            if (kmerID & length_bit_selector)
+            // reset bit if Tm out of range
+            auto Tm = (AT << 1) + (CG << 2);
+            if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
             {
-                //std::cout << "kmerID & length_bit_selector true ...\t" << bits2str(length_bit_selector>>54) << std::endl;
-                // reset bit if Tm out of range
-                auto Tm = (AT << 1) + (CG << 2);
-                //std::cout << "Tm = " << Tm << std::endl;
-                // cmp asm cmds: abs((AT << 1) + (CG << 2) - (PRIMER_MAX_TM+PRIMER_MIN_TM)/2) <= (PRIMER_MAX_TM-PRIMER_MIN_TM)/2 vs.
-
-                if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
-                    kmerID ^= length_bit_selector;
-
-                else
-                {
-                    float CG_content = float(CG) / (float(__builtin_clzl(length_bit_selector) + PRIMER_MIN_LEN));
-                    if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
-                        kmerID ^= length_bit_selector;
-                }
+                kmerID ^= mask;
             }
-            length_bit_selector = std::max(ONE_LSHIFT_63 >> 9, length_bit_selector >> 1);
+            else
+            {
+                float CG_content = float(CG) / (float(__builtin_clzl(mask) + PRIMER_MIN_LEN));
+                if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
+                    kmerID ^= mask;
+            }
+        }
+        switch(3 & code)
+        {
+            case 1:
+            case 2: --CG; break;
+            default: --AT;
         }
         code >>= 2;
-        ++l;
+        mask <<= 1;
     }
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
@@ -311,8 +311,8 @@ extern inline float gibbs_free_energy(seqan::String<priset::dna> const & s, seqa
     int8_t const m = seqan::length(t);
     int8_t s1, s2;
     int8_t t1, t2;
-    int8_t ctr_AT, ctr_CG;
-    auto energy = [](int8_t const & ctr_CG, int8_t const &ctr_AT) { return -(ctr_CG + 2*ctr_AT);};
+    int8_t AT, CG;
+    auto energy = [](int8_t const & CG, int8_t const &AT) { return -(CG + 2*AT);};
     //auto lambda = [](const std::string& s) { return std::stoi(s); };
     int8_t energy_min = 0;
     for (int8_t i = 0; i < n + m - 2 * offset + 1; ++i)
@@ -322,21 +322,21 @@ extern inline float gibbs_free_energy(seqan::String<priset::dna> const & s, seqa
         t2 = std::min<int8_t>(i + offset, m);
         s2 = std::min<int8_t>(s1 + t2 - t1, n);
         // count complementary bps
-        ctr_CG = 0;
-        ctr_AT = 0;
+        CG = 0;
+        AT = 0;
         for (auto j = 0; j < s2-s1; ++j)
         {
             switch(char(s[s1+j]))
             {
-                case 'A': ctr_AT += (t[t1+j] == 'T') ? 1 : 0; break;
-                case 'T': ctr_AT += (t[t1+j] == 'A') ? 1 : 0; break;
-                case 'C': ctr_CG += (t[t1+j] == 'G') ? 1 : 0; break;
-                case 'G': ctr_CG += (t[t1+j] == 'C') ? 1 : 0; break;
+                case 'A': AT += (t[t1+j] == 'T') ? 1 : 0; break;
+                case 'T': AT += (t[t1+j] == 'A') ? 1 : 0; break;
+                case 'C': CG += (t[t1+j] == 'G') ? 1 : 0; break;
+                case 'G': CG += (t[t1+j] == 'C') ? 1 : 0; break;
                 default: std::cout << "ERROR: primer contains unknown symbol '" << s[s1+j] << "'" << std::endl;
             }
             // update minimal energy
-            if (energy(ctr_CG, ctr_AT) < energy_min)
-                energy_min = energy(ctr_CG, ctr_AT);
+            if (energy(CG, AT) < energy_min)
+                energy_min = energy(CG, AT);
         }
     }
     return energy_min;

@@ -217,29 +217,49 @@ void chemical_filter_single_pass_test()
 
 void chemical_debug()
 {
-    std::string s = "CAGCAGCCGCGGTAATTCC";
-    std::string t = "GCTTAATTTGACTCAACACGGG";
-    TKmerID kmer_s = dna_encoder(s) + (1ULL << 60);
-    TKmerID kmer_t = dna_encoder(t) + (1ULL << 57);
-    chemical_filter_single_pass(kmer_s);
-    if (!(PREFIX_SELECTOR & kmer_s))
-        std::cout << "ERROR: expect s to pass filter\n";
-    else
-        std::cout << "SUCCESS for s\n";
+    TKmerID kmerID1 = 18411191439941538145ULL;
+    //, decoded: GTACACACCGCCCGTCGCACCGAC with length bits: 1111111110
+    TKmerID V9_fwd = dna_encoder("GTACACACCGCCCGTCGCACCGAC") + PREFIX_SELECTOR - (1ULL << 54);
+    std::cout << "reconstructed: " << (V9_fwd == kmerID1) << std::endl;
+    chemical_filter_single_pass(V9_fwd);
+    std::cout << "V9 fwd after chem filter: " << kmerID2str(V9_fwd) << std::endl;
+    TKmerID V9_rev = dna_encoder("GTAGGTGAACCTGCAGAAGGATCA") +  (1ULL << 55);
+    chemical_filter_single_pass(V9_rev);
+    std::cout << "V9 rev after chem filter: " << kmerID2str(V9_rev) << std::endl;
 
-    chemical_filter_single_pass(kmer_t);
-    if (!(PREFIX_SELECTOR & kmer_t))
-        std::cout << "ERROR: expect t to pass filter\n";
-    else
-        std::cout << "SUCCESS for t\n";
+    std::unordered_set<uint64_t> EUK15_fwds{dna_encoder("CCAGCACCCGCGGTAATTCC"), dna_encoder("CCAGCACCTGCGGTAATTCC"), dna_encoder("CCAGCAGCCGCGGTAATTCC"), dna_encoder("CCAGCAGCTGCGGTAATTCC")};
+    for (uint64_t code : EUK15_fwds)
+    {
+        code += 1ULL << 59;
+        chemical_filter_single_pass(code);
+        std::cout << "EUK15 fwd variant passed chemical filter: " << ((code & (1ULL << 59)) ? 1 : 0) << std::endl;
+    }
+    std::unordered_set<uint64_t> EUK15_revs{dna_encoder("TCAATCAAGAACGAAAGT"), dna_encoder("TCGATCAAGAACGAAAGT"), dna_encoder("TTAATCAAGAACGAAAGT"), dna_encoder("TTGATCAAGAACGAAAGT")}; //
+    for (uint64_t code : EUK15_revs)
+    {
+        code += 1ULL << 61;
+        chemical_filter_single_pass(code);
+        std::cout << "EUK15 rev variant passed chemical filter: " << ((code & (1ULL << 61)) ? 1 : 0) << std::endl;
+    }
+
+    //
+    uint64_t mask_rev = 1ULL << 61;
+    uint64_t kmerID_rev = dna_encoder("TTAATCAAGAACGAAAGT") + (1ULL << 61); // 46
+
+    uint64_t mask_fwd = 1ULL << 59;
+    uint64_t kmerID_fwd = dna_encoder("CCAGCAGCCGCGGTAATTCC") + (1ULL << 59); // 66
+    std::cout << "Would pass dTM: ";
+    std::cout << (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM) << std::endl;
+    std::cout << "dTm = " << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev)  << " and PRIMER_DTM = " << PRIMER_DTM << std::endl;
 }
+
 
 int main()
 {
+    chemical_debug();
 //    test_dTM();
 //    filter_repeats_runs_test();
 //    filter_CG_clamp_test();
 //    chemical_filter_single_pass_test();
-chemical_debug();
     return 0;
 }

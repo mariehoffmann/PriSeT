@@ -146,18 +146,13 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
         code = get_code(code_, mask);
     else
         code &= ~PREFIX_SELECTOR;
-    //std::cout << "code without prefix: " << bits2str(code) << std::endl;
 
     // TODO: use global
     std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
     uint8_t n = (63 - __builtin_clzl(code)) >> 1;
-    //std::cout << "encoded length = " << int(n) << std::endl;
     char seq[n];
     for (uint8_t i = 1; i <= n; ++i, code >>= 2)
-    {
-        //std::cout << "DEBUG: i = " << int(i) << ", 3 & code = " << (3 & code) << std::endl;
         seq[n - i] = alphabet[3 & code];
-    }
     return std::string(seq, n);
 }
 
@@ -191,7 +186,7 @@ extern inline void dna_decoder(uint64_t kmerID, std::vector<TSeq> & decodes)
 
 extern inline uint64_t location_encode(TSeqNo seqNo, TSeqPos seqPos)
 {
-    return (seqNo << 10ULL) + seqPos;
+    return (seqNo << 32) + seqPos;
 }
 
 // print binary format
