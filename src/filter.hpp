@@ -28,25 +28,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
-    //typename TKLocations::const_iterator it_aux = locations.begin();
-
-    auto loc_fwd_empty = 0;
-    auto loc_fwd_rev_empty = 0;
-    auto kmer_less_10 = 0;
-    for (auto it = locations.begin(); it != locations.end(); ++it)
-    {
-        if (!it->second.first.size())
-            ++loc_fwd_empty;
-        if (!it->second.first.size() && !it->second.second.size())
-            ++loc_fwd_rev_empty;
-        if (it->second.first.size() < FREQ_KMER_MIN && it->second.second.size() < FREQ_KMER_MIN)
-            ++kmer_less_10;
-//        else
-//            std::cout << "(" << std::get<0>(it_aux->first) << ", " << std::get<1>(it_aux->first) << "): [(" << seqan::getValueI1<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ", "  << seqan::getValueI2<TSeqNo, TSeqPos>(it_aux->second.first[0]) << ") ...]\n";
-    }
 
     references.clear();
     kmerIDs.clear();
+    // lower bound for kmer frequency
+    unsigned freq_kmer_min_abs = FREQ_KMER_MIN; //io_cfg.get_freq_kmer_min();
+
     // load corpus for dna to 64 bit conversion
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
     fs::path text_path = io_cfg.get_index_txt_path();
@@ -59,9 +46,9 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // resetLimits in mapper may lead to empty kmer occurrences
-        if ((it->second).first.size() < FREQ_KMER_MIN)
+        if ((it->second).first.size() < freq_kmer_min_abs)
         {
-            std::cout << "continue because FREQ_KMER_MIN = " << FREQ_KMER_MIN << std::endl;
+            std::cout << "continue because FREQ_KMER_MIN = " << freq_kmer_min_abs << std::endl;
             continue;
         }
         const auto & [seqNo, seqPos, K] = it->first;
@@ -112,7 +99,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
         //std::cout << "1\n";
         // cleanup in mapper may lead to undercounting kmer occurrences
         // TODO: move kmer frequency cutoff completely into mapper
-        if ((it->second).first.size() < FREQ_KMER_MIN)
+        if ((it->second).first.size() < freq_kmer_min_abs)
             continue; //std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
@@ -197,11 +184,8 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             // Check if bit is set for V9 forward: yes -> does it remain set after filter
             // No -> why not? all length bits until k_max should be set before filtering!
             TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k_max);
-            bool set_bit = 0;
-            bool set_bit_rev = 0;
-
             TKmerID kmerID = kmerID_prefix + dna_encoder(kmer_str);
-            TKmerID orig = kmerID;
+
             // erase those length bit in prefix corresponding to kmers not passing the filter
             // TODO: kmerID trimmed to maximal encoded length?
             chemical_filter_single_pass(kmerID);
@@ -216,20 +200,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             }
         }
     }
-/*    std::cout << "reference: " << references[0] << std::endl;
-    // ranking shifted by one, maybe first element misssing?
-    std::cout << "first kmerID = " << dna_decoder(kmerIDs[0][0]) << std::endl;
-    // TODO: can we now pair them with same logic as applied in combiner?
-    std::cout << "references[0][515] = " << references[0][515] << std::endl;
-    std::cout << "references[0][1086] = " << references[0][1086] << std::endl;
-    sdsl::rank_support_v5<1> r1s2(&references[0]); // check if once initialized modification of references[i] does not invalidate rank support
-    sdsl::select_support_mcl<1,1> s1s2(&references[0]);
-    std::cout << "rank at 515: " << r1s2.rank(515+1) << std::endl;
-    std::cout << "rank at 1086: " << r1s2.rank(1086+1) << std::endl;
-    auto r = r1s2.rank(1086+1);
-    std::cout << "reverse corresponds to " << dna_decoder(kmerIDs[0][r-1]) << std::endl;
-    std::cout << "forward corresponds to " << dna_decoder(kmerIDs[0][r1s2.rank(515+1)-1]) << std::endl;
-*/
 }
 
 /* Combine based on suitable location distances s.t. transcript length is in permitted range.
@@ -271,36 +241,29 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                 uint64_t mask_fwd = ONE_LSHIFT_63;
                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
-                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd))
+                    // check forward primer not ending with TTT, ATT
+                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd) && filter_WTT_tail(kmerID_fwd, mask_fwd, '+'))
                     {
                         TKmerID const kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
                         uint64_t mask_rev = ONE_LSHIFT_63;
 
                         while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
-                            bool flag = false;
                             cp_ctr++;
                             if (cp_ctr == 1ULL << 63)
                             {
                                 std::cout << "cp_ctr reached 1 << 63, exit\n";
                                 exit(0);
                             }
-                            if ((mask_rev & kmerID_rev && filter_CG_clamp(kmerID_rev, '-'))
+                            if (mask_rev & kmerID_rev && filter_CG_clamp(kmerID_rev, '-') && filter_WTT_tail(kmerID_rev, '-'))
                             {
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
-
+                                    // store combination bit
                                     cp.set(mask_fwd, mask_rev);
-                                    TPrimerKey key{get_code(kmerID_fwd, mask_fwd), get_code(kmerID_rev, mask_rev)};
-                                    if (pairs_known.find(key) != pairs_known.end())
-                                    {
-                                        std::cout << "INFO: primer pair <" << pairs_known[key] << "> found for refID = " << i << " at " << s1s.select(r_fwd) << " and " << s1s.select(r_rev) << std::endl;
-                                        verified.insert(pairs_known[key]);
-                                    }
+
                                     ++stats[KMER_COUNTS::COMBINER_CNT];
-                                    flag = false;
                                 }
-                                flag = false;
                             }
                             mask_rev >>= 1; // does not affect search window, since starting position is fixed
                         } // length mask_rev
@@ -319,8 +282,8 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
 }
 
 // Apply frequency cutoff for unique pair occurences
-template<typename TPairList, TPairFreq>
-void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::vector<TPairFreq> & pair_freqs)
+template<typename TPairList, typename TPairFreq>
+void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::vector<TPairFreq> & pair_freqs, TKmerCounts & kmerCounts)
 {
     std::unordered_map<uint64_t, uint32_t> pairhash2freq;
     std::cout << "Enter filter_pairs ...\n";
@@ -328,7 +291,7 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
     for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
     {
         std::vector<std::pair<uint8_t, uint8_t>> combinations;
-        it_pairs->get_combinations(combinations);
+        it_pairs->cp.get_combinations(combinations);
         TKmerID kmerID_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
         TKmerID kmerID_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
 
@@ -379,6 +342,7 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
                     pair_freqs.push_back(ppf);
                     seen.insert(h);
                 }
+                kmerCounts[KMER_COUNTS::FILTER2_CNT]++;
             }
         }
     }

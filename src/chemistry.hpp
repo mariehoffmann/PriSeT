@@ -80,15 +80,14 @@ extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID cons
 }
 
 // Mumur formular Tm = 2AT + 4CG
-extern inline uint8_t Tm(TKmerID kmerID)
+// If no mask is given, the code is trimmed to the smallest encoded length.
+extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
 {
     auto [prefix, code] = split(kmerID);
-    if (prefix)
-    {
-        auto enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1;
-        auto target_l =  __builtin_clzll(prefix) + PRIMER_MIN_LEN;
-        code >>= (enc_l - target_l) << 1;
-    }
+    auto target_l = PRIMER_MIN_LEN;
+    target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
+    auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
+    code >>= (enc_l - target_l) << 1;
     uint8_t AT = 0;
     uint8_t CG = 0;
     while (code != 1)
@@ -103,6 +102,28 @@ extern inline uint8_t Tm(TKmerID kmerID)
         code >>= 2;
     }
     return (std::abs(AT) << 1) + (abs(CG) << 2);
+}
+
+// CG content computation for output
+extern inline float CG(TKmerID const kmerID, uint64_t const mask)
+{
+    auto [prefix, code] = split(kmerID);
+    auto target_l = PRIMER_MIN_LEN;
+    target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
+    auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
+    code >>= (enc_l - target_l) << 1;
+    enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
+    uint8_t CG = 0;
+    while (code != 1)
+    {
+        switch (code & 3)
+        {
+            case 1:
+            case 2: ++CG;
+        }
+        code >>= 2;
+    }
+    return float(CG)/float(enc_l);;
 }
 
 //!\brief Salt-adjusted method to compute melting temperature of primer sequence.
@@ -223,6 +244,21 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint6
             ((((code >> 4) & 3) | (((code >> 4) & 3) + 1)) == 3) +
             ((((code >> 6) & 3) | (((code >> 6) & 3) + 1)) == 3) +
             ((((code >> 8) & 3) | (((code >> 8) & 3) + 1)) == 3) <= 3) ? true : false;
+}
+
+// primers should not end on TTT or ATT
+extern inline bool filter_WTT_tail(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
+{
+    auto [prefix, code] = split(kmerID);
+    uint64_t encoded_len = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
+    if (sense == '-') // reverse complement!
+    {
+        code >>= (encoded_len << 1) - 6; // shift right to have prefix of length 10
+        return (((code & 0b111111) == 0b000000) || ((code & 0b111111) == 0b000011) ? false : true;
+    }
+    uint64_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask ? mask : prefix);
+    code >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
+    return (((code & 0b111111) == 0b111111) || ((code & 0b111111) == 0b001111) ? false : true;
 }
 
 /*

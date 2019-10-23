@@ -53,6 +53,7 @@ public:
     // The number of combinations stored in data.
     uint64_t size()
     {
+        //std::cout << "Enter size in cp: popcount_0 = " << __builtin_popcountll(data[0]) << ", popcount_1 = " << __builtin_popcountll(data[1]) << std::endl;
         return __builtin_popcountll(data[0]) + __builtin_popcountll(data[1]);
     }
 

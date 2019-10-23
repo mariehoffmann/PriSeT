@@ -83,7 +83,6 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLoc
         // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
         char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", std::to_string(K).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csvRAM", "-fl"};
 
-        // indexing.hpp, int mappabilityMain(int argc, char const ** argv)
         mappabilityMain<TLocations, FREQ_KMER_MIN>(11, argv, loc_per_K);
         TKLocations::iterator it_hint = locations.begin();
         // inserting map pair using hint
