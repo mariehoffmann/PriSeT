@@ -9,6 +9,7 @@
 #pragma once
 
 #include <algorithm>
+#include <bitset>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -231,13 +232,16 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
 extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
     auto [prefix, code] = split(kmerID);
-    uint64_t encoded_len = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
+    uint64_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1; // in bits
     if (sense == '-')
-        code >>= (encoded_len << 1) - 10; // shift right to have prefix of length 10
+        code >>= enc_l - 10; // shift right to have prefix of length 10
     else
     {
-        uint64_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask ? mask : prefix);
-        code >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
+        if (mask)
+        {
+            uint8_t target_l = (PRIMER_MIN_LEN + __builtin_clzl(mask)) << 1; // in bits
+            code >>= enc_l - target_l; // delete prefix and trim to target length
+        }
     }
     return  ((((code & 3) | ((code & 3) + 1)) == 3) +
             ((((code >> 2) & 3) | (((code >> 2) & 3) + 1)) == 3) +
@@ -247,18 +251,67 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint6
 }
 
 // primers should not end on TTT or ATT
-extern inline bool filter_WTT_tail(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
+extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
+    std::unordered_set<uint64_t> const infixes = {0b000000, 0b000011, 0b001100, 0b001111, 0b110000, 0b110011, 0b111100, 0b111111};
     auto [prefix, code] = split(kmerID);
-    uint64_t encoded_len = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
+    uint64_t encoded_len = (WORD_SIZE - __builtin_clzll(code) - 1) >> 1;
+    uint64_t tail;
     if (sense == '-') // reverse complement!
     {
         code >>= (encoded_len << 1) - 6; // shift right to have prefix of length 10
-        return (((code & 0b111111) == 0b000000) || ((code & 0b111111) == 0b000011) ? false : true;
+        tail = code & 0b111111;
+        return (infixes.find(tail) != infixes.end()) ? false : true;
     }
-    uint64_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask ? mask : prefix);
-    code >>= ((encoded_len - target_len) << 1); // delete prefix and trim to target length
-    return (((code & 0b111111) == 0b111111) || ((code & 0b111111) == 0b001111) ? false : true;
+    if (mask)
+    {
+        uint64_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask);
+        code >>= (encoded_len - target_len) << 1; // delete prefix and trim to target length
+    }
+    return (infixes.find(code & 0b111111) != infixes.end()) ? false : true;
+}
+
+// Partial self-annealing test for leading PRIMER_MIN_LEN bps.
+// Deletes complete length mask if 4-more in reverse complement is found.
+extern inline void filter_self_annealing(TKmerID & kmerID)
+{
+    // 2-mer reverse complement map
+    std::array<uint8_t, 16> const lookup = {
+        0b1111, 0b1110, 0b1101, 0b1100,
+        0b1011, 0b1010, 0b1001, 0b1000,
+        0b0111, 0b0110, 0b1101, 0b0100,
+        0b0011, 0b0010, 0b0001, 0b0000};
+    // set bit for 4-mers found in kmerID
+    std::bitset<512> four;
+    auto [prefix, code] = split(kmerID);
+    uint8_t enc_l = (WORD_SIZE - __builtin_clzll(code) - 1);
+    code >>= (enc_l - (PRIMER_MIN_LEN << 1));
+    auto infix_mask = 0b11111111;
+    while (code > (1 << 8))
+    {
+        four.set(infix_mask & code);
+        code >>= 2;
+    }
+    code = kmerID & ~PREFIX_SELECTOR;
+    // trim to last PRIMER_MIN_LEN bps
+    code >>= (enc_l - (PRIMER_MIN_LEN << 1));
+    //std::cout << "CTTC seen: " << ((lookup[0b01111101]) ? 1 : 0) << std::endl;
+    //std::cout << "GAAG seen: " << ((lookup[0b10000010]) ? 1 : 0) << std::endl;
+
+    uint8_t infix = lookup[code & 0b1111]; // last 4 bits
+    while (code > (1 << 8))
+    {
+
+        infix += lookup[code >> 4 & 0b1111] << 4; // before last 4 bits
+
+        if (four[infix])
+        {
+            kmerID &= ~PREFIX_SELECTOR;
+            return;
+        }
+        code >>= 4;
+        infix >>= 4;
+    }
 }
 
 /*
@@ -280,6 +333,7 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     uint8_t AT = 0; // counter 'A'|'T'
     uint8_t CG = 0; // counter 'C'|'G'
 
+    uint64_t enc_l;
     // sum CG, AT content for longest kmer
     while (code != 1)
     {
@@ -289,6 +343,22 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             case 2: ++CG; break;
             default: ++AT;
         }
+        // TATA box test
+        enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1;
+        if ((code > (1ULL << 9)) && (((code & 0b11111111) == 0b11001100) || ((code & 0b11111111) == 0b00110011)))
+        {
+            if (enc_l <= PRIMER_MIN_LEN) // delete all length bits to discard this kmer
+            {
+                kmerID &= (1ULL << 52) - 1;
+                return;
+            }
+            else // delete all length bits between current encoded length and subsequent
+            {
+                kmerID &= (ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN + 1)) - 1;
+            }
+        }
+        if (!(kmerID & PREFIX_SELECTOR))
+            return;
         code >>= 2;
     }
     code = kmerID & ~PREFIX_SELECTOR;
@@ -324,6 +394,8 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     }
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
+    // Check for self-annealing
+    filter_self_annealing(kmerID);
 }
 
 /*
@@ -400,6 +472,31 @@ extern inline bool filter_cross_dimerization(TKmerID kmerID1, TKmerID kmerID2)
 extern inline bool filter_self_dimerization(TKmerID kmer_ID)
 {
     return filter_cross_dimerization(kmer_ID, kmer_ID);
+}
+
+// evaluate soft constraints
+double score_kmer(TKmerID kmerID, uint64_t mask)
+{
+    double score = 0.0;
+    double const eps = 0.1;
+    // has 3 run
+    auto [prefix, code] = split(kmerID);
+    if (mask)
+    {
+        uint8_t enc_l = (WORD_SIZE - __builtin_clzll(code) - 1) >> 1;
+        uint8_t target_l = __builtin_clzll(mask) + PRIMER_MIN_LEN;
+        code >>= enc_l - target_l;
+    }
+    while (code >= (1 << 6))
+    {
+        uint64_t infix = code & 0b111111;
+        if (infix == 0b000000 || infix == 0b111111)
+            score -= eps;
+        if (infix == 0b010101 || infix == 0b101010) // 3 runs of CG worse
+            score -= 2*eps;
+        code >>= 2;
+    }
+    return std::max(0.0, score);
 }
 
 /*

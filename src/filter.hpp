@@ -242,7 +242,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
                     // check forward primer not ending with TTT, ATT
-                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd) && filter_WTT_tail(kmerID_fwd, mask_fwd, '+'))
+                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd) && filter_WWW_tail(kmerID_fwd, mask_fwd, '+'))
                     {
                         TKmerID const kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
                         uint64_t mask_rev = ONE_LSHIFT_63;
@@ -255,8 +255,11 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                                 std::cout << "cp_ctr reached 1 << 63, exit\n";
                                 exit(0);
                             }
-                            if (mask_rev & kmerID_rev && filter_CG_clamp(kmerID_rev, '-') && filter_WTT_tail(kmerID_rev, '-'))
+                            if (mask_rev & kmerID_rev && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_rev, '-'))
                             {
+                                //std::string str_rev = dna_decoder(kmerID_rev);
+                                //if (str_rev.substr(0,18).compare("AAAGTCTTTGGGTTCCGG") == 0)
+                                //    std::cout << "ERROR: " << str_rev << " passed WTT filter\n";
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
                                     // store combination bit
