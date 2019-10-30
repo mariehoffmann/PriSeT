@@ -25,9 +25,10 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/tests/clade_X.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o clade_X
+// g++ ../PriSeT/tests/plankton_verification.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o verif
 
-// ./clade_X $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+// ./verif $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+
 struct setup
 {
     std::string lib_dir;
@@ -83,7 +84,7 @@ void chemical_filter_test()
         "GCGGTAATTCCAGCTCCAATAG",
         "TATTCGTATTCCATTGTCAGAG",
         "CAGCAGCCGCGGTAATTCC",
-        "GCTTAATTTGACTCAACACGGG",
+        "GCTTAATTTGACTCAACACGGG", // self-annealing!
         "GCTTGTCTCAAAGATTAAGCC",
         "TCCAAGGAAGGCAGCAGGC",
         "GTACACACCGCCCGTC",
@@ -139,6 +140,8 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
     auto cp_ctr = 0ULL;
     for (uint64_t i = 0; i < references.size(); ++i)
     {
+        if (i <= 6676)
+            continue;
         sdsl::bit_vector reference;
         sdsl::util::assign(reference, references.at(i));
         sdsl::rank_support_v5<1, 1> r1s(&references.at(i)); // replace after bugfix with
@@ -168,7 +171,6 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
 
                         while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
-                            bool flag = false;
                             cp_ctr++;
                             if (cp_ctr == 1ULL << 63)
                             {
@@ -179,24 +181,22 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
                             {
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
-                                    auto code_fwd = get_code(kmerID_fwd, mask_fwd);
+                                    /*auto code_fwd = get_code(kmerID_fwd, mask_fwd);
                                     auto code_rev = get_code(kmerID_rev, mask_rev);
                                     auto h = hash_pair(code_fwd, code_rev);
                                     if (pair2freq.find(h) == pair2freq.end())
                                         pair2freq[h] = 1;
                                     else
-                                        pair2freq[h]++;
-                                    cp.set(mask_fwd, mask_rev);
+                                        pair2freq[h]++;*/
+                                    //cp.set(mask_fwd, mask_rev);
                                     TPrimerKey key{get_code(kmerID_fwd, mask_fwd), get_code(kmerID_rev, mask_rev)};
+                                    //std::cout << "kmerID_fwd = " << kmerID_fwd << " with length " << __builtin_clzl(mask_fwd) + PRIMER_MIN_LEN << ", get_code: " << get_code(kmerID_fwd, mask_fwd) << std::endl;
                                     if (pairs_known.find(key) != pairs_known.end())
                                     {
                                         std::cout << "INFO: primer pair <" << pairs_known[key] << "> found for refID = " << i << " at " << s1s.select(r_fwd) << " and " << s1s.select(r_rev) << std::endl;
                                         verified.insert(pairs_known[key]);
                                     }
-                                    ++stats[KMER_COUNTS::COMBINER_CNT];
-                                    flag = false;
                                 }
-                                flag = false;
                             }
                             mask_rev >>= 1; // does not affect search window, since starting position is fixed
                         } // length mask_rev

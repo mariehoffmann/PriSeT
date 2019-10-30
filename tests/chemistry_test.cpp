@@ -149,17 +149,17 @@ void filter_CG_clamp_test()
     else
         std::cout << "INFO: Success\n";
     std::cout << "---------------------------------------------\n";
-    kmerID = (1ULL << 62) + dna_encoder("GAATGCCTAGTAAGCGC");
-    res = filter_CG_clamp(kmerID, '+');
+    kmerID = dna_encoder("TTTGACTCAACACGGGGA") + (ONE_LSHIFT_63 >> 1) + (ONE_LSHIFT_63 >> 2);
+    res = filter_CG_clamp(kmerID, '+', ONE_LSHIFT_63 >> 1);
     if (res)
         std::cout << "ERROR: expect false, got true.\n";
     else
         std::cout << "INFO: Success\n";
 
     // now test kmer[0:16] which should pass test
-    res = filter_CG_clamp(kmerID, '+', ONE_LSHIFT_63);
-    if (!res)
-        std::cout << "ERROR: expect true, got false.\n";
+    res = filter_CG_clamp(kmerID, '+', ONE_LSHIFT_63 >> 2);
+    if (res)
+        std::cout << "ERROR: expect false, got true.\n";
     else
         std::cout << "INFO: Success\n";
 }
@@ -253,10 +253,89 @@ void chemical_debug()
     std::cout << "dTm = " << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev)  << " and PRIMER_DTM = " << PRIMER_DTM << std::endl;
 }
 
+void test_filter_WWW()
+{
+    TKmerID kmerID = 4036873631493718478;
+    std::cout << kmerID2str(kmerID) << std::endl;
+    std::cout << "passes WWW filter: " << filter_WWW_tail(kmerID, '+', ONE_LSHIFT_63 >> 2) << std::endl;
+}
+
+void test_reverse_complement()
+{
+    std::string seq = "CCGGAACCCAAAGACTTT";
+    std::string seq_rc = reverse_complement(seq);
+    std::cout << "reverse complement correct: " << ((seq_rc.compare("AAAGTCTTTGGGTTCCGG") == 0) ? 1 : 0) << std::endl;
+}
+
+void test_filter_self_annealing()
+{
+    //CGAAAGTCAGGGGATCG
+    //           CGATCCCCTGACTTTCG
+    TKmerID kmerID = dna_encoder("CGAAAGTCAGGGGATCG") + ONE_LSHIFT_63;
+    filter_self_annealing(kmerID);
+    if (!(PREFIX_SELECTOR & kmerID))
+        std::cout << "ERROR: expected kmerID to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+
+    // forward self-annealing
+    kmerID = dna_encoder("TCTAGTCCTCTTCGATCC") + (ONE_LSHIFT_63 >> 2);
+    filter_self_annealing(kmerID);
+    if (PREFIX_SELECTOR & kmerID)
+        std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+    // reverse self-annealing
+    kmerID = dna_encoder("TGATCGTCTTCGATCCC") + (ONE_LSHIFT_63 >> 2);
+    filter_self_annealing(kmerID);
+    if (PREFIX_SELECTOR & kmerID)
+        std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+}
+
+void test_filter_cross_annealing()
+{
+    // case: forward cross annealing in both's prefixes => no combination possible
+    TKmerID kmerID1 = dna_encoder("CGAAAGTCAGGGGATCG") + ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 1);
+    TKmerID kmerID2 = dna_encoder("TTCTAGGGCCACGTCT") + ONE_LSHIFT_63;
+    filter_cross_annealing(kmerID1, kmerID2);
+    if (!(PREFIX_SELECTOR & kmerID1) || !(PREFIX_SELECTOR & kmerID2))
+        std::cout << "ERROR: expected kmerIDs not to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+
+    // case: reverse cross annealing in both's prefixes
+    kmerID2 = dna_encoder("TTGATCGGCCACGTCT") + ONE_LSHIFT_63;
+    filter_cross_annealing(kmerID1, kmerID2);
+    if (!(PREFIX_SELECTOR & kmerID1) || !(PREFIX_SELECTOR & kmerID2))
+        std::cout << "ERROR: expected kmerIDs not to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+
+    // case: forward cross annealing between 1st prefix and 2nd suffix
+    kmerID2 = dna_encoder("TTGATCGGCCACGTCTAG") + ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 2);
+    filter_cross_annealing(kmerID1, kmerID2);
+    if (!(PREFIX_SELECTOR & kmerID1) && !(PREFIX_SELECTOR & kmerID2))
+        std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+
+    // case: reverse cross annealing between 1st prefix and 2nd suffix
+    // case: forward cross annealing between 1st suffix and 2nd prefix
+    // case: reverse cross annealing between 1st suffix and 2nd prefix
+    // case: forward annealing both's suffixes
+    // case: reverse annealing both's suffixes
+
+}
 
 int main()
 {
-    chemical_debug();
+//    test_filter_self_annealing();
+    test_filter_cross_annealing();
+//    test_filter_WWW();
+//    test_reverse_complement();
+//    chemical_debug();
 //    test_dTM();
 //    filter_repeats_runs_test();
 //    filter_CG_clamp_test();

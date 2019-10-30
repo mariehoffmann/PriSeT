@@ -185,14 +185,13 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
 
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
-    //uint64_t code = get_code(code, 0); // trim to true length
     kmerID = code; // save trimmed kmer-code part
     uint64_t const k = (63 - __builtin_clzl(code)) >> 1;
     for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {
         uint64_t tail_10 = tail_selector_10 & code;
-        // XOR tail with A_5, C_5, G_5, T_5
-        if ((tail_10 == 0b0000000000) || (tail_10 == 0b0101010101) || (tail_10 == 0b1010101010) || (tail_10 == 0b1111111111))
+        // XOR tail with A_4, C_4, G_4, T_
+        if ((tail_10 == 0b00000000) || (tail_10 == 0b01010101) || (tail_10 == 0b10101010) || (tail_10 == 0b11111111))
         {
             // note that (x >> 64) won't be executed
             uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
@@ -211,7 +210,6 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
                  (tail_20 == 0b01110111011101110111) || (tail_20 == 0b11011101110111011101) ||
                  (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
             {
-                //std::cout << "DEBUG: match for di-nucl run in tail!" << std::endl;
                 // delete all k bits ≥ len_selector
                 uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
                 // delete all k bits ≥ len_selector
@@ -253,35 +251,33 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint6
 // primers should not end on TTT or ATT
 extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
+    if (sense != '+' && sense != '-')
+        throw std::invalid_argument("Expected sense '-' or '+'!");
     std::unordered_set<uint64_t> const infixes = {0b000000, 0b000011, 0b001100, 0b001111, 0b110000, 0b110011, 0b111100, 0b111111};
     auto [prefix, code] = split(kmerID);
-    uint64_t encoded_len = (WORD_SIZE - __builtin_clzll(code) - 1) >> 1;
+    uint64_t encoded_len = WORD_SIZE - __builtin_clzll(code) - 1;
     uint64_t tail;
     if (sense == '-') // reverse complement!
     {
-        code >>= (encoded_len << 1) - 6; // shift right to have prefix of length 10
+        code >>= encoded_len - 6; // shift right to have prefix of length 10
         tail = code & 0b111111;
         return (infixes.find(tail) != infixes.end()) ? false : true;
     }
     if (mask)
     {
-        uint64_t target_len = PRIMER_MIN_LEN + __builtin_clzl(mask);
-        code >>= (encoded_len - target_len) << 1; // delete prefix and trim to target length
+        uint64_t target_len = (PRIMER_MIN_LEN + __builtin_clzl(mask)) << 1;
+        code >>= encoded_len - target_len; // delete prefix and trim to target length
     }
     return (infixes.find(code & 0b111111) != infixes.end()) ? false : true;
 }
 
-// Partial self-annealing test for leading PRIMER_MIN_LEN bps.
+// Partial self-annealing test for leading PRIMER_MIN_LEN bps. Checks if any 4-mer
+// occurs (reverse) complementary in first 16 bases. Case that suffix 4-mer is complementary
+// to another suffix 4-mer is not tested yet.
 // Deletes complete length mask if 4-more in reverse complement is found.
 extern inline void filter_self_annealing(TKmerID & kmerID)
 {
-    // 2-mer reverse complement map
-    std::array<uint8_t, 16> const lookup = {
-        0b1111, 0b1110, 0b1101, 0b1100,
-        0b1011, 0b1010, 0b1001, 0b1000,
-        0b0111, 0b0110, 0b1101, 0b0100,
-        0b0011, 0b0010, 0b0001, 0b0000};
-    // set bit for 4-mers found in kmerID
+    // build 4-mer map of kmerID or kmerID2 if
     std::bitset<512> four;
     auto [prefix, code] = split(kmerID);
     uint8_t enc_l = (WORD_SIZE - __builtin_clzll(code) - 1);
@@ -294,23 +290,96 @@ extern inline void filter_self_annealing(TKmerID & kmerID)
     }
     code = kmerID & ~PREFIX_SELECTOR;
     // trim to last PRIMER_MIN_LEN bps
-    code >>= (enc_l - (PRIMER_MIN_LEN << 1));
-    //std::cout << "CTTC seen: " << ((lookup[0b01111101]) ? 1 : 0) << std::endl;
-    //std::cout << "GAAG seen: " << ((lookup[0b10000010]) ? 1 : 0) << std::endl;
-
-    uint8_t infix = lookup[code & 0b1111]; // last 4 bits
-    while (code > (1 << 8))
+    // check annealing for same orientation
+    uint8_t infix;
+    while (code > (1UL << 8))
     {
-
-        infix += lookup[code >> 4 & 0b1111] << 4; // before last 4 bits
-
+        infix = ~(code & 0b11111111);
         if (four[infix])
         {
-            kmerID &= ~PREFIX_SELECTOR;
-            return;
+            uint8_t l = (WORD_SIZE - __builtin_clzll(code) - 1) >> 1;
+            if (l <= PRIMER_MIN_LEN)
+            {
+                kmerID &= ~PREFIX_SELECTOR;
+                return;
+            }
+            // del succeeding length bits because all longer kmers are affected
+            kmerID = (kmerID & ~PREFIX_SELECTOR) + (prefix & ~((ONE_LSHIFT_63 >> (l - PRIMER_MIN_LEN - 1)) - 1));
+            //std::cout << kmerID2str(kmerID) << std::endl;
         }
-        code >>= 4;
-        infix >>= 4;
+        code >>= 2;
+    }
+    // trim to last PRIMER_MIN_LEN bps
+    // check reversed annealing
+    code = kmerID & ~PREFIX_SELECTOR;
+    int8_t offset = enc_l - 8;
+    char const codes[4] = {'A', 'C', 'G', 'T'};
+    uint64_t infixL;
+    while (offset >= 0)
+    {
+        infixL = (0b11111111 << offset) & kmerID;
+        infixL = 0b11111111 & ((~infixL) >> offset);
+        infixL = ((infixL & 0b11) << 6) + ((infixL & 0b1100) << 2) + ((infixL & 0b110000) >> 2) + ((infixL & 0b11000000) >> 6);
+        if (four[infixL])
+        {
+            uint8_t l = (WORD_SIZE - __builtin_clzll(0b11111111 << offset) - 1) >> 1;
+            if (l <= PRIMER_MIN_LEN)
+            {
+                kmerID &= ~PREFIX_SELECTOR;
+                return;
+            }
+            kmerID = (kmerID & ~PREFIX_SELECTOR) + (prefix & ~((ONE_LSHIFT_63 >> (l - PRIMER_MIN_LEN - 1)) - 1));
+        }
+        ----offset;
+    }
+}
+
+// test forward and reverse cross annealing between two kmers. Two kmers cross-anneal
+// if there are at least 4 nts complementary to each other.
+extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
+{
+    auto [prefix1, code1] = split(kmerID1);
+    auto [prefix2, code2] = split(kmerID2);
+    if (!prefix1 || !prefix2)
+        return;
+    // build 4-mer position map of kmerID1
+    uint8_t infix_mask = 0b11111111;
+    uint8_t four[512];
+    std::memset(four, std::numeric_limits<uint8_t>::max(), 512);
+    while (code1 > (1 << 8))
+    {
+        four[infix_mask & code1] = uint8_t(WORD_SIZE - __builtin_clzl(code1) - 1);
+        code1 >>= 2;
+    }
+    // forward/reverse annealing of kmerID2
+    while (code2 > (1 << 8))
+    {
+        // same sense homology
+        uint64_t infix = (~code2 & infix_mask);
+        // antisense homology
+        uint64_t infix_rev = ((infix & 0b11) << 6) + ((infix & 0b1100) << 2) + ((infix & 0b110000) >> 2) + ((infix & 0b11000000) >> 6);
+        if (four[infix] != std::numeric_limits<uint8_t>::max() || four[infix_rev] != std::numeric_limits<uint8_t>::max())
+        {
+            // select earliest annealing pattern
+            uint8_t l1 = std::min(four[infix], four[infix_rev]) + 8;
+            uint8_t l2 = WORD_SIZE - __builtin_clzl(code2) - 1;
+            // annealing in both prefix makes them incombinable
+            if (l1 <= PRIMER_MIN_LEN && l2 <= PRIMER_MIN_LEN)
+            {
+                kmerID1 &= ~PREFIX_SELECTOR;
+                kmerID2 &= ~PREFIX_SELECTOR;
+                return;
+            }
+            else
+            {
+                // kmerID1 remains combinable with prefix of kmerID2 or l2 prefix needs to be trimmed
+                if (l1 <= PRIMER_MIN_LEN || l2 > PRIMER_MIN_LEN)
+                    kmerID2 = (kmerID2 & ~PREFIX_SELECTOR) + (prefix2 & ~((ONE_LSHIFT_63 >> (l2 - PRIMER_MIN_LEN - 1)) - 1));
+                if (l2 <= PRIMER_MIN_LEN || l1 > PRIMER_MIN_LEN) // kmerID2 remains combinable with prefix of kmerID1
+                    kmerID1 = (kmerID1 & ~PREFIX_SELECTOR) + (prefix1 & ~((ONE_LSHIFT_63 >> (l1 - PRIMER_MIN_LEN - 1)) - 1));
+            }
+        }
+        code2 >>= 2;
     }
 }
 
@@ -380,7 +449,9 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             {
                 float CG_content = float(CG) / (float(__builtin_clzl(mask) + PRIMER_MIN_LEN));
                 if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
+                {
                     kmerID ^= mask;
+                }
             }
         }
         switch(3 & code)
@@ -455,7 +526,6 @@ extern inline float gibbs_free_energy(seqan::String<priset::dna> const & s, seqa
  */
 extern inline bool filter_cross_dimerization(TKmerID kmerID1, TKmerID kmerID2)
 {
-//    std::cout << "enter filter_cross_dimerization with kmerID1 = " << kmerID1 << " and kmerID2 = " << kmerID2 << std::endl;
     // Approximate: check for smallest encoded kmer
     // TODO: do check exact and avoid String conversion
     TSeq seq1 = dna_decoder(kmerID1, __builtin_clzl(kmerID1) + PRIMER_MIN_LEN);

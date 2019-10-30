@@ -223,7 +223,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
         for (uint64_t r_fwd = 1; r_fwd < r1s.rank(reference.size()); ++r_fwd)
         {
             uint64_t idx_fwd = s1s.select(r_fwd);  // text position of r-th k-mer
-            TKmerID const kmerID_fwd = kmerIDs[i][r_fwd - 1];
+            TKmerID kmerID_fwd = kmerIDs[i][r_fwd - 1];
             if (!(kmerID_fwd >> CODE_SIZE))
                 std::cerr << "ERROR: k length pattern is zero\n";
 
@@ -239,14 +239,14 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
             {
                 TCombinePattern<TKmerID, TKmerLength> cp;
                 uint64_t mask_fwd = ONE_LSHIFT_63;
+                TKmerID kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
+                filter_cross_annealing(kmerID_fwd, kmerID_rev);
                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
                     // check forward primer not ending with TTT, ATT
-                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd) && filter_WWW_tail(kmerID_fwd, mask_fwd, '+'))
+                    if ((mask_fwd & kmerID_fwd) && filter_CG_clamp(kmerID_fwd, '+', mask_fwd) && filter_WWW_tail(kmerID_fwd, '+', mask_fwd))
                     {
-                        TKmerID const kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
                         uint64_t mask_rev = ONE_LSHIFT_63;
-
                         while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
                             cp_ctr++;
@@ -257,9 +257,6 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                             }
                             if (mask_rev & kmerID_rev && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_rev, '-'))
                             {
-                                //std::string str_rev = dna_decoder(kmerID_rev);
-                                //if (str_rev.substr(0,18).compare("AAAGTCTTTGGGTTCCGG") == 0)
-                                //    std::cout << "ERROR: " << str_rev << " passed WTT filter\n";
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
                                     // store combination bit
@@ -276,7 +273,6 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                 if (cp.is_set())
                 {
                     pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
-
                 }
             } // kmerID rev
         } // kmerID fwd

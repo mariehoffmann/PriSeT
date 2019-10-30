@@ -37,6 +37,16 @@ namespace priset
 // The maximal primer length (or a kmer). Recommended: 22.
 #define PRIMER_MAX_LEN 25ULL
 
+/*
+PRIMER_MIN_TM	46
+PRIMER_MAX_TM	64
+PRIMER_DTM	8
+CG_MIN_CONTENT	0.3
+CG_MAX_CONTENT	0.7
+FREQ_KMER_MIN	2
+FREQ_PAIR_MIN	5
+*/
+
 // The minimal transcript length.
 #define TRANSCRIPT_MIN_LEN 30
 
@@ -44,14 +54,14 @@ namespace priset
 #define TRANSCRIPT_MAX_LEN 800
 
 // The minimal primer melting temperature. Recommended 52.
-#define PRIMER_MIN_TM 52.0 //46
+#define PRIMER_MIN_TM 52 //46
 
 // The maximal primer melting temperature. Recommended 58.
-#define PRIMER_MAX_TM 58.0  //64
+#define PRIMER_MAX_TM 58 //64
 
 // Maximal permitted temperature difference [Kelvin] of primers.
 // Differences above 5 Kelvin can lead to no amplification.
-#define PRIMER_DTM 5 //8
+#define PRIMER_DTM 5  //8
 
 // The lower bound for relative CG content. Recommended: 0.4.
 #define CG_MIN_CONTENT .4 //.3

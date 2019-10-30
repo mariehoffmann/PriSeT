@@ -23,6 +23,10 @@ namespace priset
 
 #define MAX_PATH_LENGTH 100
 
+// Lower kmer frequency cutoff in percentage, i.e. all kmer occurences below will be dropped.
+#define FREQ_KMER_MIN_PERCENT 10
+#define FREQ_KMER_MIN 50
+
 struct io_cfg_type
 {
 
@@ -77,12 +81,18 @@ public:
             {
                 id_file = p;
                 // set library size
+                // faster with  wc -l root_10190.id
+                //std::system("ls -l >test.txt"); // execute the UNIX command "ls -l >test.txt"
+                //std::cout << std::ifstream("test.txt").rdbuf();
+
                 FILE * infile = fopen(id_file.string().c_str(), "r");
                 int c;
                 while (EOF != (c = getc(infile)))
                     if (c == '\n')
                         ++library_size;
                 std::cout << "INFO: library size = " << library_size << std::endl;
+                std::cout << "INFO: frequency cutoff in PriSeT and FM Map =\t" << FREQ_KMER_MIN << std::endl;
+                //std::cout << "INFO: frequency cutoff in PriSeT =\t" << get_freq_kmer_min() << std::endl;
             }
         }
         if (!acc_file.has_filename())
@@ -179,6 +189,12 @@ public:
     uint64_t get_library_size() const noexcept
     {
         return library_size;
+    }
+
+
+    constexpr unsigned get_freq_kmer_min() const noexcept
+    {
+        return unsigned(float(FREQ_KMER_MIN_PERCENT)/float(100) * library_size);
     }
 
     // Return template file for shiny app.

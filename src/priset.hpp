@@ -129,6 +129,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     if (timeit_flag)
         start = std::chrono::high_resolution_clock::now();
 
+        /*
     combine<TPairList>(references, kmerIDs, pairs, kmerCounts, pair2freq);
     if (timeit_flag)
     {
@@ -154,7 +155,7 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     }
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
-
+*/
 /*
     if (!timeit_flag)
     {
@@ -165,6 +166,6 @@ int priset_main(int argc, char * const * argv, std::array<size_t, TIMEIT::SIZE> 
     }
 */
 
-    
+
     return 0;
 }

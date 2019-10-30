@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdlib>
@@ -25,9 +26,10 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/tests/clade_X.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o clade_X
+// g++ ../PriSeT/tests/plankton_denovo.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o denovo
 
-// ./clade_X $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+// ./denovo $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+
 struct setup
 {
     std::string lib_dir;
@@ -79,8 +81,6 @@ struct hash_pp
 
 int main(int argc, char ** argv)
 {
-    chemical_filter_test();
-
     if (argc != 4)
     {
         std::cout << "Give taxid, and paths to lib and work dirs.\n";
@@ -92,6 +92,10 @@ int main(int argc, char ** argv)
     char * const priset_argv[priset_argc] = {"priset", "-l", argv[2], "-w", argv[3], "-s"};
     for (unsigned i = 0; i < priset_argc; ++i) std::cout << priset_argv[i] << " ";
     std::cout << std::endl;
+
+    // timing
+    std::chrono::time_point<std::chrono::system_clock> start, finish;
+    std::array<size_t, TIMEIT::SIZE> runtimes;
 
     // collect number of kmers or kmer pairs left after relevant processing steps
     TKmerCounts kmerCounts{0, 0, 0, 0};
@@ -105,21 +109,26 @@ int main(int argc, char ** argv)
     // parse options and init io and primer configurators
     options opt(priset_argc, priset_argv, primer_cfg, io_cfg);
 
-    std::chrono::time_point<std::chrono::system_clock> start, finish;
-
     TKLocations locations;
     TDirectoryInformation directoryInformation;
     TSequenceNames sequenceNames;
     TSequenceLengths sequenceLengths;
 
     // compute k-mer mappings
+    start = std::chrono::high_resolution_clock::now();
     fm_map(io_cfg, primer_cfg, locations);
+    finish = std::chrono::high_resolution_clock::now();
+    runtimes.at(TIMEIT::MAP) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+
     std::cout << "INFO: kmers init = " << std::accumulate(locations.begin(), locations.end(), 0, [](unsigned ctr, auto & location){return ctr + location.second.first.size();}) << std::endl;
 
     TReferences references;
     TKmerIDs kmerIDs;
     TSeqNoMap seqNoMap;
+    start = std::chrono::high_resolution_clock::now();
     filter_and_transform(io_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
+    finish = std::chrono::high_resolution_clock::now();
+    runtimes.at(TIMEIT::FILTER1_TRANSFORM) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
@@ -127,22 +136,43 @@ int main(int argc, char ** argv)
     TPairList pairs;
     // dictionary collecting (unique) pair frequencies
 
-    combine<TPairList, TPrimerKey>(references, kmerIDs, pairs, kmerCounts);
-    std::cout << "INFO: pairs after combiner = " << get_num_pairs<TPairList>(pairs) << std::endl;
+    //void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
+    start = std::chrono::high_resolution_clock::now();
+    combine(references, kmerIDs, pairs, kmerCounts);
+    finish = std::chrono::high_resolution_clock::now();
+    runtimes.at(TIMEIT::COMBINE_FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+
+    std::cout << "INFO: pairs after combiner = " << kmerCounts[KMER_COUNTS::COMBINER_CNT] << std::endl;
 
     //  <freq, <kmer_fwd, mask_fwd, kmer_rev, mask_rev> >
     using TPairFreq = std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>>;
     std::vector<TPairFreq> pair_freqs;
-    filter_pairs(references, kmerIDs, pairs, pair_freqs);
+    start = std::chrono::high_resolution_clock::now();
+    filter_pairs(references, kmerIDs, pairs, pair_freqs, kmerCounts);
+    std::cout << "INFO: pairs after pair_freq filter = " << kmerCounts[KMER_COUNTS::FILTER2_CNT] << std::endl;
+    finish = std::chrono::high_resolution_clock::now();
+    runtimes.at(TIMEIT::PAIR_FREQ) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+
+    std::cout << "K\tMAP\t\tFILTER1_TRANSFORM\tCOMBINE_FILTER2\tPAIR_FREQ\t|\tSUM [μs]\n" << std::string(100, '_') << "\n";
+    std::cout << "[" << 16 << ":" << 25 << "]\t" << runtimes[priset::TIMEIT::MAP] << "\t" <<
+            '\t' << runtimes[priset::TIMEIT::FILTER1_TRANSFORM] <<
+            '\t' << runtimes[priset::TIMEIT::COMBINE_FILTER2] << '\t' << runtimes[priset::TIMEIT::PAIR_FREQ] <<
+            "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
 
     // Sort pairs by frequency
-    std::sort(pair_freqs.begin(), pair_freqs.end(), [&](TPairFreq & p1, TPairFreq & p2){return p1.first > p2.first});
-    std::cout << "Frequency\tForward\t\tReverse\n";
-    for (auto k = 0; k < std::max(pair_freqs.size(), 10); ++k)
+    std::sort(pair_freqs.begin(), pair_freqs.end(), [&](TPairFreq & p1, TPairFreq & p2){return p1.first > p2.first;});
+    std::cout << "ID\tFrequency\tForward\tReverse\tTm\tCG\n";
+    for (size_t k = 0; k < std::min(pair_freqs.size(), size_t(15)); ++k)
     {
         TPairFreq pf = pair_freqs.at(k);
-        std::cout << pf.first << "\t" << dna_decoder(std::get<0>(pf.second), std::get<1>(pf.second)) << "\t";
-        std::cout << dna_decoder(std::get<2>(pf.second), std::get<3>(pf.second)) << std::endl; 
+        const auto & [code_fwd, mask_fwd, code_rev, mask_rev] = pf.second;
+        std::string fwd = dna_decoder(code_fwd, mask_fwd);
+        std::string rev = reverse_complement(dna_decoder(code_rev, mask_rev));
+        std::stringstream sstream;
+        sstream << std::hex << std::hash<std::string>()(fwd + rev);
+        std::cout << sstream.str().substr(0,8) << "," << pf.first << "," << fwd << ",";
+        std::cout << rev << ",\"[" << float(Tm(code_fwd, mask_fwd)) << ",";
+        std::cout << float(Tm(code_rev, mask_rev)) << "]\",\"[" << CG(code_fwd, mask_fwd) << "," << CG(code_rev, mask_rev) << "]\"" << std::endl;
     }
 
     return 0;
