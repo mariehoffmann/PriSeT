@@ -14,8 +14,75 @@
 
 #include <seqan/basic.h>
 
+#include "primer_cfg_type.hpp"
+#include "utilities.hpp"
+
 namespace priset
 {
+
+std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
+
+extern inline uint64_t complement(uint64_t const code_)
+{
+    auto [prefix, code] = split(code_);
+    uint64_t code_c = 0;
+    uint8_t offset = 0;
+    while (code > 1)
+    {
+        switch (code & 0b11)
+        {
+            case 0b00: code_c |= (0b11UL << (offset << 1)); break;
+            case 0b01: code_c |= (0b10UL << (offset << 1)); break;
+            case 0b10: code_c |= (0b01UL << (offset << 1)); break;
+        }
+        code >>= 2;
+        ++offset;
+    }
+    code_c |= 1ULL << (offset << 1);
+    return (prefix) ? prefix | code_c : code_c;
+}
+
+extern inline uint64_t reverse_complement(uint64_t code)
+{
+    code &= ~PREFIX_SELECTOR;
+    uint64_t code_rc = 0b01; // closure
+    while (code > 1)
+    {
+        code_rc <<= 2;
+        switch (code & 0b11)
+        {
+            case 0b00: code_rc += 0b11; break;
+            case 0b01: code_rc += 0b10; break;
+            case 0b10: code_rc += 0b01; break;
+            default: code_rc += 0b00;
+        }
+        code >>= 2;
+    }
+    return code_rc;
+}
+
+/*
+extern inline std::string reverse_complement(std::string const & seq)
+{
+    char rc[PRIMER_MAX_LEN];
+    uint8_t i = 0;
+    for (char const c : seq)
+    {
+        switch (c)
+        {
+            case 'A': rc[i] = 'T'; break;
+            case 'C': rc[i] = 'G'; break;
+            case 'G': rc[i] = 'C'; break;
+            default: rc[i] = 'A';
+        }
+        ++i;
+    }
+    std::string seq_rc(rc, i);
+    std::reverse(seq_rc.begin(), seq_rc.end());
+    return seq_rc;
+}
+*/
+
     //using dna = seqan::Dna;
 //!\brief DNA codes as enums.
 // TODO: use seqan Dna

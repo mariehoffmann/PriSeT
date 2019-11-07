@@ -184,26 +184,6 @@ extern inline void dna_decoder(uint64_t kmerID, std::vector<TSeq> & decodes)
     }
 }
 
-extern inline std::string reverse_complement(std::string const & seq)
-{
-    char rc[PRIMER_MAX_LEN];
-    uint8_t i = 0;
-    for (char const c : seq)
-    {
-        switch (c)
-        {
-            case 'A': rc[i] = 'T'; break;
-            case 'C': rc[i] = 'G'; break;
-            case 'G': rc[i] = 'C'; break;
-            default: rc[i] = 'A';
-        }
-        ++i;
-    }
-    std::string seq_rc(rc, i);
-    std::reverse(seq_rc.begin(), seq_rc.end());
-    return seq_rc;
-}
-
 extern inline uint64_t location_encode(TSeqNo seqNo, TSeqPos seqPos)
 {
     return (seqNo << 32) + seqPos;
