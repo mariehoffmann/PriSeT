@@ -15,7 +15,6 @@
 //#include "chemistry.hpp"
 #include "types.hpp"
 
-
 namespace priset
 {
 
@@ -37,16 +36,37 @@ namespace priset
 // The maximal primer length (or a kmer). Recommended: 22.
 #define PRIMER_MAX_LEN 25ULL
 
-/*
-PRIMER_MIN_TM	46
-PRIMER_MAX_TM	64
-PRIMER_DTM	8
-CG_MIN_CONTENT	0.3
-CG_MAX_CONTENT	0.7
-FREQ_KMER_MIN	2
-FREQ_PAIR_MIN	5
-*/
+/* Primer Verification */
 
+// The minimal transcript length.
+#define TRANSCRIPT_MIN_LEN 30
+
+// The minimal transcript length.
+#define TRANSCRIPT_MAX_LEN 800
+
+// The minimal primer melting temperature. Recommended 52.
+#define PRIMER_MIN_TM 52
+
+// The maximal primer melting temperature. Recommended 58.
+#define PRIMER_MAX_TM 58
+
+// Maximal permitted temperature difference [Kelvin] of primers.
+// Differences above 5 Kelvin can lead to no amplification.
+#define PRIMER_DTM 5
+
+// The lower bound for relative CG content. Recommended: 0.4.
+#define CG_MIN_CONTENT .4
+
+// The upper bound for relative CG content. Recommended: 0.6.
+#define CG_MAX_CONTENT .6
+
+// The minimal distance (bp) between two identical kmers on same reference.
+#define TRAP_DIST 400
+
+// Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
+#define FREQ_PAIR_MIN 5
+
+/*
 // The minimal transcript length.
 #define TRANSCRIPT_MIN_LEN 30
 
@@ -74,6 +94,7 @@ FREQ_PAIR_MIN	5
 
 // Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
 #define FREQ_PAIR_MIN 5
+*/
 
 struct primer_cfg_type
 {

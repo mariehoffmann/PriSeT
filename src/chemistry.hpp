@@ -18,6 +18,7 @@
 
 #include <seqan/basic.h>
 
+#include "dna.hpp"
 #include "primer_cfg_type.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
@@ -271,66 +272,167 @@ extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense, uint6
     return (infixes.find(code & 0b111111) != infixes.end()) ? false : true;
 }
 
-// Partial self-annealing test for leading PRIMER_MIN_LEN bps. Checks if any 4-mer
-// occurs (reverse) complementary in first 16 bases. Case that suffix 4-mer is complementary
-// to another suffix 4-mer is not tested yet.
-// Deletes complete length mask if 4-more in reverse complement is found.
-extern inline void filter_self_annealing(TKmerID & kmerID)
+/*
+ * Self-annealing helper.
+
+*/
+bool check_and_reset_helper(TKmerID & kmerID, TKmerID & kmerID2, uint8_t l, uint8_t & four[512])
 {
-    // build 4-mer map of kmerID or kmerID2 if
-    std::bitset<512> four;
+    if (!kmerID2) // self-annealing
+    {
+        if ((l >> 1) <= PRIMER_MIN_LEN - k) // self-annealing within first 16 bases
+        {
+            kmerID &= ~PREFIX_SELECTOR;
+            return false;
+        }
+        else
+        {   // latter 4-mer invalidates corresponding length bits
+            kmerID = (kmerID & ~PREFIX_SELECTOR) + (prefix & ~((ONE_LSHIFT_63 >> (max(l, four[infix]) - PRIMER_MIN_LEN - 1)) - 1));
+        }
+    }
+    else  // cross-annealing
+    {
+        // both kmers are incombinable
+        if (((four[infix] >> 1) <= PRIMER_MIN_LEN - k) && (l >> 1) <= PRIMER_MIN_LEN - k))
+        {
+            kmerID &= ~PREFIX_SELECTOR;
+            kmerID2 &= ~PREFIX_SELECTOR;
+            return false;
+        }
+        // kmer1 sufixes not combinable with (partial) kmer2
+        if (four[infix] >= l)
+        {
+            // del succeeding length bits because all longer kmers are affected
+            kmerID = (kmerID & ~PREFIX_SELECTOR) + (kmerID & PREFIX_SELECTOR & ~((ONE_LSHIFT_63 >> (four[infix] - PRIMER_MIN_LEN - 1)) - 1));
+        }
+        // kmer2 sufixes not combinable with (partial) kmer1
+        if (l >= four[infix])
+            kmerID2 = (kmerID2 & ~PREFIX_SELECTOR) + (kmerID2 & PREFIX_SELECTOR & ~((ONE_LSHIFT_63 >> (l - PRIMER_MIN_LEN - 1)) - 1));
+    }
+    //std::cout << kmerID2str(kmerID) << std::endl;
+    return true;
+}
+
+/*
+ * Self- and cross-dimerization test (if 2nd kmer is given). 4-mers ending before
+ * position PRIMER_MIN_LEN result in deletion of length mask, otherwise only
+ * affected lengths are erased. In the second part non-consecutive annealing is
+ * tested - more than 8 annealing positions are considered to be critical.
+ */
+extern inline void filter_annealing(TKmerID & kmerID, TKmerID & kmerID2 = 0)
+{
+    const uint8_t k = 4;
+    // build 4-mer map of kmerID
+    uint8_t four[512];
+    std::memset(four, inf8_t, 512);
+//    std::bitset<512> four;
     auto [prefix, code] = split(kmerID);
     uint8_t enc_l = (WORD_SIZE - __builtin_clzll(code) - 1);
-    code >>= (enc_l - (PRIMER_MIN_LEN << 1));
+//    code >>= (enc_l - (PRIMER_MIN_LEN << 1));
     auto infix_mask = 0b11111111;
+    uint8_t l = enc_l;
     while (code > (1 << 8))
     {
-        four.set(infix_mask & code);
+        four[infix_mask & code] = min(four[infix_mask & code], l);
         code >>= 2;
+        l >>= 2;
     }
-    code = kmerID & ~PREFIX_SELECTOR;
+    // compare with same kmer code (self-annealing) or other one (cross-annealing)
+    code = complement(((kmerID2) ? kmerID2 : kmerID) & ~PREFIX_SELECTOR);
     // trim to last PRIMER_MIN_LEN bps
     // check annealing for same orientation
     uint8_t infix;
+    // reset length
+    l = (kmerID2) ? ((WORD_SIZE - __builtin_clzll(~PREFIX_SELECTOR & kmerID2) - 1)) : enc_l;
     while (code > (1UL << 8))
     {
-        infix = ~(code & 0b11111111);
-        if (four[infix])
+        infix = code & 0b11111111;
+        if (four[infix] != inf8_t)
         {
-            uint8_t l = (WORD_SIZE - __builtin_clzll(code) - 1) >> 1;
-            if (l <= PRIMER_MIN_LEN)
-            {
-                kmerID &= ~PREFIX_SELECTOR;
+            if (!check_and_reset_helper(kmerID, kmerID2, l, four))
                 return;
-            }
-            // del succeeding length bits because all longer kmers are affected
-            kmerID = (kmerID & ~PREFIX_SELECTOR) + (prefix & ~((ONE_LSHIFT_63 >> (l - PRIMER_MIN_LEN - 1)) - 1));
-            //std::cout << kmerID2str(kmerID) << std::endl;
         }
+        l >>= 2;
         code >>= 2;
     }
     // trim to last PRIMER_MIN_LEN bps
     // check reversed annealing
-    code = kmerID & ~PREFIX_SELECTOR;
-    int8_t offset = enc_l - 8;
-    char const codes[4] = {'A', 'C', 'G', 'T'};
+    code = reverse_complement((kmerID2 ? kmerID2 : kmerID) & ~PREFIX_SELECTOR);
+    l = 8;
+
+    //int8_t offset = enc_l - 8;
     uint64_t infixL;
-    while (offset >= 0)
+    while (code > (1UL << 8))
     {
-        infixL = (0b11111111 << offset) & kmerID;
-        infixL = 0b11111111 & ((~infixL) >> offset);
-        infixL = ((infixL & 0b11) << 6) + ((infixL & 0b1100) << 2) + ((infixL & 0b110000) >> 2) + ((infixL & 0b11000000) >> 6);
+        infixL = 0b11111111 & code;
         if (four[infixL])
         {
-            uint8_t l = (WORD_SIZE - __builtin_clzll(0b11111111 << offset) - 1) >> 1;
-            if (l <= PRIMER_MIN_LEN)
-            {
-                kmerID &= ~PREFIX_SELECTOR;
+            if (!check_and_reset_helper(kmerID, kmerID2, code, four))
                 return;
-            }
-            kmerID = (kmerID & ~PREFIX_SELECTOR) + (prefix & ~((ONE_LSHIFT_63 >> (l - PRIMER_MIN_LEN - 1)) - 1));
         }
-        ----offset;
+        code >>= 2;
+        l <<= 2;
+    }
+
+    // check self-annealing positions <= 8
+    // code1 <--------------
+    //         |||||||||||||
+    // code2   -------------->
+    //         |||||||||||||
+    // code3 >--------------
+    if (kmerID & PREFIX_SELECTOR)
+    {
+        code = kmerID & ~PREFIX_SELECTOR;
+        int8_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1;
+        uint8_t j;
+        uint8_t annealings12, annealings23;
+        uint64_t mask = (1ULL << enc_l) - 1;
+        uint64_t code1, code2, code3;
+        uint64_t ident12, ident23;
+        // Due to symmetry we need to test only the first half of possible overlapping positions
+        uint64_t code_rev = reverse(code);
+        for (int8_t offset = 1; offset <= ((enc_l - 16) >> 1) && kmerID & PREFIX_SELECTOR; ++offset)
+        {
+            // 0 to enc_l - offset
+            mask >>= 2;
+            code1 = mask & code;
+            code2 = ((mask << (offset << 1)) & code)  >> (offset << 1);
+            code3 = mask & code_rev;
+            // creates 11 patterns with even offsets for complementary bases
+            ident12 = code1 ^ code2;
+            ident23 = code3 ^ code2;
+            annealings12 = 0;
+            annealings23 = 0;
+            auto j = 0;
+            while (ident12 > 0 || ident23)
+            {
+                if ((ident12 & 0b11) == 0b11)
+                    ++annealings12;
+                if ((ident23 & 0b11) == 0b11)
+                    ++annealings23;
+
+                if (ident12 > 0)
+                    ident12 >>= 2;
+                if (ident23 > 0)
+                    ident23 >>= 2;
+
+                // get current length and check annealing proportion
+                if (annealings12 >= 8 || annealings23)
+                {
+                    if (uint8_t(j + (offset << 1)) <= PRIMER_MIN_LEN)
+                    {
+                        kmerID = ~PREFIX_SELECTOR & kmerID;
+                        return;
+                    }
+                    else
+                    {
+                        kmerID = ((~(ONE_LSHIFT_63 >> (j - PRIMER_MIN_LEN + 1))) & kmerID) + (kmerID & (~PREFIX_SELECTOR));
+                        break;
+                    }
+                }
+                ++j;
+            }
+        }
     }
 }
 

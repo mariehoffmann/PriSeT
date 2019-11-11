@@ -39,6 +39,7 @@ enum KMER_COUNTS
 };
 
 typedef std::array<uint64_t, 4> TKmerCounts;
+typedef inf8_t = numeric_limits<uint8_t>::max;
 
 //using dna = typename seqan::Dna5;
 typedef seqan::Dna5 dna;
