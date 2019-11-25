@@ -19,6 +19,8 @@
 
 #define ONE_LSHIFT_63 9223372036854775808ULL
 
+#define NULL_KMERID 0ULL
+
 namespace priset
 {
 
@@ -39,7 +41,6 @@ enum KMER_COUNTS
 };
 
 typedef std::array<uint64_t, 4> TKmerCounts;
-typedef inf8_t = numeric_limits<uint8_t>::max;
 
 //using dna = typename seqan::Dna5;
 typedef seqan::Dna5 dna;
@@ -50,8 +51,8 @@ using TSeqPos = uint64_t;
 // Kmer length type. A negative indicates reverse direction given associated position.
 using TKmerLength = int64_t;
 using TBWTLen = uint64_t;
-using TFMIndexConfig = TGemMapFastFMIndexConfig<TBWTLen>;
-typedef String<seqan::Dna, seqan::Alloc<>> TString;
+using TFMIndexConfig = TGenMapFastFMIndexConfig<TBWTLen>;
+typedef seqan::String<seqan::Dna, seqan::Alloc<>> TString;
 typedef seqan::StringSet<TString, seqan::Owner<seqan::ConcatDirect<SizeSpec_<TSeqNo, TSeqPos> > > > TStringSet;
 // set index type, TBiIndexConfig defined src/common.hpp
 using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig> >;

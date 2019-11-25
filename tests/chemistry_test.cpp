@@ -260,38 +260,59 @@ void test_filter_WWW()
     std::cout << "passes WWW filter: " << filter_WWW_tail(kmerID, '+', ONE_LSHIFT_63 >> 2) << std::endl;
 }
 
-void test_reverse_complement()
-{
-    std::string seq = "CCGGAACCCAAAGACTTT";
-    std::string seq_rc = reverse_complement(seq);
-    std::cout << "reverse complement correct: " << ((seq_rc.compare("AAAGTCTTTGGGTTCCGG") == 0) ? 1 : 0) << std::endl;
-}
-
 void test_filter_self_annealing()
 {
     //CGAAAGTCAGGGGATCG
     //           CGATCCCCTGACTTTCG
     TKmerID kmerID = dna_encoder("CGAAAGTCAGGGGATCG") + ONE_LSHIFT_63;
-    filter_self_annealing(kmerID);
+    filter_annealing(kmerID);
     if (!(PREFIX_SELECTOR & kmerID))
         std::cout << "ERROR: expected kmerID to pass annealing test\nt";
     else
         std::cout << "OK\n";
-
+/*
     // forward self-annealing
-    kmerID = dna_encoder("TCTAGTCCTCTTCGATCC") + (ONE_LSHIFT_63 >> 2);
-    filter_self_annealing(kmerID);
-    if (PREFIX_SELECTOR & kmerID)
+    TKmerID kmerID2 = dna_encoder("TCTAGTCCTCTTCGATCC") + (ONE_LSHIFT_63 >> 2);
+    filter_annealing(kmerID2);
+    if (PREFIX_SELECTOR & kmerID2)
         std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
     else
         std::cout << "OK\n";
+
     // reverse self-annealing
-    kmerID = dna_encoder("TGATCGTCTTCGATCCC") + (ONE_LSHIFT_63 >> 2);
-    filter_self_annealing(kmerID);
-    if (PREFIX_SELECTOR & kmerID)
+    TKmerID kmerID3 = dna_encoder("TGATCGTCTTCGATCCC") + (ONE_LSHIFT_63 >> 2);
+    filter_annealing(kmerID3);
+    if (PREFIX_SELECTOR & kmerID3)
         std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
     else
         std::cout << "OK\n";
+*/
+    /*
+    * case: accumulated annealing positions exceed 50 % when matched -/-
+       5-AGCTAGATGTACTTG->
+         | ||| ||| ||
+    5-AGCTAGATGTACTTG->
+    */
+    // TKmerID kmerID4 = dna_encoder("AGCTAGATGTACTTGT") + ONE_LSHIFT_63;
+    // filter_annealing(kmerID4);
+    // if (PREFIX_SELECTOR & kmerID4)
+    //     std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
+    // else
+    //     std::cout << "OK\n";
+
+/* case: accumulated annealing positions exceed 50 % when matched +/-
+     5-ACTTAGATGTACGTGG->
+       ||  || || || ||
+   <-GGTGCATGTAGATTCA-5
+*/
+/*    TKmerID kmerID5 = dna_encoder("ACTTAGATGTACGTGG") + (ONE_LSHIFT_63 >> 1);
+    filter_annealing(kmerID5);
+    if (PREFIX_SELECTOR & kmerID5)
+        std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
+    else
+        std::cout << "OK\n";
+*/
+
 }
 
 void test_filter_cross_annealing()
@@ -299,7 +320,7 @@ void test_filter_cross_annealing()
     // case: forward cross annealing in both's prefixes => no combination possible
     TKmerID kmerID1 = dna_encoder("CGAAAGTCAGGGGATCG") + ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 1);
     TKmerID kmerID2 = dna_encoder("TTCTAGGGCCACGTCT") + ONE_LSHIFT_63;
-    filter_cross_annealing(kmerID1, kmerID2);
+    filter_annealing(kmerID1, kmerID2);
     if (!(PREFIX_SELECTOR & kmerID1) || !(PREFIX_SELECTOR & kmerID2))
         std::cout << "ERROR: expected kmerIDs not to pass annealing test\nt";
     else
@@ -307,7 +328,7 @@ void test_filter_cross_annealing()
 
     // case: reverse cross annealing in both's prefixes
     kmerID2 = dna_encoder("TTGATCGGCCACGTCT") + ONE_LSHIFT_63;
-    filter_cross_annealing(kmerID1, kmerID2);
+    filter_annealing(kmerID1, kmerID2);
     if (!(PREFIX_SELECTOR & kmerID1) || !(PREFIX_SELECTOR & kmerID2))
         std::cout << "ERROR: expected kmerIDs not to pass annealing test\nt";
     else
@@ -315,7 +336,7 @@ void test_filter_cross_annealing()
 
     // case: forward cross annealing between 1st prefix and 2nd suffix
     kmerID2 = dna_encoder("TTGATCGGCCACGTCTAG") + ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 2);
-    filter_cross_annealing(kmerID1, kmerID2);
+    filter_annealing(kmerID1, kmerID2);
     if (!(PREFIX_SELECTOR & kmerID1) && !(PREFIX_SELECTOR & kmerID2))
         std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
     else
@@ -331,8 +352,10 @@ void test_filter_cross_annealing()
 
 int main()
 {
-//    test_filter_self_annealing();
-    test_filter_cross_annealing();
+//    reverse_complement_test();
+//    complement_test();
+    test_filter_self_annealing();
+//    test_filter_cross_annealing();
 //    test_filter_WWW();
 //    test_reverse_complement();
 //    chemical_debug();

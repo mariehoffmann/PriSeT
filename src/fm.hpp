@@ -78,6 +78,7 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLoc
     using TKLocationsValue = typename TKLocations::mapped_type;
     for (auto K = PRIMER_MIN_LEN; K <= PRIMER_MAX_LEN; ++K)
     {
+        if (K == 22) continue;
         std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
         std::cout << "INFO: K = " << K << std::endl;
         // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!

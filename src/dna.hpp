@@ -12,7 +12,7 @@
 #include <cassert>
 #include <unordered_map>
 
-#include <seqan/basic.h>
+//#include <seqan/basic.h>
 
 #include "primer_cfg_type.hpp"
 #include "utilities.hpp"
@@ -42,23 +42,37 @@ extern inline uint64_t complement(uint64_t const code_)
     return (prefix) ? prefix | code_c : code_c;
 }
 
-extern inline uint64_t reverse_complement(uint64_t code)
+// Preserves length bits and closure.
+extern inline uint64_t reverse(uint64_t const code_)
 {
-    code &= ~PREFIX_SELECTOR;
+    auto [prefix, code] = split(code_);
+    uint64_t code_r = 0b01; // closure
+    while (code > 1)
+    {
+        code_r <<= 2;
+        code_r |= (code & 0b11);
+        code >>= 2;
+    }
+    return prefix | code_r;
+}
+
+
+extern inline uint64_t reverse_complement(uint64_t const code_)
+{
+    auto [prefix, code] = split(code_);
     uint64_t code_rc = 0b01; // closure
     while (code > 1)
     {
         code_rc <<= 2;
         switch (code & 0b11)
         {
-            case 0b00: code_rc += 0b11; break;
-            case 0b01: code_rc += 0b10; break;
-            case 0b10: code_rc += 0b01; break;
-            default: code_rc += 0b00;
+            case 0b00: code_rc |= 0b11; break;
+            case 0b01: code_rc |= 0b10; break;
+            case 0b10: code_rc |= 0b01;
         }
         code >>= 2;
     }
-    return code_rc;
+    return prefix | code_rc;
 }
 
 /*

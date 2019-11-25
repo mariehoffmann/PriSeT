@@ -83,7 +83,7 @@ public:
         return data.none();
     }
 
-    constexpr std::string to_string() const noexcept
+    std::string to_string() const noexcept
     {
         return data.to_string();
     }
