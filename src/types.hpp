@@ -11,15 +11,14 @@
 #include <bitset>
 #include <stdlib.h>
 
-#include <sdsl/bit_vectors.hpp>
+//#include <sdsl/bit_vectors.hpp>
+#include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 
 #include "../submodules/genmap/src/common.hpp"
 
 //#include "primer_cfg_type.hpp"
 
 #define ONE_LSHIFT_63 9223372036854775808ULL
-
-#define NULL_KMERID 0ULL
 
 namespace priset
 {
@@ -87,6 +86,8 @@ using TSequenceLengths = typename seqan::StringSet<uint32_t>;
 
 // The type for kmer identifiers encoding kmer sequences up to a length of 30 bp.
 typedef uint64_t TKmerID;
+
+static TKmerID NULL_TKMERID = 0;
 
 // The type for taxonomic identifiers.
 typedef uint32_t TTaxid;

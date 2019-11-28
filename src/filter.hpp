@@ -8,10 +8,12 @@
 #include <string>
 #include <unordered_set>
 
-#include <sdsl/bit_vectors.hpp>
+//#include <sdsl/bit_vectors.hpp>
+
 
 #include "../submodules/genmap/src/common.hpp"
 #include "../submodules/genmap/src/genmap_helper.hpp"
+#include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 
 //#include "../submodules/sdsl/include/sdsl/bit_vectors.hpp"
 

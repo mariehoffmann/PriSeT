@@ -42,6 +42,19 @@ static inline uint64_t log2_asm(uint64_t const x) {
 }
 */
 
+// helper: delete lengths bits including the one representing 2bit encode l and larger ones
+extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
+{
+    auto [prefix, code] = split(kmerID);
+    if (l <= PRIMER_MIN_LEN)
+        kmerID = code;
+    else
+    {
+        uint64_t offset = PRIMER_MAX_LEN + 1 - (l >> 1);
+        kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
+    }
+}
+
 // Execute in terminal and collect command return value.
 std::string exec(char const * cmd) {
     std::cout << "Enter util.exec with cmd = " << std::string(cmd) << std::endl;

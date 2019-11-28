@@ -305,50 +305,31 @@ extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense,
     return !WWW_tails()[code & 0b111111];
 }
 
-/*
- * Self-annealing helper.
+extern inline void filter_annealing_disconnected(TKmerID &, TKmerID &);
 
-*/
-bool check_and_reset_helper(TKmerID & kmerID, TKmerID & kmerID2, uint8_t infix, uint8_t l, uint8_t four[512])
+extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l);
+
+// l1, l2 refer to kmer lengths including dimerizing 4-mer
+extern inline void annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kmerID2, uint8_t l2)
 {
-    auto [prefix, code] = split(kmerID);
-    if (!kmerID2) // self-annealing
+    if (!kmerID2) // first 4-mer occurrence significant
+        delete_length_bits(kmerID1, std::min(l1, l2));
+    else
     {
-        if ((l >> 1) <= PRIMER_MIN_LEN - 4) // self-annealing within first 16 bases
+        // case: l1 <= 16 and l2 > 16 or l1 > 16 and l2 > 16
+        if (l2 > 16)
+            delete_length_bits(kmerID2, l2);
+        // case: l1 > 16 and l2 <= 16 or l1 > 16 and l2 > 16
+        if (l1 > 16)
+            delete_length_bits(kmerID1, l1);
+        // case: l1 <= 16 and l2 <= 16
+        if (l1 <= 16 && l2 <= 16)
         {
-            kmerID = code;
-            return false;
-        }
-        else
-        {   // latter 4-mer invalidates corresponding length bits
-            kmerID = (prefix & ~((ONE_LSHIFT_63 >> (std::max(l, four[infix]) - PRIMER_MIN_LEN - 1)) - 1)) | code;
+            delete_length_bits(kmerID1, l1);
+            delete_length_bits(kmerID2, l2);
         }
     }
-    else  // cross-annealing
-    {
-        auto [prefix2, code2] = split(kmerID2);
-        // both kmers are incombinable
-        if (((four[infix] >> 1) <= PRIMER_MIN_LEN - 4) && (l >> 1) <= PRIMER_MIN_LEN - 4)
-        {
-            kmerID = code;
-            kmerID2 = code2;
-            return false;
-        }
-        // kmer1 sufixes not combinable with (partial) kmer2
-        if (four[infix] >= l)
-        {
-            // del succeeding length bits because all longer kmers are affected
-            kmerID = (kmerID & PREFIX_SELECTOR & ~((ONE_LSHIFT_63 >> (four[infix] - PRIMER_MIN_LEN - 1)) - 1)) | code;
-        }
-        // kmer2 sufixes not combinable with (partial) kmer1
-        if (l >= four[infix])
-            kmerID2 = (kmerID2 & PREFIX_SELECTOR & ~((ONE_LSHIFT_63 >> (l - PRIMER_MIN_LEN - 1)) - 1)) | code2;
-    }
-    //std::cout << kmerID2str(kmerID) << std::endl;
-    return true;
 }
-
-extern inline void filter_annealing_non_consecutive(TKmerID &, TKmerID &);
 
 /*
  * Self- and cross-dimerization test (if 2nd kmer is not zero). 4-mers ending before
@@ -356,69 +337,123 @@ extern inline void filter_annealing_non_consecutive(TKmerID &, TKmerID &);
  * affected lengths are erased. In the second part non-consecutive annealing is
  * tested - more than 8 annealing positions are considered to be critical.
  */
-extern inline void filter_annealing(TKmerID & kmerID, TKmerID & kmerID2)
+extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
 {
-    // build 4-mer map of kmerID
-    uint8_t four[512];
+    uint64_t const fourmer_mask = 0b11111111;
+    auto [prefix1, code1] = split(kmerID1);
+    auto [prefix2, code2] = (kmerID2) ? split(kmerID2) : split(kmerID1);
+    uint64_t const code2_rev = reverse(code2);
+    uint8_t const l1 = WORD_SIZE - __builtin_clzll(code1) - 1;
+    uint8_t const l2 = WORD_SIZE - __builtin_clzll(code2) - 1;
+    uint64_t prefix;
+    uint8_t overlap;
+    uint64_t overlap_mask;
+    int ctr = 32;
+    // test overlap positions [0, 0:l1-2] @code1 against [l2-8:max(0,l2-l1+2), l2] @code2
+    for (overlap = 8; (overlap_mask = (1ULL << overlap) - 1) <= (1ULL << (l1 - 2)) - 1; ++++overlap) // TODO: test invariant
+    {
+        if (ctr < 0)
+            exit(0);
+        --ctr;
+        // overlap_mask = (1ULL << overlap) - 1;
+        // prefix of code1 and suffix of code2
+        prefix = (code1 >> (l1 - overlap));
+        // suffix = code2; // & overlap_mask; // needed?
+        // suffix_rev = code2_rev;// & overlap_mask;
+        // handle case l1 > l2, trim leading bits from 1st code
+        if (kmerID2 && overlap > l2 && l2 < l1)
+            overlap_mask = (1 << l2) - 1;
+        // std::cout << "overlap_mask = " << std::bitset<36>(overlap_mask).to_string() << std::endl;
+        auto x = (prefix ^ code2) & overlap_mask;
+        auto y = (prefix ^ code2_rev) & overlap_mask;
 
-    uint8_t INF_uint8 = std::numeric_limits<uint8_t>::max();
-    std::memset(four, INF_uint8, 512);
-//    std::bitset<512> four;
-    uint64_t code = ~PREFIX_SELECTOR & kmerID;
-    uint8_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1;
-//    code >>= (enc_l - (PRIMER_MIN_LEN << 1));
-    auto infix_mask = 0b11111111;
-    uint8_t l = enc_l;
-    while (code > (1 << 8))
-    {
-        four[infix_mask & code] = std::min(four[infix_mask & code], l);
-        code >>= 2;
-        l >>= 2;
-    }
-    for (size_t i = 0; i < 512; ++i)
-    {
-        if (four[i] != INF_uint8)
-            std::cout << "four[" << i << "] = " << four[i] << std::endl;
-    }
-    // compare with same kmer code (self-annealing) or other one (cross-annealing)
-    code = ((kmerID2) ? complement(kmerID2) : complement(kmerID)) & ~PREFIX_SELECTOR;
-    // trim to last PRIMER_MIN_LEN bps
-    // check annealing for same orientation
-    uint8_t infix;
-    // reset length
-    l = (kmerID2) ? ((WORD_SIZE - __builtin_clzll(~PREFIX_SELECTOR & kmerID2) - 1)) : enc_l;
-    while (code > (1UL << 8))
-    {
-        infix = code & 0b11111111;
-        if (four[infix] != INF_uint8)
-        {
-            if (!check_and_reset_helper(kmerID, kmerID2, infix, l, four))
-                return;
-        }
-        l >>= 2;
-        code >>= 2;
-    }
-    // trim to last PRIMER_MIN_LEN bps
-    // check reversed annealing
-    code = reverse_complement((kmerID2 ? kmerID2 : kmerID) & ~PREFIX_SELECTOR);
-    l = 8;
+        uint8_t i = 0;
+        std::cout << "overlap: " << overlap << std::endl;
+        std::cout << "prefix = " << std::bitset<36>(prefix).to_string() << std::endl;
 
-    //int8_t offset = enc_l - 8;
-    uint8_t infixL;
-    while (code > (1UL << 8))
-    {
-        infixL = 0b11111111 & code;
-        if (four[infixL])
+        while (x >= fourmer_mask || y >= fourmer_mask)
         {
-            if (!check_and_reset_helper(kmerID, kmerID2, infixL, code, four))
-                return;
+            std::cout << "x = " << std::bitset<36>(x).to_string() << std::endl;
+            std::cout << "y = " << std::bitset<36>(y).to_string() << std::endl;
+            if ((x & fourmer_mask) == fourmer_mask)
+            {
+                std::cout << "forward 4-mer: " << std::bitset<36>(x).to_string() << " with overlap = " << overlap << std::endl;
+                annealing_helper(kmerID1, overlap - i, kmerID2, l2 - i);
+            }
+            if ((y & fourmer_mask) == fourmer_mask)
+            {
+                // std::cout << std::bitset<36>(y).to_string() << std::endl;
+                // std::cout << "reset length bit: i = " << int(i) << std::endl;
+                // std::cout << "computed length l'1 = " << overlap - i << std::endl;
+                // std::cout << "computed length l'2 = " << i+8 << std::endl;
+                std::cout << "reverse 4-mer: " << std::bitset<36>(y).to_string() << " with overlap = " << overlap << std::endl;
+                annealing_helper(kmerID1, overlap - i, kmerID2, i + 8);
+            }
+            x >>= 2;
+            y >>= 2;
+            ++++i;
         }
-        code >>= 2;
-        l <<= 2;
+        if (!(kmerID1 & PREFIX_SELECTOR) || (kmerID2 && !(kmerID2 & PREFIX_SELECTOR)))
+            return;
+        // ++++overlap;
     }
-    // filter non-consecutive annealing
-    if (kmerID & PREFIX_SELECTOR)
-        filter_annealing_non_consecutive(kmerID, kmerID2);
+    // test for cross- and inverse-dimerization, i.e. overlap positions
+    // [0:l1-8, l1] @code against [l2-l1:0, l2:8]
+    if (kmerID1 & PREFIX_SELECTOR)
+    {
+        std::cout << "2nd part of shifting ...\n";
+        overlap = (l1 < l2) ? l1 : l2;
+        uint8_t code2_prefix_ctr = (l1 < l2) ? l2 - l1 : 0;
+        std::cout << "code2_prefix_ctr = " << int(code2_prefix_ctr) << std::endl;
+        std::cout << "initial overlap = " << int(overlap) << std::endl;
+
+        uint8_t offset = 0;
+        while ((overlap_mask = (1ULL << overlap) - 1) >= fourmer_mask)
+        {
+            if (kmerID2)
+            {
+                auto x = (code1 ^ (code2 >> offset)) & overlap_mask;
+                std::cout << "x = " << std::bitset<40>(x) << std::endl;
+                uint8_t i = 0;
+                while (x >= fourmer_mask)
+                {
+                    std::cout << "computed length l'1 = " << int(l1 - i) << std::endl;
+                    std::cout << "computed length l'2 = " << int(l2 - offset - i) << std::endl;
+                    if ((x & fourmer_mask) == fourmer_mask)
+                    {
+                        std::cout << "2nd part: 4-mer forward found with offset " << int(offset) << std::endl;
+                        annealing_helper(kmerID1, l1 - i, kmerID2, l2 - offset - i);
+                    }
+                    x >>= 2;
+                    ++++i;
+                }
+            }
+            // cross- or self-annealing with reversed sequence
+            auto y = (code1 ^ (code2_rev >> offset)) & overlap_mask;
+            std::cout << std::bitset<36>(y).to_string() << std::endl;
+            // std::cout << "offset = " << int(offset) << std::endl;
+            // std::cout << "y = " << std::bitset<40>(y) << std::endl;
+            uint8_t i = 0;
+            while (y >= fourmer_mask)
+            {
+                // std::cout << "computed length l'1 = " << l1 - i << std::endl;
+                // std::cout << "computed length l'2 = " << offset+i+8 << std::endl;
+                if ((y & fourmer_mask) == fourmer_mask)
+                {
+                    std::cout << "2nd part: 4-mer reverse found with offset = " << int(offset) << std::endl;
+                    annealing_helper(kmerID1, l1 - i, kmerID2, offset + i + 8);
+                }
+                y >>= 2;
+                ++++i;
+            }
+            // process code2 prefix if code2 longer than code1
+            if (l1 < l2 && code2_prefix_ctr)
+                ----code2_prefix_ctr;
+            else // continue shortening overlap
+                ----overlap;
+            ++++offset;
+        }
+    }
 }
 
 // check for disconnected self-annealing positions <= 8
@@ -427,8 +462,10 @@ extern inline void filter_annealing(TKmerID & kmerID, TKmerID & kmerID2)
 // code2   -------------->
 //         |||||||||||||
 // code3 >--------------
-extern inline void filter_annealing_non_consecutive(TKmerID & kmerID, TKmerID & kmerID2)
+extern inline void filter_annealing_disconnected(TKmerID & kmerID, TKmerID & kmerID2 = NULL_TKMERID)
 {
+    if (!(kmerID & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
+        return;
     uint64_t code = kmerID & ~PREFIX_SELECTOR;
     int8_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1;
     uint64_t annealings12, annealings23;
@@ -623,7 +660,8 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     filter_repeats_runs(kmerID);
     // Check for self-annealing
     TKmerID kmerID2{0};
-    filter_annealing(kmerID, kmerID2);
+    filter_annealing_connected(kmerID, kmerID2);
+    filter_annealing_disconnected(kmerID, kmerID2);
 }
 
 /*

@@ -32,14 +32,13 @@
 
 #define GENMAP_DEBUG 0
 
+#include "../submodules/genmap/include/lambda/src/mkindex_saca.hpp"
+#include "../submodules/genmap/include/lambda/src/mkindex_misc.hpp"
+#include "../submodules/genmap/include/lambda/src/mkindex_algo.hpp"
 #include "../submodules/genmap/src/common.hpp"
 #include "../submodules/genmap/src/genmap_helper.hpp"
 #include "../submodules/genmap/src/indexing.hpp"
 #include "../submodules/genmap/src/mappability.hpp"
-
-#include "../submodules/genmap/include/lambda/src/mkindex_saca.hpp"
-#include "../submodules/genmap/include/lambda/src/mkindex_misc.hpp"
-#include "../submodules/genmap/include/lambda/src/mkindex_algo.hpp"
 
 #pragma GCC diagnostic pop
 
