@@ -31,6 +31,7 @@ std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
 extern inline uint64_t complement(uint64_t const code);
 extern inline uint64_t reverse(uint64_t const code);
 extern inline uint64_t reverse_complement(uint64_t const code);
+extern inline void trim_to_true_length(TKmerID &);
 
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
 extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID const kmerID2, TKmerID const mask2)
@@ -310,25 +311,35 @@ extern inline void filter_annealing_disconnected(TKmerID &, TKmerID &);
 extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l);
 
 // l1, l2 refer to kmer lengths including dimerizing 4-mer
-extern inline void annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kmerID2, uint8_t l2)
+extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kmerID2, uint8_t l2)
 {
+
+    // std::cout << "l1 = " << int(l1) << ", l2 = " << int(l2) << ", kmerID2 ? " << (kmerID2 ? 1 : 0)  << std::endl;
     if (!kmerID2) // first 4-mer occurrence significant
         delete_length_bits(kmerID1, std::min(l1, l2));
     else
     {
         // case: l1 <= 16 and l2 > 16 or l1 > 16 and l2 > 16
-        if (l2 > 16)
-            delete_length_bits(kmerID2, l2);
-        // case: l1 > 16 and l2 <= 16 or l1 > 16 and l2 > 16
-        if (l1 > 16)
-            delete_length_bits(kmerID1, l1);
-        // case: l1 <= 16 and l2 <= 16
-        if (l1 <= 16 && l2 <= 16)
+        if (l2 > (PRIMER_MIN_LEN << 1) && l2 > l1)
         {
+            // std::cout << "l1 > primer_min_len\n";
+            delete_length_bits(kmerID2, l2);
+        }
+        // case: l1 > 16 and l2 <= 16 or l1 > 16 and l2 > 16
+        if (l1 > (PRIMER_MIN_LEN << 1) && l1 > l2)
+        {
+            // std::cout << "l1 > primer_min_len\n";
+            delete_length_bits(kmerID1, l1);
+        }
+        // case: l1 <= 16 and l2 <= 16
+        if (l1 <= (PRIMER_MIN_LEN << 1) && l2 <= (PRIMER_MIN_LEN << 1))
+        {
+            // std::cout << "both kmers in prefixes\n";
             delete_length_bits(kmerID1, l1);
             delete_length_bits(kmerID2, l2);
         }
     }
+    return (!(kmerID1 & PREFIX_SELECTOR) || !(kmerID2 & PREFIX_SELECTOR)) ? 1 : 0;
 }
 
 /*
@@ -337,11 +348,20 @@ extern inline void annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
  * affected lengths are erased. In the second part non-consecutive annealing is
  * tested - more than 8 annealing positions are considered to be critical.
  */
+ // TODO: cross-annealing 4-mer in suffix 17,17 only excludes 17-17, but still allows for
+ // combining 16-17 and vice versa, and 16 - 16, deleting length bit 17 in one kmer may exclude
+ // one ore more possible combinations, better directly receeive combiner struct to set
+ // combination bits instead of post-processing length bits of both k-mers
 extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
 {
+
     uint64_t const fourmer_mask = 0b11111111;
     auto [prefix1, code1] = split(kmerID1);
     auto [prefix2, code2] = (kmerID2) ? split(kmerID2) : split(kmerID1);
+    if (!prefix1 || !prefix2)
+        return;
+    trim_to_true_length(kmerID1);
+    trim_to_true_length(kmerID2);
     uint64_t const code2_rev = reverse(code2);
     uint8_t const l1 = WORD_SIZE - __builtin_clzll(code1) - 1;
     uint8_t const l2 = WORD_SIZE - __builtin_clzll(code2) - 1;
@@ -368,61 +388,43 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
         auto y = (prefix ^ code2_rev) & overlap_mask;
 
         uint8_t i = 0;
-        std::cout << "overlap: " << overlap << std::endl;
-        std::cout << "prefix = " << std::bitset<36>(prefix).to_string() << std::endl;
-
         while (x >= fourmer_mask || y >= fourmer_mask)
         {
-            std::cout << "x = " << std::bitset<36>(x).to_string() << std::endl;
-            std::cout << "y = " << std::bitset<36>(y).to_string() << std::endl;
             if ((x & fourmer_mask) == fourmer_mask)
             {
-                std::cout << "forward 4-mer: " << std::bitset<36>(x).to_string() << " with overlap = " << overlap << std::endl;
-                annealing_helper(kmerID1, overlap - i, kmerID2, l2 - i);
+
+                if (annealing_helper(kmerID1, overlap - i, kmerID2, l2 - i))
+                    return;
             }
             if ((y & fourmer_mask) == fourmer_mask)
             {
-                // std::cout << std::bitset<36>(y).to_string() << std::endl;
-                // std::cout << "reset length bit: i = " << int(i) << std::endl;
-                // std::cout << "computed length l'1 = " << overlap - i << std::endl;
-                // std::cout << "computed length l'2 = " << i+8 << std::endl;
-                std::cout << "reverse 4-mer: " << std::bitset<36>(y).to_string() << " with overlap = " << overlap << std::endl;
-                annealing_helper(kmerID1, overlap - i, kmerID2, i + 8);
+                if (annealing_helper(kmerID1, overlap - i, kmerID2, i + 8))
+                    return;
             }
             x >>= 2;
             y >>= 2;
             ++++i;
         }
-        if (!(kmerID1 & PREFIX_SELECTOR) || (kmerID2 && !(kmerID2 & PREFIX_SELECTOR)))
-            return;
-        // ++++overlap;
     }
     // test for cross- and inverse-dimerization, i.e. overlap positions
     // [0:l1-8, l1] @code against [l2-l1:0, l2:8]
     if (kmerID1 & PREFIX_SELECTOR)
     {
-        std::cout << "2nd part of shifting ...\n";
         overlap = (l1 < l2) ? l1 : l2;
         uint8_t code2_prefix_ctr = (l1 < l2) ? l2 - l1 : 0;
-        std::cout << "code2_prefix_ctr = " << int(code2_prefix_ctr) << std::endl;
-        std::cout << "initial overlap = " << int(overlap) << std::endl;
-
         uint8_t offset = 0;
         while ((overlap_mask = (1ULL << overlap) - 1) >= fourmer_mask)
         {
             if (kmerID2)
             {
                 auto x = (code1 ^ (code2 >> offset)) & overlap_mask;
-                std::cout << "x = " << std::bitset<40>(x) << std::endl;
                 uint8_t i = 0;
                 while (x >= fourmer_mask)
                 {
-                    std::cout << "computed length l'1 = " << int(l1 - i) << std::endl;
-                    std::cout << "computed length l'2 = " << int(l2 - offset - i) << std::endl;
                     if ((x & fourmer_mask) == fourmer_mask)
                     {
-                        std::cout << "2nd part: 4-mer forward found with offset " << int(offset) << std::endl;
-                        annealing_helper(kmerID1, l1 - i, kmerID2, l2 - offset - i);
+                        if (annealing_helper(kmerID1, l1 - i, kmerID2, l2 - offset - i))
+                            return;
                     }
                     x >>= 2;
                     ++++i;
@@ -430,18 +432,13 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
             }
             // cross- or self-annealing with reversed sequence
             auto y = (code1 ^ (code2_rev >> offset)) & overlap_mask;
-            std::cout << std::bitset<36>(y).to_string() << std::endl;
-            // std::cout << "offset = " << int(offset) << std::endl;
-            // std::cout << "y = " << std::bitset<40>(y) << std::endl;
             uint8_t i = 0;
             while (y >= fourmer_mask)
             {
-                // std::cout << "computed length l'1 = " << l1 - i << std::endl;
-                // std::cout << "computed length l'2 = " << offset+i+8 << std::endl;
                 if ((y & fourmer_mask) == fourmer_mask)
                 {
-                    std::cout << "2nd part: 4-mer reverse found with offset = " << int(offset) << std::endl;
-                    annealing_helper(kmerID1, l1 - i, kmerID2, offset + i + 8);
+                    if (annealing_helper(kmerID1, l1 - i, kmerID2, offset + i + 8))
+                        return;
                 }
                 y >>= 2;
                 ++++i;
@@ -462,61 +459,110 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
 // code2   -------------->
 //         |||||||||||||
 // code3 >--------------
-extern inline void filter_annealing_disconnected(TKmerID & kmerID, TKmerID & kmerID2 = NULL_TKMERID)
+extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
 {
-    if (!(kmerID & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
+    if (!(kmerID1 & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
         return;
-    uint64_t code = kmerID & ~PREFIX_SELECTOR;
-    int8_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1;
-    uint64_t annealings12, annealings23;
-    uint64_t mask = (1ULL << enc_l) - 1;
-    uint64_t code1, code2, code3;
-    uint64_t ident12, ident23;
+    std::cout << "l1 before trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
+
+    trim_to_true_length(kmerID1);
+    std::cout << "l1 after trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
+    if (kmerID2)
+        trim_to_true_length(kmerID2);
+    auto [prefix1, code1] = split(kmerID1);
+    auto [prefix2, code2] = (kmerID2) ? split(kmerID2) : split(kmerID1);
+    uint64_t code2_rev = reverse(code2);
+    uint8_t l1 =  WORD_SIZE - __builtin_clzll(code1) - 1;
+    uint8_t l2 =  WORD_SIZE - __builtin_clzll(code2) - 1;
+    
+    std::cout << "l1 = " << int(l1) << ", l2 = "  << int(l2) << std::endl;
+    std::cout << std::bitset<64>(code1) << std::endl;
+    uint8_t overlap = 20;
+    uint64_t overlap_mask;
+    uint64_t prefix, x, y;
+
     // Due to symmetry we need to test only the first half of possible overlapping positions
-    uint64_t code_rev = reverse(code);
-    for (uint8_t offset = 1; offset <= ((enc_l - 16) >> 1) && kmerID & PREFIX_SELECTOR; ++offset)
+    std::cout << std::bitset<50>((1ULL << (std::min(l1, l2) - 2)) - 1) << std::endl;
+    std::cout << "init overlap mask = " << std::bitset<50>((1ULL << (overlap << 1)) - 1) << std::endl;
+    //exit(0);
+    std::cout << "maximal forward overlap = " << std::min(l1, l2) - 2 << std::endl;
+    std::cout << "initial overlap = " << overlap << std::endl;
+    for (overlap = 20; (overlap_mask = (1ULL << overlap) - 1) <= (1ULL << (std::min(l1, l2) - 2)) - 1; ++++overlap)
     {
-        // 0 to enc_l - offset
-        mask >>= 2;
-        code1 = mask & code;
-        code2 = ((mask << (offset << 1)) & code)  >> (offset << 1);
-        code3 = mask & code_rev;
+        // prefix of code1 and suffix of code2
+        prefix = (code1 >> (l1 - overlap));
         // creates 11 patterns with even offsets for complementary bases
-        ident12 = code1 ^ code2;
-        ident23 = code3 ^ code2;
-        annealings12 = 0;
-        annealings23 = 0;
-        auto j = 0;
-        while (ident12 > 0 || ident23)
+        x = (prefix ^ code2) & overlap_mask;
+        // std::cout << "x1 = " << std::bitset<50>(x) << std::endl;
+
+        y = (prefix ^ code2_rev) & overlap_mask;
+
+        // count ones every two bits and store in 2 bits, 011011 -> 010110
+        x = x - ((x >> 1) & 0x1555555555555);
+        // std::cout << "x2 = " << std::bitset<50>(x) << std::endl;
+
+        // filter every second set bit
+        x &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{50}
+        // std::cout << "x3 = " << std::bitset<50>(x) << std::endl;
+        auto annealings_x = __builtin_popcountll(x);
+        // std::cout << "overlap = " << int(overlap) << ", annealings_x = " << annealings_x << std::endl;
+        if (annealings_x >= 8)
+            annealing_helper(kmerID1, overlap, kmerID2, l2);
+        y = y - ((y >> 1) & 0x1555555555555);
+        // filter every second set bit
+        y &= 0xAAAAAAAAAAAA; // 0b10_{42}
+        auto annealings_y = __builtin_popcountll(y);
+        if (annealings_y >= 8)
+            annealing_helper(kmerID1, overlap, kmerID2, l2);
+    }
+
+    // std::cout << "-------------------------------------------------------\n";
+    if (kmerID1 & PREFIX_SELECTOR)
+    {
+        // std::cout << "l1 = " << WORD_SIZE - __builtin_clzll(code1) - 1 << std::endl;
+        overlap = (l1 <= l2) ? l1 : l2;
+
+        // std::cout << "initial overlap = " << int(overlap) << std::endl;
+        while (overlap >= 20)
         {
-            if ((ident12 & 0b11) == 0b11)
-                ++annealings12;
-            if ((ident23 & 0b11) == 0b11)
-                ++annealings23;
-
-            if (ident12 > 0)
-                ident12 >>= 2;
-            if (ident23 > 0)
-                ident23 >>= 2;
-
-            // get current length and check annealing proportion
-            if (annealings12 >= 8 || annealings23)
+            overlap_mask = (1ULL << overlap) - 1;
+            if (kmerID2) // cross-annealing with code2 forward
             {
-                if (uint64_t(j + (offset << 1)) <= PRIMER_MIN_LEN)
+                x = (code1 ^ code2) & overlap_mask;
+                x = x - ((x >> 1) & 0x1555555555555);
+                x &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{50}
+                // std::cout << "x3 = " << std::bitset<50>(x) << std::endl;
+                auto annealings_x = __builtin_popcountll(x);
+                if (annealings_x >= 8)
                 {
-                    kmerID &= ~PREFIX_SELECTOR;
-                    break;
-                }
-                else
-                {
-                    kmerID = ((~(ONE_LSHIFT_63 >> (j - PRIMER_MIN_LEN + 1))) & kmerID) + (kmerID & (~PREFIX_SELECTOR));
+                    kmerID1 &= ~PREFIX_SELECTOR;
+                    kmerID2 &= ~PREFIX_SELECTOR;
                     break;
                 }
             }
-            ++j;
+            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
+            y = (code1 ^ code2_rev) & overlap_mask;
+            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
+            y = y - ((y >> 1) & 0x1555555555555);
+            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
+            y &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{42}
+            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
+            auto annealings_y = __builtin_popcountll(y);
+            // std::cout << "overlap = " << int(overlap) << ", annealings = " << int(annealings_y) << std::endl;
+            // std::cout << "reverse 2nd half: " << std::bitset<50>(y) << std::endl;
+            // TODO: in case l1 < l2, for (l2-l1) iterations l2 is smaller, but then increases to l2
+            if (annealings_y >= 8)
+            {
+                kmerID1 &= ~PREFIX_SELECTOR;
+                kmerID2 &= ~PREFIX_SELECTOR;
+                break;
+            }
+            code2 >>= 2;
+            // std::cout << "code2 = " <<  kmerID2str(code2) << std::endl;
+            overlap = std::min(WORD_SIZE - __builtin_clzll(code2) - 1, int(l1));
+
         }
     }
-
 }
 
 /*
@@ -659,9 +705,8 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
     // Check for self-annealing
-    TKmerID kmerID2{0};
-    filter_annealing_connected(kmerID, kmerID2);
-    filter_annealing_disconnected(kmerID, kmerID2);
+    filter_annealing_connected(kmerID);
+//    filter_annealing_disconnected(kmerID);
 }
 
 /*

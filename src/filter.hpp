@@ -26,7 +26,7 @@ namespace priset
 {
 
 // Filter of single kmers and transform of references to bit vectors.
-void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts & stats)
+void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap, TKmerCounts * kmerCounts = nullptr)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -197,7 +197,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
                 references[i][seqPos] = 0;
             else
             {
-                stats[KMER_COUNTS::FILTER1_CNT] += __builtin_popcountll(kmerID >> 54);
+                kmerCounts->at(KMER_COUNTS::FILTER1_CNT) += __builtin_popcountll(kmerID >> 54);
                 kmerIDs[i].push_front(kmerID);
             }
         }
@@ -210,7 +210,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
  * primer, i.e. (k1, k2) != (k2, k1).
  */
 template<typename TPairList>
-void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
+void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts * kmerCounts = nullptr)
 {
     pairs.clear();
     auto cp_ctr = 0ULL;
@@ -218,10 +218,9 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
     {
         sdsl::bit_vector reference;
         sdsl::util::assign(reference, references.at(i));
-        sdsl::rank_support_v5<1, 1> r1s(&references.at(i)); // replace after bugfix with
+        sdsl::rank_support_v5<1, 1> r1s(&references.at(i));
         sdsl::select_support_mcl<1> s1s(&reference);
 
-        //std::cout << "DEBUG: iterate over " << r1s.rank(reference.size()) << " kmer IDs\n";
         for (uint64_t r_fwd = 1; r_fwd < r1s.rank(reference.size()); ++r_fwd)
         {
             uint64_t idx_fwd = s1s.select(r_fwd);  // text position of r-th k-mer
@@ -264,7 +263,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                                     // store combination bit
                                     cp.set(mask_fwd, mask_rev);
 
-                                    ++stats[KMER_COUNTS::COMBINER_CNT];
+                                    ++kmerCounts->at(KMER_COUNTS::COMBINER_CNT);
                                 }
                             }
                             mask_rev >>= 1; // does not affect search window, since starting position is fixed
@@ -283,8 +282,8 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
 }
 
 // Apply frequency cutoff for unique pair occurences
-template<typename TPairList, typename TPairFreq>
-void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::vector<TPairFreq> & pair_freqs, TKmerCounts & kmerCounts)
+template<typename TPairList, typename TPairFreqList>
+void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, TPairFreqList & pair_freqs, TKmerCounts * kmerCounts = nullptr)
 {
     std::unordered_map<uint64_t, uint32_t> pairhash2freq;
     std::cout << "Enter filter_pairs ...\n";
@@ -337,13 +336,14 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
             {
                 if (seen.find(h) == seen.end())
                 {
+                    // TODO: derive container types from template parameter
                     std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> pp{kmer_fwd, ONE_LSHIFT_63 >> comb.first,
                                                             kmer_rev, ONE_LSHIFT_63 >> comb.second};
                     std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>> ppf{pairhash2freq.at(h), pp};
                     pair_freqs.push_back(ppf);
                     seen.insert(h);
                 }
-                kmerCounts[KMER_COUNTS::FILTER2_CNT]++;
+                kmerCounts->at(KMER_COUNTS::FILTER2_CNT)++;
             }
         }
     }

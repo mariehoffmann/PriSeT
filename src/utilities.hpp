@@ -42,17 +42,21 @@ static inline uint64_t log2_asm(uint64_t const x) {
 }
 */
 
+extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
+
 // helper: delete lengths bits including the one representing 2bit encode l and larger ones
 extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
 {
+    std::cout << "call delete_length_bits with l = " << int(l) << std::endl;
     auto [prefix, code] = split(kmerID);
-    if (l <= PRIMER_MIN_LEN)
+    if (l <= (PRIMER_MIN_LEN << 1))
         kmerID = code;
     else
     {
         uint64_t offset = PRIMER_MAX_LEN + 1 - (l >> 1);
         kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
     }
+    std::cout << "delete_length_bits: " << kmerID2str(kmerID) << std::endl;
 }
 
 // Execute in terminal and collect command return value.
@@ -67,6 +71,22 @@ std::string exec(char const * cmd) {
         result += buffer.data();
     std::cout << "util.exec, result = " << result << std::endl;
     return result;
+}
+
+// Trim to true length
+extern inline void trim_to_true_length(TKmerID & kmerID)
+{
+    // std::cout << "trim2tl input: ";
+    // std::cout << kmerID2str(kmerID) << std::endl;
+    auto [prefix, code] = split(kmerID);
+    if (!prefix)
+        return;
+    auto l_max = (26 - ffsll(prefix >> 54)) << 1;
+    auto l_enc = WORD_SIZE - __builtin_clzll(code) - 1;
+    if (l_max > l_enc || l_enc < int(PRIMER_MIN_LEN << 1))
+        throw std::runtime_error("ERROR: Code shorter than 16 or largest encoded length!");
+    code >>= (l_enc - l_max);
+    kmerID = prefix | code;
 }
 
 // Split prefix and code given a kmerID.
@@ -153,7 +173,7 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
 {
     // note that assert converted to nop due to seqan's #define NDEBUG
     if (code_ == 0ULL)
-        throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code == 0.");
     uint64_t code = code_;
     if (mask)
         code = get_code(code_, mask);
@@ -171,7 +191,7 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
 
 std::string kmerID2str(TKmerID kmerID)
 {
-    return bits2str((kmerID & PREFIX_SELECTOR) >> 54) + "|" + dna_decoder(kmerID);
+    return bits2str(kmerID >> 54) + "|" + dna_decoder(kmerID);
 }
 
 extern inline void dna_decoder(uint64_t kmerID, std::vector<TSeq> & decodes)

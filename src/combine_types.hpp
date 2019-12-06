@@ -116,4 +116,10 @@ struct TPair
 
 template<typename TPair>
 using TPairList = std::vector<TPair>;
+
+// Type for storing unique kmer combinations and their frequencies
+typedef std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> > TPairFreq;
+typedef std::vector<TPairFreq> TPairFreqList;
+
+
 } // priset

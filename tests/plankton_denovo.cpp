@@ -145,7 +145,7 @@ int main(int argc, char ** argv)
     std::cout << "INFO: pairs after combiner = " << kmerCounts[KMER_COUNTS::COMBINER_CNT] << std::endl;
 
     //  <freq, <kmer_fwd, mask_fwd, kmer_rev, mask_rev> >
-    using TPairFreq = std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>>;
+    // using TPairFreq = std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>>;
     std::vector<TPairFreq> pair_freqs;
     start = std::chrono::high_resolution_clock::now();
     filter_pairs(references, kmerIDs, pairs, pair_freqs, kmerCounts);
