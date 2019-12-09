@@ -47,7 +47,7 @@ extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
 // helper: delete lengths bits including the one representing 2bit encode l and larger ones
 extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
 {
-    std::cout << "call delete_length_bits with l = " << int(l) << std::endl;
+    // std::cout << "call delete_length_bits with l = " << int(l) << std::endl;
     auto [prefix, code] = split(kmerID);
     if (l <= (PRIMER_MIN_LEN << 1))
         kmerID = code;
@@ -56,7 +56,7 @@ extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
         uint64_t offset = PRIMER_MAX_LEN + 1 - (l >> 1);
         kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
     }
-    std::cout << "delete_length_bits: " << kmerID2str(kmerID) << std::endl;
+    // std::cout << "delete_length_bits: " << kmerID2str(kmerID) << std::endl;
 }
 
 // Execute in terminal and collect command return value.

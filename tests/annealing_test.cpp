@@ -53,7 +53,7 @@ void test_filter_self_annealing_connected()
     kmerID = (1ULL << 62) | dna_encoder("CGAAAGTCAGGGGATCG") ;
     filter_annealing_connected(kmerID);
     if ((PREFIX_SELECTOR & kmerID))
-        std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -73,7 +73,7 @@ void test_filter_self_annealing_connected()
     //  TGATCGTCTTCGATCCC
     //   |||||    |||||
     // CCCTAGCTTCTGCTAGT
-    kmerID = dna_encoder("TGATCGTCTTCGATCCC") + (ONE_LSHIFT_63 >> 2);
+    kmerID = (1ULL << 62) | dna_encoder("TGATCGTCTTCGATCCC");
     filter_annealing_connected(kmerID);
     if (PREFIX_SELECTOR & kmerID)
         std::cout << "ERROR: expected kmerID not to pass annealing test\n";
@@ -87,7 +87,6 @@ void test_filter_self_annealing_connected()
     //              ACTAGGCTTCTCCTCGACT
     kmerID = (1ULL << 63) | (1ULL << 61) | (1ULL << 60) | dna_encoder("TCAGCACCTCTTCGGATCA");
     filter_annealing_connected(kmerID);
-    std::cout << std::bitset<10>(kmerID >> 53) << std::endl;
     if ((PREFIX_SELECTOR & kmerID) != (1ULL << 63))
         std::cout << "ERROR: expected kmerID to pass annealing test only for length 16\n";
     else
@@ -111,10 +110,10 @@ void test_filter_self_annealing_disconnected()
     //    5-AGCTAGATGTACTTGG->
     //      | ||| ||| ||
     // 5-AGCTAGATGTACTTGG->
-    kmerID = dna_encoder("AGCTAGATGTACTTGG") + ONE_LSHIFT_63;
+    kmerID = (1ULL << 63) | dna_encoder("AGCTAGATGTACTTGG");
     filter_annealing_disconnected(kmerID);
     if (PREFIX_SELECTOR & kmerID)
-        std::cout << "ERROR: expected kmerID not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -133,7 +132,6 @@ void test_filter_self_annealing_disconnected()
     //   CGAAACTCAGGGGATCGG
     //   |||  | | | |  |||
     //  GGCTAGGGGACTCAAAGC
-    // 00000000001000000000
     kmerID = (1ULL << 61) | dna_encoder("CGAAACTCAGGGGATCGG");
     filter_annealing_disconnected(kmerID);
     if (PREFIX_SELECTOR & kmerID)
@@ -153,7 +151,7 @@ void test_filter_cross_annealing_connected()
     TKmerID kmerID2 = (1ULL << 63) | dna_encoder("TTCTAGGGCCACGTCT");
     filter_annealing_connected(kmerID1, kmerID2);
     if ((PREFIX_SELECTOR & kmerID1) != (1ULL << 63) || (PREFIX_SELECTOR & kmerID2) != (1ULL << 63))
-        std::cout << "ERROR: expected kmerIDs to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerIDs to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -165,7 +163,7 @@ void test_filter_cross_annealing_connected()
     kmerID2 = dna_encoder("TTCTAGGGCATCCTCT") + ONE_LSHIFT_63;
     filter_annealing_connected(kmerID1, kmerID2);
     if ((PREFIX_SELECTOR & kmerID1) || (PREFIX_SELECTOR & kmerID2))
-        std::cout << "ERROR: expected kmerIDs not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerIDs not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -177,7 +175,7 @@ void test_filter_cross_annealing_connected()
     kmerID2 = (1ULL << 63) | dna_encoder("TTGATCGGCCACGTCT");
     filter_annealing_connected(kmerID1, kmerID2);
     if ((PREFIX_SELECTOR & kmerID1) || (PREFIX_SELECTOR & kmerID2))
-        std::cout << "ERROR: expected kmerIDs not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerIDs not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -190,7 +188,7 @@ void test_filter_cross_annealing_connected()
     kmerID2 = (1ULL << 63) | (1ULL << 61) | dna_encoder("TTACCTGCACCGGCTACT");
     filter_annealing_connected(kmerID1, kmerID2);
     if (((PREFIX_SELECTOR & kmerID1) != (1ULL << 63)) || (PREFIX_SELECTOR & kmerID2) != (1ULL << 63))
-        std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID2 not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -219,7 +217,7 @@ void test_filter_cross_annealing_connected()
     kmerID2 = (1ULL << 63) | (1ULL << 61) | dna_encoder("CCGATTGGCCACGTCTAG");
     filter_annealing_connected(kmerID1, kmerID2);
     if (((PREFIX_SELECTOR & kmerID1) != (1ULL << 63)) || (PREFIX_SELECTOR & kmerID2) != (1ULL << 63))
-        std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID2 not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -231,7 +229,7 @@ void test_filter_cross_annealing_connected()
     kmerID2 = (1ULL << 63) | (1ULL << 61) | dna_encoder("GTAGGATTCACGGCATGG");
     filter_annealing_connected(kmerID1, kmerID2);
     if (((PREFIX_SELECTOR & kmerID1) != ((1ULL << 63) | (1ULL << 62))) || (PREFIX_SELECTOR & kmerID2) != (1ULL << 63))
-        std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID2 not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -239,16 +237,11 @@ void test_filter_cross_annealing_connected()
     // 5-GATGTGGACCGGCTTGAT->
     //                ||||
     // 5-GTAGGATCACGGAAACT->
-
-//    GATGTGGACCGGCTTGAT
-//                  ||||
-//          TCAAAGGCACTAGGATG
-
     kmerID1 = (1ULL << 63) | (1ULL << 61) | dna_encoder("GATGTGGACCGGCTTGAT");
     kmerID2 = (1ULL << 63) | (1ULL << 62) | dna_encoder("GTAGGATCACGGAAACT");
     filter_annealing_connected(kmerID1, kmerID2);
     if (((PREFIX_SELECTOR & kmerID1) != (1ULL << 63)) || (PREFIX_SELECTOR & kmerID2) != ((1ULL << 63) | (1ULL << 62)))
-        std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID2 not to pass annealing test\n";
     else
         std::cout << "OK\n";
 
@@ -260,20 +253,56 @@ void test_filter_cross_annealing_connected()
     kmerID2 = (1ULL << 63) | (1ULL << 62) | dna_encoder("TACCAGCGTACCAGTAG");
     filter_annealing_connected(kmerID1, kmerID2);
     if (((PREFIX_SELECTOR & kmerID1) != ((1ULL << 63))) || (PREFIX_SELECTOR & kmerID2) != ((1ULL << 63) | (1ULL << 62)))
-        std::cout << "ERROR: expected kmerID2 not to pass annealing test\nt";
+        std::cout << "ERROR: expected kmerID2 not to pass annealing test\n";
     else
         std::cout << "OK\n";
 }
 
 void test_filter_cross_annealing_disconnected()
 {
+    // insignifanct cross-annealing, not that kmerID2 would not pass self-annealing test!
+    //   5-CGAAAGCGAGGGGATCG->
+    //       |  |   ||  ||
+    // 5-ACATTAACCGGCCGGTAAGGCA->
+    TKmerID kmerID1 = (1ULL << 62) | dna_encoder("CGAAAGTGAGGGGATCG");
+    TKmerID kmerID2 = (1ULL << 62) | (1ULL << 59) | dna_encoder("ACATTAACCGGCCGGTAAGGCA");
+    filter_annealing_disconnected(kmerID1, kmerID2);
+    if (!(PREFIX_SELECTOR & kmerID1) || !(PREFIX_SELECTOR & kmerID2))
+        std::cout << "ERROR: expected kmerID1/2 to pass annealing test.\n";
+    else
+        std::cout << "OK\n";
 
+    // annealing positions exceed 50 % when matched -/-
+    //   5-CGAAAGCGAGGGGATCG->
+    //       |  ||| ||  ||
+    // 5-ACATTAACGCGCCGGTAAGGCA->
+    kmerID1 = (1ULL << 62) | dna_encoder("CGAAAGTGAGGGGATCG");
+    kmerID2 = (1ULL << 62) | (1ULL << 59) | dna_encoder("ACATTAACGCGCCGGTAAGGCA");
+    filter_annealing_disconnected(kmerID1, kmerID2);
+    if (PREFIX_SELECTOR & kmerID1 || PREFIX_SELECTOR & kmerID2)
+        std::cout << "ERROR: expected kmerID1/2 not to pass annealing test.\n";
+    else
+        std::cout << "OK\n";
+
+    // annealing positions exceed 50 % when matched -/+
+    //  CGAAAGACAGGGGCTGACT
+    //       || ||| |  ||
+    //      ACTTTCCGCTTCTCTAC
+    kmerID1 = (1ULL << 63) | (1ULL << 60) | dna_encoder("CGAAAGACAGGGGCTGACT");
+    kmerID2 = (1ULL << 63) | (1ULL << 62) | dna_encoder("CATCTCTTCGCCTTTCA");
+    filter_annealing_disconnected(kmerID1, kmerID2);
+    if (PREFIX_SELECTOR & kmerID1 || PREFIX_SELECTOR & kmerID2)
+        std::cout << "ERROR: expected kmerID1/2 not to pass annealing test.\n";
+    else
+        std::cout << "OK\n";
 }
 
 int main()
 {
-    //test_filter_self_annealing_connected();
-    //test_filter_cross_annealing_connected();
+    test_filter_self_annealing_connected();
+    test_filter_cross_annealing_connected();
     test_filter_self_annealing_disconnected();
+    test_filter_cross_annealing_disconnected();
+
     return 0;
 }

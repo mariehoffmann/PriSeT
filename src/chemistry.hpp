@@ -463,10 +463,10 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
 {
     if (!(kmerID1 & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
         return;
-    std::cout << "l1 before trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
+    // std::cout << "l1 before trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
 
     trim_to_true_length(kmerID1);
-    std::cout << "l1 after trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
+    // std::cout << "l1 after trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
     if (kmerID2)
         trim_to_true_length(kmerID2);
     auto [prefix1, code1] = split(kmerID1);
@@ -474,19 +474,18 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
     uint64_t code2_rev = reverse(code2);
     uint8_t l1 =  WORD_SIZE - __builtin_clzll(code1) - 1;
     uint8_t l2 =  WORD_SIZE - __builtin_clzll(code2) - 1;
-    
-    std::cout << "l1 = " << int(l1) << ", l2 = "  << int(l2) << std::endl;
-    std::cout << std::bitset<64>(code1) << std::endl;
+
+    // std::cout << "l1 = " << int(l1) << ", l2 = "  << int(l2) << std::endl;
+    // std::cout << std::bitset<64>(code1) << std::endl;
     uint8_t overlap = 20;
     uint64_t overlap_mask;
     uint64_t prefix, x, y;
 
     // Due to symmetry we need to test only the first half of possible overlapping positions
-    std::cout << std::bitset<50>((1ULL << (std::min(l1, l2) - 2)) - 1) << std::endl;
-    std::cout << "init overlap mask = " << std::bitset<50>((1ULL << (overlap << 1)) - 1) << std::endl;
-    //exit(0);
-    std::cout << "maximal forward overlap = " << std::min(l1, l2) - 2 << std::endl;
-    std::cout << "initial overlap = " << overlap << std::endl;
+    // std::cout << std::bitset<50>((1ULL << (std::min(l1, l2) - 2)) - 1) << std::endl;
+    // std::cout << "init overlap mask = " << std::bitset<50>((1ULL << (overlap << 1)) - 1) << std::endl;
+    // std::cout << "maximal forward overlap = " << std::min(l1, l2) - 2 << std::endl;
+    // std::cout << "initial overlap = " << overlap << std::endl;
     for (overlap = 20; (overlap_mask = (1ULL << overlap) - 1) <= (1ULL << (std::min(l1, l2) - 2)) - 1; ++++overlap)
     {
         // prefix of code1 and suffix of code2
@@ -521,7 +520,6 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
     {
         // std::cout << "l1 = " << WORD_SIZE - __builtin_clzll(code1) - 1 << std::endl;
         overlap = (l1 <= l2) ? l1 : l2;
-
         // std::cout << "initial overlap = " << int(overlap) << std::endl;
         while (overlap >= 20)
         {
@@ -560,7 +558,6 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
             code2 >>= 2;
             // std::cout << "code2 = " <<  kmerID2str(code2) << std::endl;
             overlap = std::min(WORD_SIZE - __builtin_clzll(code2) - 1, int(l1));
-
         }
     }
 }
