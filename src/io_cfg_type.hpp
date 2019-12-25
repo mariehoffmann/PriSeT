@@ -23,10 +23,6 @@ namespace priset
 
 #define MAX_PATH_LENGTH 100
 
-// Lower kmer frequency cutoff in percentage, i.e. all kmer occurences below will be dropped.
-#define FREQ_KMER_MIN_PERCENT 10
-#define FREQ_KMER_MIN 50
-
 struct io_cfg_type
 {
 

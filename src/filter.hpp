@@ -65,7 +65,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             continue;
         }
         // update largest kmer position
-        seqNo2maxPos[seqNo] = (seqNo2maxPos.find(seqNo) == seqNo2maxPos.end()) ? seqPos : std::max(seqNo2maxPos.at(seqNo), seqPos);
+        seqNo2maxPos[seqNo] = (seqNo2maxPos.find(seqNo) == seqNo2maxPos.end()) ? seqPos : std::max(seqNo2maxPos[seqNo], seqPos);
         // and also for other occurences
         for (std::vector<TLocation>::const_iterator it_loc_fwd = it->second.first.begin(); it_loc_fwd != it->second.first.end(); ++it_loc_fwd)
         {
@@ -73,6 +73,11 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             TSeqPos seqPos_fwd = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
             seqNo2maxPos[seqNo_fwd] = (seqNo2maxPos.find(seqNo_fwd) == seqNo2maxPos.end()) ? seqPos_fwd : std::max(seqNo2maxPos.at(seqNo_fwd), seqPos_fwd);
         }
+    }
+    for (auto it = seqNo2maxPos.cbegin(); it != seqNo2maxPos.end(); ++it)
+    {
+        seqan::DnaString seq = seqan::valueById(text, it->first);
+        std::cout << "seqNo = " << it->first << " with last pos = " << it->second << ", total seq length = " << seqan::length(seq) << std::endl;
     }
     // (ii) Create bit vectors in the length of largest kmer occurences, and set
     // bits for kmer occurrences. Collect also kmer lengths encoded in final kmer
@@ -102,7 +107,11 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
         // cleanup in mapper may lead to undercounting kmer occurrences
         // TODO: move kmer frequency cutoff completely into mapper
         if ((it->second).first.size() < freq_kmer_min_abs)
-            continue; //std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
+        {
+             std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
+             continue;
+        }
+
         const auto & [seqNo, seqPos, K] = (it->first);
         // use symmetry and lexicographical ordering of locations to skip already seen ones
         // TODO: is this already shortcut fm mapper?
@@ -129,8 +138,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             if (it_loc_fwd > it->second.first.begin() && seqNo_prev == seqNo && seqPos_prev + TRAP_DIST < seqPos)
             {
                 seqan::DnaString seq = seqan::valueById(text, seqNo);
-                if (seqan::infixWithLength(seq, seqPos, 24) == "GTAGGTGAACCTGCAGAAGGATCA")
-                    std::cout << "DEBUG: TRAP_DIST! for V9 rev\n";
 
                 // undo previous kmer bit in reference
                 references[seqNo_cx][seqPos_prev] = 0;
@@ -151,6 +158,12 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             seqNo_prev = seqNo;
             seqPos_prev = seqPos;
         }
+        for (unsigned i = 0; i < debug_drop_kmer_repeats.size(); ++i)
+        {
+            if (debug_drop_kmer_repeats[i])
+                std::cout << "seqNo_cx = " << i << ", dropouts: " << debug_drop_kmer_repeats[i] << std::endl;
+        }
+
     }
 
     // (iii) lookup kmer sequences, filter and encode as 64 bit integers.
@@ -177,7 +190,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             TKmerID kmerID_prefix = loc_and_ks[loc_key]; // tail not filled yet & CODE_SIZEgth_mask;
             if (!kmerID_prefix)
                 throw std::invalid_argument("ERROR: prefix is 0!");
-            // identify lowest set bit in head
+            // identify lowest set bit in prefix
             TKmerLength k_max = PRIMER_MAX_LEN - ffsll(kmerID_prefix >> 54) + 1;
 
             // lookup sequence in corpus and encode

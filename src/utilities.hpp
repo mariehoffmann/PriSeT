@@ -42,13 +42,16 @@ static inline uint64_t log2_asm(uint64_t const x) {
 }
 */
 
-extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
+// Split prefix and code given a kmerID.
+#define split_kmerID(kmerID) std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR}
+
+// extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
 
 // helper: delete lengths bits including the one representing 2bit encode l and larger ones
 extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
 {
     // std::cout << "call delete_length_bits with l = " << int(l) << std::endl;
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     if (l <= (PRIMER_MIN_LEN << 1))
         kmerID = code;
     else
@@ -78,7 +81,7 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
 {
     // std::cout << "trim2tl input: ";
     // std::cout << kmerID2str(kmerID) << std::endl;
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     if (!prefix)
         return;
     auto l_max = (26 - ffsll(prefix >> 54)) << 1;
@@ -89,12 +92,11 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
     kmerID = prefix | code;
 }
 
-// Split prefix and code given a kmerID.
-extern inline std::pair<uint64_t, uint64_t> split(TKmerID kmerID)
-{
-    //std::cout << "split: " << bits2str(kmerID) << std::endl;
-    return std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR};
-}
+// extern inline std::pair<uint64_t, uint64_t> split(TKmerID kmerID)
+// {
+//     //std::cout << "split: " << bits2str(kmerID) << std::endl;
+//     return std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR};
+// }
 
 // forward declaration
 struct primer_cfg_type;
@@ -123,7 +125,6 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
     uint64_t code(0);
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
-         //std::cout << "char at pos i = " << i << char(seqan::getValue(seq, i)) << std::endl;
          switch (char(seqan::getValue(seq, i))) //char(seq[i]))
          {
              case 'C': code += 1ULL; break;
@@ -135,8 +136,28 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
      }
      code >>= 2;
      code += 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
-     //std::cout << "code by encoder = " << code << std::endl;
-     //std::cout << "code by encoder as bitstr = " << std::bitset<64>(code) << std::endl;
+     return code;
+}
+
+// with length bit in prefix
+uint64_t dna_encoder_with_lbit(seqan::String<priset::dna> const & seq)
+{
+    uint64_t code(0);
+    auto l = seqan::length(seq);
+     for (uint64_t i = 0; i < l; ++i)
+     {
+         switch (char(seqan::getValue(seq, i))) //char(seq[i]))
+         {
+             case 'C': code += 1ULL; break;
+             case 'G': code += 2ULL; break;
+             case 'T': code += 3ULL;
+         }
+         code <<= 2;
+     }
+     // revert last shift
+     code >>= 2;
+     // add length bit and stop symbol 'C' = 1
+     code |= 1ULL << (63 - (l - PRIMER_MIN_LEN)) | (1ULL << uint64_t(l << 1));
      return code;
 }
 
@@ -146,24 +167,16 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
 // A leading bit ('C') remains in the code to signal the end.
 extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
 {
-    //std::cout << "Enter get_code with kmerID = " << kmerID << std::endl;
-    auto [prefix, code] = split(kmerID);
-    //std::cout << "Code after split = " << code << std::endl;
+    auto [prefix, code] = split_kmerID(kmerID);
     if (!code)
     {
         std::cout << "ERROR: expected kmerID not zero\n";
         exit(0);
     }
-
-    //std::cout << "Leading zero count = " << __builtin_clzl(code) << std::endl;
     uint8_t enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
     if (!mask)
         mask = ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN);
-
-    //std::cout << "Encoded length = " << int(enc_l) << std::endl;
     uint8_t mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
-    //std::cout << "Target length = " << int(mask_l) << std::endl;
-
     return (enc_l == mask_l) ? code : code >> ((enc_l - mask_l) << 1);   // kmer length correction
 }
 
@@ -529,7 +542,7 @@ void unique_kmers(TKmerIDs const & kmerIDs, std::set<uint64_t> & set)
     {
         for (auto it_kmerID = it_ref->begin(); it_kmerID <= it_ref->end(); ++it_kmerID)
         {
-            auto [prefix, code] = split(*it_kmerID);
+            auto [prefix, code] = split_kmerID(*it_kmerID);
             bool start_shift = false; // since kmer IDs represent only the longest kmer they encode and not necessarily the longest possible primer length, we start truncating the ID after we have seen the first length bit
             while (prefix)
             {

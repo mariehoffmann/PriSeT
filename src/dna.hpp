@@ -20,11 +20,11 @@
 namespace priset
 {
 
-std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
+// std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
 
 extern inline uint64_t complement(uint64_t const code_)
 {
-    auto [prefix, code] = split(code_);
+    auto [prefix, code] = split_kmerID(code_);
     uint64_t code_c = 0;
     uint8_t offset = 0;
     while (code > 1)
@@ -45,7 +45,7 @@ extern inline uint64_t complement(uint64_t const code_)
 // Preserves length bits and closure.
 extern inline uint64_t reverse(uint64_t const code_)
 {
-    auto [prefix, code] = split(code_);
+    auto [prefix, code] = split_kmerID(code_);
     uint64_t code_r = 0b01; // closure
     while (code > 1)
     {
@@ -59,7 +59,7 @@ extern inline uint64_t reverse(uint64_t const code_)
 
 extern inline uint64_t reverse_complement(uint64_t const code_)
 {
-    auto [prefix, code] = split(code_);
+    auto [prefix, code] = split_kmerID(code_);
     uint64_t code_rc = 0b01; // closure
     while (code > 1)
     {

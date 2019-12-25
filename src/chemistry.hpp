@@ -27,7 +27,7 @@ namespace priset  //::chemistry TODO: introduce chemistry namespace
 {
 
 std::string dna_decoder(uint64_t code, uint64_t const mask);
-std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
+// std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
 extern inline uint64_t complement(uint64_t const code);
 extern inline uint64_t reverse(uint64_t const code);
 extern inline uint64_t reverse_complement(uint64_t const code);
@@ -92,7 +92,7 @@ extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID cons
  */
 extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
 {
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     auto target_l = PRIMER_MIN_LEN;
     target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
     auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
@@ -116,7 +116,7 @@ extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
 // CG content computation for output
 extern inline float CG(TKmerID const kmerID, uint64_t const mask)
 {
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     auto target_l = PRIMER_MIN_LEN;
     target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
     auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
@@ -185,7 +185,7 @@ std::string kmerID2str(TKmerID kmerID);
  */
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     if (!code)
         throw std::invalid_argument("Expected kmerID non zero!");
     if (!prefix)
@@ -237,7 +237,7 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
 // Returns false if constraint is violated.
 extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     uint64_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1; // in bits
     if (sense == '-')
         code >>= enc_l - 10; // shift right to have prefix of length 10
@@ -291,7 +291,7 @@ extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense,
 {
     if (sense != '+' && sense != '-')
         throw std::invalid_argument("Expected sense '-' or '+'!");
-    auto [prefix, code] = split(kmerID);
+    auto [prefix, code] = split_kmerID(kmerID);
     uint64_t encoded_len = WORD_SIZE - __builtin_clzll(code) - 1;
     if (sense == '-') // reverse complement!
     {
@@ -356,8 +356,8 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
 {
 
     uint64_t const fourmer_mask = 0b11111111;
-    auto [prefix1, code1] = split(kmerID1);
-    auto [prefix2, code2] = (kmerID2) ? split(kmerID2) : split(kmerID1);
+    auto [prefix1, code1] = split_kmerID(kmerID1);
+    auto [prefix2, code2] = (kmerID2) ? split_kmerID(kmerID2) : split_kmerID(kmerID1);
     if (!prefix1 || !prefix2)
         return;
     trim_to_true_length(kmerID1);
@@ -469,8 +469,8 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
     // std::cout << "l1 after trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
     if (kmerID2)
         trim_to_true_length(kmerID2);
-    auto [prefix1, code1] = split(kmerID1);
-    auto [prefix2, code2] = (kmerID2) ? split(kmerID2) : split(kmerID1);
+    auto [prefix1, code1] = split_kmerID(kmerID1);
+    auto [prefix2, code2] = (kmerID2) ? split_kmerID(kmerID2) : split_kmerID(kmerID1);
     uint64_t code2_rev = reverse(code2);
     uint8_t l1 =  WORD_SIZE - __builtin_clzll(code1) - 1;
     uint8_t l2 =  WORD_SIZE - __builtin_clzll(code2) - 1;
@@ -574,8 +574,8 @@ extern inline void filter_annealing(TKmerID & kmerID) // function overload for s
 // if there are at least 4 nts complementary to each other.
 extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
 {
-    auto [prefix1, code1] = split(kmerID1);
-    auto [prefix2, code2] = split(kmerID2);
+    auto [prefix1, code1] = split_kmerID(kmerID1);
+    auto [prefix2, code2] = split_kmerID(kmerID2);
     if (!prefix1 || !prefix2)
         return;
     // build 4-mer position map of kmerID1
@@ -699,11 +699,33 @@ void chemical_filter_single_pass(TKmerID & kmerID)
         code >>= 2;
         mask <<= 1;
     }
+    // bool passed = 1;
+    // if (!(kmerID & PREFIX_SELECTOR))
+    // {
+    //     std::cout << "Did not pass 1st part. " << std::endl;
+    //     passed = 0;
+    // }
+
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
-    // Check for self-annealing
-    filter_annealing_connected(kmerID);
-//    filter_annealing_disconnected(kmerID);
+    // if (!(kmerID & PREFIX_SELECTOR) && passed)
+    // {
+    //     std::cout << "Did not pass filter_repeats_runs." << std::endl;
+    //     passed = 0;
+    // }
+    // // Check for self-annealing
+    // filter_annealing_connected(kmerID);
+    // if (!(kmerID & PREFIX_SELECTOR) && passed)
+    // {
+    //     passed = 0;
+    //     std::cout << "Did not pass filter_annealing_connected." << std::endl;
+    // }
+    // filter_annealing_disconnected(kmerID);
+    // if (!(kmerID & PREFIX_SELECTOR) && passed)
+    // {
+    //     std::cout << "Did not pass filter_annealing_disconnected." << std::endl;
+    // }
+
 }
 
 /*
@@ -758,91 +780,4 @@ extern inline float gibbs_free_energy(seqan::String<priset::dna> const & s, seqa
     return energy_min;
 }
 
-/* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
- * Returns true if ΔG ≥ -5kcal/mol
- */
-extern inline bool filter_cross_dimerization(TKmerID kmerID1, TKmerID kmerID2)
-{
-    // Approximate: check for smallest encoded kmer
-    // TODO: do check exact and avoid String conversion
-    TSeq seq1 = dna_decoder(kmerID1, __builtin_clzl(kmerID1) + PRIMER_MIN_LEN);
-    TSeq seq2 = dna_decoder(kmerID2, __builtin_clzl(kmerID2) + PRIMER_MIN_LEN);
-
-    float dG = gibbs_free_energy(seq1, seq2);
-    //std::cout << "minimal free energy for self-dimerization of s,t is " << dG << std::endl;
-    return (dG < -10) ? false : true;
-}
-
-/* !\brief Check for self-dimerization, i.e. bonding energy by same sense bonding.
- * Returns true if ΔG ≥ -5kcal/mol
- */
-extern inline bool filter_self_dimerization(TKmerID kmer_ID)
-{
-    return filter_cross_dimerization(kmer_ID, kmer_ID);
-}
-
-// evaluate soft constraints
-double score_kmer(TKmerID kmerID, uint64_t mask)
-{
-    double score = 0.0;
-    double const eps = 0.1;
-    // has 3 run
-    auto [prefix, code] = split(kmerID);
-    if (mask)
-    {
-        uint8_t enc_l = (WORD_SIZE - __builtin_clzll(code) - 1) >> 1;
-        uint8_t target_l = __builtin_clzll(mask) + PRIMER_MIN_LEN;
-        code >>= enc_l - target_l;
-    }
-    while (code >= (1 << 6))
-    {
-        uint64_t infix = code & 0b111111;
-        if (infix == 0b000000 || infix == 0b111111)
-            score -= eps;
-        if (infix == 0b010101 || infix == 0b101010) // 3 runs of CG worse
-            score -= 2*eps;
-        code >>= 2;
-    }
-    return std::max(0.0, score);
-}
-
-/*
-
-# check for 2ndary structure hairpin, may only be present at 3' end with a delta(G) = -2 kcal/mol,
-# or internally with a delta(G) of -3 kcal/mol
-# TODO: upper limit for loop length is disrespected currently
-def filter_hairpin(seq, cfg):
-    n, min_loop_len = len(seq), int(cfg.var['hairpin_loop_len'][0])
-    palindrome_len_rng = range(3, len(seq)/2 - min_loop_len + 1)
-    seq_ci = complement(seq)[::-1] # inverted, complemented sequence
-    for i in range(len(seq) - 2*palindrome_len_rng[0] - min_loop_len):
-        for m in palindrome_len_rng:
-            for i_inv in range(n - 2*m - min_loop_len):
-                if seq[i:i+m] == seq_ci[i_inv:i_inv+m]:
-                    #print seq[i:i+m], ' == ', seq_ci[i_inv:i_inv+m]
-                    return False
-    return True
-
-'''
-    Same sense interaction: sequence is partially homologous to itself.
-'''
-def filter_selfdimer(seq, cfg):
-    seq_rev = seq[::-1]
-    return filter_crossdimer(seq, seq[::-1], cfg)
-
-'''
-    Pairwise interaction: sequence s is partially homologous to sequence t.
-    If primer binding is too strong in terms of delta G, less primers are available for DNA binding.
-    Todo: Use discrete FFT convolution to compute all free Gibb's energy values for all overlaps in O(nlogn).
-'''
-def filter_crossdimer(s, t, cfg):
-    n, m = len(s), len(t)
-    cnv = [0 for _ in range(len(s)+len(t)-1)]
-    for n in range(len(s) + len(t) - 1):
-        cnv[n] = sum([delta_G(s[m], t[n-m]) for m in range(len(s))])
-    if min(cnv) < cfg.var['delta_G_cross']:
-        return False
-    return True, min(cnv)
-*/
-
-} // namespace chemistry
+} // namespace priset
