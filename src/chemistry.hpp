@@ -40,24 +40,24 @@ extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID cons
         std::cerr << "Error: target mask bit not set\n";
 
     // remove length mask
-    TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR ;
+    TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR;
     TKmerID code2 = kmerID2 & ~PREFIX_SELECTOR;
 
-    uint8_t enc_l1 = (WORD_SIZE - 1 - __builtin_clzl(code1)) >> 1; // encoded length
-    uint8_t mask_l1 = __builtin_clzl(mask1) + PRIMER_MIN_LEN;      // selected length
+    uint8_t enc_l1 = WORD_SIZE - 1 - __builtin_clzl(code1);  // encoded length 2bit
+    uint8_t mask_l1 = (__builtin_clzl(mask1) + PRIMER_MIN_LEN) << 1;   // selected length 2bit
 
-    uint8_t enc_l2 = (WORD_SIZE - 1 - __builtin_clzl(code2)) >> 1; // encoded length
-    uint8_t mask_l2 = __builtin_clzl(mask2) + PRIMER_MIN_LEN;      // selected length
+    uint8_t enc_l2 = WORD_SIZE - 1 - __builtin_clzl(code2); // encoded length
+    uint8_t mask_l2 = (__builtin_clzl(mask2) + PRIMER_MIN_LEN) << 1;      // selected length
 
     if (mask_l1 > enc_l1 || mask_l2 > enc_l2)
         std::cerr << "ERROR: largest encoded kmer length undershoots target length!\n";
 
-    // trim kmer if overlong
-    code1 >>= (enc_l1 - mask_l1) << 1;
-    code2 >>= (enc_l2 - mask_l2) << 1;
+    // trim kmer if exceeding encoded length
+    code1 >>= enc_l1 - mask_l1;
+    code2 >>= enc_l2 - mask_l2;
 
-    int8_t AT = 0;
-    int8_t CG = 0;
+    int8_t AT{0};
+    int8_t CG{0};
 
     if (!(__builtin_clzl(code1) % 2))
         std::cerr << "ERROR: expected odd number of leading zeros\n";
@@ -77,6 +77,10 @@ extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID cons
     }
     return std::abs(2 * AT + 4 * CG);
 }
+
+// AT   AT = 2
+//
+// CG      CG = -2
 
 /*
  * Compute melting temperature of an encoded oligomer. The oligomer is trimmed
@@ -185,12 +189,15 @@ std::string kmerID2str(TKmerID kmerID);
  */
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
+    // std::cout << "\tenter filter_repeats_runs ...\n";
     auto [prefix, code] = split_kmerID(kmerID);
     if (!code)
         throw std::invalid_argument("Expected kmerID non zero!");
     if (!prefix)
+    {
+        // std::cout << "prefix is already 0 \n";
         return;
-
+    }
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
     kmerID = code; // save trimmed kmer-code part
@@ -198,13 +205,14 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
     for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {
         uint64_t tail_10 = tail_selector_10 & code;
-        // XOR tail with A_4, C_4, G_4, T_
+        // XOR tail with A_4, C_4, G_4, T_4
         if ((tail_10 == 0b00000000) || (tail_10 == 0b01010101) || (tail_10 == 0b10101010) || (tail_10 == 0b11111111))
         {
             // note that (x >> 64) won't be executed
             uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
             // delete all k bits ≥ len_selector
             prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
+            // std::cout << "\t4-run found\n";
         }
         // at least 10 characters left to test for di-nucleotide repeats of length 5
         if (k - i > 9)
@@ -222,14 +230,21 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
                 uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
                 // delete all k bits ≥ len_selector
                 prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
+                // std::cout << "\tdi-nucleotide run found\n";
             }
         }
         if (!prefix)
+        {
+            // std::cout << "\tprefix is 0\n";
             break;
+        }
+
         code >>= 2;
     }
     // add updated prefix
-    kmerID += prefix;
+
+    kmerID |= prefix;
+    // std::cout << "\tored kmerID = " << kmerID2str(kmerID) << std::endl;
 }
 
 // Check if not more than 3 out of the 5 last bases at the 3' end are CG.
@@ -633,12 +648,13 @@ extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
  */
 void chemical_filter_single_pass(TKmerID & kmerID)
 {
-    TKmerID code = kmerID & ~PREFIX_SELECTOR;
+    // TKmerID code = kmerID & ~PREFIX_SELECTOR;
+    auto [prefix, code] = split_kmerID(kmerID);
     assert(kmerID > 0 && code > 0);
     uint8_t AT = 0; // counter 'A'|'T'
     uint8_t CG = 0; // counter 'C'|'G'
 
-    uint64_t enc_l;
+    uint64_t enc_l = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
     // sum CG, AT content for longest kmer
     while (code != 1)
     {
@@ -649,30 +665,43 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             default: ++AT;
         }
         // TATA box test
-        enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1;
+
         if ((code > (1ULL << 9)) && (((code & 0b11111111) == 0b11001100) || ((code & 0b11111111) == 0b00110011)))
         {
+            bool print_info = 0;
+            // if (dna_decoder(kmerID).substr(0, 18) == "ATTCCAGCTCCAATAGCG")
+            // {
+            //     print_info = 1;
+            //     std::cout << "TATA box found in DIAZ fwd" << std::endl;
+            //     std::cout << "kmerID = " << kmerID2str(kmerID) << ", enc_l = " << enc_l << std::endl;
+            // }
             if (enc_l <= PRIMER_MIN_LEN) // delete all length bits to discard this kmer
             {
-                kmerID &= (1ULL << 52) - 1;
+                kmerID &= ~PREFIX_SELECTOR;
+                // if (print_info)
+                //     std::cout << "delete all length bits" << std::endl;
                 return;
             }
-            else // delete all length bits between current encoded length and subsequent
+            else // delete all length bits between current encoded length and larger ones
             {
-                kmerID &= (ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN + 1)) - 1;
+
+                prefix &= ~((1ULL << (WORD_SIZE - enc_l + PRIMER_MIN_LEN)) - 1);
+                // if (print_info)
+                //     std::cout << "\tshift offset = " << (WORD_SIZE - enc_l + PRIMER_MIN_LEN) << ", delete tailing length bits: " << kmerID2str(prefix | (~PREFIX_SELECTOR & kmerID)) << std::endl;
             }
         }
-        if (!(kmerID & PREFIX_SELECTOR))
+        if (!prefix)
             return;
         code >>= 2;
+        --enc_l;
     }
     code = kmerID & ~PREFIX_SELECTOR;
+    kmerID = prefix | code;
     // start with largest kmer
-    uint64_t tailing_zeros = ffsll((kmerID & PREFIX_SELECTOR) >> 54) - 1;
+    uint64_t tailing_zeros = ffsll(prefix >> 54) - 1;
     uint64_t mask = 1ULL << (54 + tailing_zeros);
     for (uint8_t i = 0; i < 10 - tailing_zeros; ++i)
     {
-
         if (kmerID & mask)
         {
             // reset bit if Tm out of range
@@ -680,6 +709,7 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
             {
                 kmerID ^= mask;
+                // std::cout << "\tTm out of range: " << Tm << std::endl;
             }
             else
             {
@@ -687,6 +717,7 @@ void chemical_filter_single_pass(TKmerID & kmerID)
                 if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
                 {
                     kmerID ^= mask;
+                    // std::cout << "\tCG out of range: " << CG_content << std::endl;
                 }
             }
         }
@@ -699,12 +730,6 @@ void chemical_filter_single_pass(TKmerID & kmerID)
         code >>= 2;
         mask <<= 1;
     }
-    // bool passed = 1;
-    // if (!(kmerID & PREFIX_SELECTOR))
-    // {
-    //     std::cout << "Did not pass 1st part. " << std::endl;
-    //     passed = 0;
-    // }
 
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
