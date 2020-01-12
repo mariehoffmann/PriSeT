@@ -27,6 +27,9 @@
 #include "io_cfg_type.hpp"
 #include "types.hpp"
 
+// Split prefix and code given a kmerID.
+#define split_kmerID(kmerID) std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR}
+
 namespace priset
 {
 
@@ -42,8 +45,7 @@ static inline uint64_t log2_asm(uint64_t const x) {
 }
 */
 
-// Split prefix and code given a kmerID.
-#define split_kmerID(kmerID) std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR}
+std::string kmerID2str(TKmerID kmerID);
 
 // extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
 
@@ -125,17 +127,17 @@ uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
     uint64_t code(0);
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
      {
-         switch (char(seqan::getValue(seq, i))) //char(seq[i]))
+         switch (char(seqan::getValue(seq, i)))
          {
-             case 'C': code += 1ULL; break;
-             case 'G': code += 2ULL; break;
-             case 'T': code += 3ULL;
+             case 'C': code |= 1ULL; break;
+             case 'G': code |= 2ULL; break;
+             case 'T': code |= 3ULL;
          }
          code <<= 2;
 
      }
      code >>= 2;
-     code += 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
+     code |= 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
      return code;
 }
 
@@ -144,13 +146,13 @@ uint64_t dna_encoder_with_lbit(seqan::String<priset::dna> const & seq)
 {
     uint64_t code(0);
     auto l = seqan::length(seq);
-     for (uint64_t i = 0; i < l; ++i)
-     {
-         switch (char(seqan::getValue(seq, i))) //char(seq[i]))
+    for (uint64_t i = 0; i < l; ++i)
+    {
+         switch (char(seqan::getValue(seq, i)))
          {
-             case 'C': code += 1ULL; break;
-             case 'G': code += 2ULL; break;
-             case 'T': code += 3ULL;
+             case 'C': code |= 1ULL; break;
+             case 'G': code |= 2ULL; break;
+             case 'T': code |= 3ULL;
          }
          code <<= 2;
      }
@@ -230,9 +232,10 @@ extern inline void dna_decoder(uint64_t kmerID, std::vector<TSeq> & decodes)
     }
 }
 
+// Assume that sequence IDs and position indices do not exceed 32 bits.
 extern inline uint64_t location_encode(TSeqNo seqNo, TSeqPos seqPos)
 {
-    return (seqNo << 32) + seqPos;
+    return (seqNo << 32) | seqPos;
 }
 
 // print binary format

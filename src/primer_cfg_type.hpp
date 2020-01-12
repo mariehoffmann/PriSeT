@@ -65,17 +65,14 @@ namespace priset
 
 // Lower kmer frequency cutoff in percentage, i.e. all kmer occurences below will be dropped.
 #define FREQ_KMER_MIN_PERCENT 10
-#define FREQ_KMER_MIN 1  //50
+
+// Lower k-mer frequency cutoff.
+#define FREQ_KMER_MIN 2  //50
 
 // Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
 #define FREQ_PAIR_MIN 5
 
 /*
-// The minimal transcript length.
-#define TRANSCRIPT_MIN_LEN 30
-
-// The minimal transcript length.
-#define TRANSCRIPT_MAX_LEN 800
 
 // The minimal primer melting temperature. Recommended 52.
 #define PRIMER_MIN_TM 52 //46

@@ -668,26 +668,14 @@ void chemical_filter_single_pass(TKmerID & kmerID)
 
         if ((code > (1ULL << 9)) && (((code & 0b11111111) == 0b11001100) || ((code & 0b11111111) == 0b00110011)))
         {
-            bool print_info = 0;
-            // if (dna_decoder(kmerID).substr(0, 18) == "ATTCCAGCTCCAATAGCG")
-            // {
-            //     print_info = 1;
-            //     std::cout << "TATA box found in DIAZ fwd" << std::endl;
-            //     std::cout << "kmerID = " << kmerID2str(kmerID) << ", enc_l = " << enc_l << std::endl;
-            // }
             if (enc_l <= PRIMER_MIN_LEN) // delete all length bits to discard this kmer
             {
                 kmerID &= ~PREFIX_SELECTOR;
-                // if (print_info)
-                //     std::cout << "delete all length bits" << std::endl;
                 return;
             }
             else // delete all length bits between current encoded length and larger ones
             {
-
                 prefix &= ~((1ULL << (WORD_SIZE - enc_l + PRIMER_MIN_LEN)) - 1);
-                // if (print_info)
-                //     std::cout << "\tshift offset = " << (WORD_SIZE - enc_l + PRIMER_MIN_LEN) << ", delete tailing length bits: " << kmerID2str(prefix | (~PREFIX_SELECTOR & kmerID)) << std::endl;
             }
         }
         if (!prefix)
@@ -709,16 +697,12 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
             {
                 kmerID ^= mask;
-                // std::cout << "\tTm out of range: " << Tm << std::endl;
             }
             else
             {
                 float CG_content = float(CG) / (float(__builtin_clzl(mask) + PRIMER_MIN_LEN));
                 if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
-                {
                     kmerID ^= mask;
-                    // std::cout << "\tCG out of range: " << CG_content << std::endl;
-                }
             }
         }
         switch(3 & code)

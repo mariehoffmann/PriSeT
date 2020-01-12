@@ -105,8 +105,11 @@ typedef std::vector<TReference> TReferences;
 // Stores for each reference the encoded kmers in order of occurrence.
 typedef std::vector<std::deque<TKmerID>> TKmerIDs;
 
-// Transforms sequence ID 0..n-1 to contiguous range 0 .. k <= n-1.
-// Background: some sequences may have no kmers and therefore no space should be reserved in bit vector set.
+// Translates sequences identifiers (seqNo) in use to a contiguous range (seqNo_cx).
+// Dictionary is bidirectional: seqNo -> seqNo_cx and inverse add a leading one 
+// to the compressed key: (1 << 63 | seqNo_cx) -> seqNo.
+// Background: some sequences produce no k-mers and therefore no space should be
+// reserved in its bit transformation.
 typedef std::unordered_map<TSeqNo, TSeqNo> TSeqNoMap;
 
 // vector type of k-mers and their locations
