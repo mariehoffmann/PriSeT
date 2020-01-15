@@ -175,7 +175,7 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
     // (iii) lookup kmer sequences, filter and encode as 64 bit integers.
     for (TSeqNo seqNo_cx = 0; seqNo_cx < references.size(); ++seqNo_cx) // Note: we iterate over compressed sequence identifiers
     {
-        std::cout << "STATUS: bit vector assignment for seqNo_cx = " << seqNo_cx << std::endl;
+        // std::cout << "STATUS: bit vector assignment for seqNo_cx = " << seqNo_cx << std::endl;
         sdsl::rank_support_v5<1> r1s(&references[seqNo_cx]); // check if once initialized modification of references[i] does not invalidate rank support
         sdsl::select_support_mcl<1,1> s1s(&references[seqNo_cx]);
         for (unsigned r = r1s.rank(references[seqNo_cx].size()); r > 0; --r)
