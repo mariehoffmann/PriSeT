@@ -86,11 +86,10 @@ void chemical_filter_test(std::unordered_map<TPrimerKey, std::string, hash_pp> &
     for (auto p : pairs_known)
     {
         fwd = p.first.fwd;
-        // std::cout << "\thas l bit: " << ((PREFIX_SELECTOR & fwd) > 0) << ", " << kmerID2str(fwd) << std::endl;
         chemical_filter_single_pass(fwd);
         rev = p.first.rev;
         chemical_filter_single_pass(rev);
-        // std::cout << p.second << ": ";
+        std::cout << p.second << ": ";
         if ((PREFIX_SELECTOR & fwd) && (PREFIX_SELECTOR & rev))
             std::cout << " OK\n";
         else if (!(PREFIX_SELECTOR & fwd) && (PREFIX_SELECTOR & rev))
@@ -237,10 +236,6 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
 
             uint64_t w_begin = idx_fwd + PRIMER_MIN_LEN + TRANSCRIPT_MIN_LEN;
             uint64_t w_end = std::min(reference.size(), idx_fwd + PRIMER_MAX_LEN + TRANSCRIPT_MAX_LEN + 1); // + 1: rank excludes upper bound
-            // bool found = 0;
-
-            // if (dna_decoder(kmerID_fwd).substr(0, 18) == "ATTCCAGCTCCAATAGCG")
-            //     std::cout << "DIAZ fwd contained in kmerID_fwd = " << kmerID2str(kmerID_fwd) << std::endl;
 
             for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
             {
@@ -248,38 +243,17 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
                 uint64_t mask_fwd = ONE_LSHIFT_63;
                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
-                    // if (mask_fwd == 1ULL << 61 && dna_decoder(kmerID_fwd).substr(0, 18) == "ATTCCAGCTCCAATAGCG")
-                    //     std::cout << "DIAZ fwd contained in k-mer and being selected by mask\n";
                     if ((mask_fwd & kmerID_fwd)) //&& filter_CG_clamp(kmerID_fwd, '+', mask_fwd) && filter_WWW_tail(kmerID_fwd, '+', mask_fwd))
                     {
-                        // if (mask_fwd == 1ULL << 61 && dna_decoder(kmerID_fwd).substr(0, 18) == "ATTCCAGCTCCAATAGCG")
-                        //     std::cout << "DIAZ fwd passed mask test\n";
-
                         TKmerID const kmerID_rev = kmerIDs.at(seqNo).at(r_rev - 1);
                         uint64_t mask_rev = ONE_LSHIFT_63;
-                        // if (dna_decoder(kmerID_rev).substr(0, 20) == "GATTAGATACCATCGTAGTC")
-                        //     std::cout << "DIAZ rev contained in kmerID_rev = " << kmerID2str(kmerID_rev) << std::endl;
-
                         while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
-                            // if (mask_fwd == 1ULL << 61 && dna_decoder(kmerID_fwd).substr(0, 20) == "GATTAGATACCATCGTAGTC")
-                            //     std::cout << "DIAZ rev contained in k-mer and being selected by mask\n";
-
-                            if ((mask_rev & kmerID_rev)) // && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_fwd, '+', mask_fwd))
-                            {                               // ATTCCAGCTCCAATAGCG
-                                // if (mask_fwd == 1ULL << 61 && dna_decoder(kmerID_fwd).substr(0, 20) == "GATTAGATACCATCGTAGTC")
-                                //     std::cout << "...passed mask test\n";
-                                // if (mask_fwd == (1ULL << 61) && (dna_decoder(kmerID_fwd).substr(0, 18) == "ATTCCAGCTCCAATAGCG") &&
-                                //     mask_rev == (1ULL << 59) && (dna_decoder(kmerID_rev).substr(0, 20) == "GATTAGATACCATCGTAGTC"))
-                                //     {
-                                //         std::cout << "DIAZ fwd + rev handled, " << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << std::endl;
-                                //         std::cout << "dTm = " << dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) << ", and Primer_DTM = " <<  PRIMER_DTM << std::endl;
-                                //     }
+                            if ((mask_rev & kmerID_rev) && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_fwd, '+', mask_fwd))
+                            {
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {
-                                    //cp.set(mask_fwd, mask_rev);
                                     TPrimerKey key{get_code(kmerID_fwd, mask_fwd) | mask_fwd, get_code(kmerID_rev, mask_rev) | mask_rev};
-                                    // std::cout << "kmerID_fwd = " << kmerID_fwd << " with length " << __builtin_clzl(mask_fwd) + PRIMER_MIN_LEN << ", get_code: " << get_code(kmerID_fwd, mask_fwd) << std::endl;
                                     if (pairs_known.find(key) != pairs_known.end())
                                     {
                                         std::cout << "INFO: primer pair <" << pairs_known[key] << "> found for refID = " << seqNo << " at " << s1s.select(r_fwd) << " and " << s1s.select(r_rev) << std::endl;
