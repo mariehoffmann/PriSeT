@@ -143,11 +143,10 @@ int main(/*int argc, char ** argv*/)
     // TODO: result structure for references and k-mer pairs: candidates/matches
     // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     start = std::chrono::high_resolution_clock::now();
-    // pre_filter_main(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLocations & locations, TReferences & references, TKmerIDs & kmerIDs, TSeqNoMap & seqNoMap)
     TReferences references;
     TKmerIDs kmerIDs;
-    TSeqNoMap seqNoMap;
-    filter_and_transform(io_cfg, locations, references, kmerIDs, seqNoMap, &kmerCounts);
+    // TSeqNoMap seqNoMap;
+    filter_and_transform(io_cfg, locations, references, kmerIDs, &kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
     runtimes[TIMEIT::FILTER1_TRANSFORM] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
 
