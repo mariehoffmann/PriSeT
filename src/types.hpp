@@ -106,7 +106,7 @@ typedef std::vector<TReference> TReferences;
 typedef std::vector<std::deque<TKmerID>> TKmerIDs;
 
 // Translates sequences identifiers (seqNo) in use to a contiguous range (seqNo_cx).
-// Dictionary is bidirectional: seqNo -> seqNo_cx and inverse add a leading one 
+// Dictionary is bidirectional: seqNo -> seqNo_cx and inverse add a leading one
 // to the compressed key: (1 << 63 | seqNo_cx) -> seqNo.
 // Background: some sequences produce no k-mers and therefore no space should be
 // reserved in its bit transformation.

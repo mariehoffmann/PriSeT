@@ -249,7 +249,7 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
                         uint64_t mask_rev = ONE_LSHIFT_63;
                         while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
-                            if ((mask_rev & kmerID_rev) && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_fwd, '+', mask_fwd))
+                            if ((mask_rev & kmerID_rev)) // && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_fwd, '+', mask_fwd))
                             {
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
                                 {

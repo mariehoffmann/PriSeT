@@ -43,10 +43,10 @@ extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID cons
     TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR;
     TKmerID code2 = kmerID2 & ~PREFIX_SELECTOR;
 
-    uint8_t enc_l1 = WORD_SIZE - 1 - __builtin_clzl(code1);  // encoded length 2bit
+    uint8_t enc_l1 = encoded_length(code1);  // encoded length 2bit
     uint8_t mask_l1 = (__builtin_clzl(mask1) + PRIMER_MIN_LEN) << 1;   // selected length 2bit
 
-    uint8_t enc_l2 = WORD_SIZE - 1 - __builtin_clzl(code2); // encoded length
+    uint8_t enc_l2 = encoded_length(code2); // encoded length 2bit
     uint8_t mask_l2 = (__builtin_clzl(mask2) + PRIMER_MIN_LEN) << 1;      // selected length
 
     if (mask_l1 > enc_l1 || mask_l2 > enc_l2)

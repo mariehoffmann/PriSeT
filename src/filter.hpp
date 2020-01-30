@@ -227,17 +227,17 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
 {
     pairs.clear();
     auto cp_ctr = 0ULL;
-    for (uint64_t i = 0; i < references.size(); ++i)
+    for (uint64_t seqNo_cx = 0; seqNo_cx < references.size(); ++seqNo_cx)
     {
         sdsl::bit_vector reference;
-        sdsl::util::assign(reference, references.at(i));
-        sdsl::rank_support_v5<1, 1> r1s(&references.at(i));
+        sdsl::util::assign(reference, references.at(seqNo_cx));
+        sdsl::rank_support_v5<1, 1> r1s(&references.at(seqNo_cx));
         sdsl::select_support_mcl<1> s1s(&reference);
 
         for (uint64_t r_fwd = 1; r_fwd < r1s.rank(reference.size()); ++r_fwd)
         {
             uint64_t idx_fwd = s1s.select(r_fwd);  // text position of r-th k-mer
-            TKmerID kmerID_fwd = kmerIDs[i][r_fwd - 1];
+            TKmerID kmerID_fwd = kmerIDs[seqNo_cx][r_fwd - 1];
             if (!(kmerID_fwd >> CODE_SIZE))
                 std::cerr << "ERROR: k length pattern is zero\n";
 
@@ -253,7 +253,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
             {
                 TCombinePattern<TKmerID, TKmerLength> cp;
                 uint64_t mask_fwd = ONE_LSHIFT_63;
-                TKmerID kmerID_rev = kmerIDs.at(i).at(r_rev - 1);
+                TKmerID kmerID_rev = kmerIDs.at(seqNo_cx).at(r_rev - 1);
                 filter_cross_annealing(kmerID_fwd, kmerID_rev);
                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
@@ -264,11 +264,6 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                         while ((((mask_rev - 1) << 1) & kmerID_rev) >> 54)
                         {
                             cp_ctr++;
-                            if (cp_ctr == 1ULL << 63)
-                            {
-                                std::cout << "cp_ctr reached 1 << 63, exit\n";
-                                exit(0);
-                            }
                             if (mask_rev & kmerID_rev && filter_CG_clamp(kmerID_rev, '-') && filter_WWW_tail(kmerID_rev, '-'))
                             {
                                 if (dTm(kmerID_fwd, mask_fwd, kmerID_rev, mask_rev) <= PRIMER_DTM)
@@ -286,7 +281,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                 } // length mask_fwd
                 if (cp.is_set())
                 {
-                    pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{i, r_fwd, r_rev, cp});
+                    pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{seqNo_cx, r_fwd, r_rev, cp});
                 }
             } // kmerID rev
         } // kmerID fwd
