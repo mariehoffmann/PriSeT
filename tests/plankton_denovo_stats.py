@@ -65,7 +65,6 @@ def read_taxa(taxfile, accfile):
         while line:
             if line.startswith("#"):
                 continue
-            print(line)
             line = line.strip().split(',')
             taxid = int(line[0])
             for acc in line[1:]:
@@ -77,7 +76,7 @@ def read_taxa(taxfile, accfile):
 # given reference sequence, determine all primer positions via text search
 def get_matches(reference, primers):
     found = {}
-    print(primers)
+    # print(primers)
     for primerID, seqs in primers.items():
         pos1 = reference.find(seqs[0])  # search forward primer
         if (pos1 > -1):
@@ -104,8 +103,9 @@ def dereplication(libraryFile, primers):
                             seqhash2accs[key].append(ref[0])
                         else:
                             seqhash2accs[key] = [ref[0]]
+                        if key is None:
+                            sys.exit()
                 ref = [line.split(' ')[0][1:], ""]
-                print(ref[0])
             else:
                 ref[1] += line.strip()
             line = f.readline()
@@ -126,23 +126,26 @@ def bin_class_counts(acc2tax, seqhash2accs, tax2ptax, level = 0):
         primerID, seqhash = key[0], key[1]
         primerIDs.add(primerID)
         tax_ctrs = Counter([acc2tax[acc] for acc in accs if acc2tax[acc] in tax2ptax]) # tax: ctr on species level!
-        # majority vote for cluster, tax_major is cluster label
-        cnt_major, tax_major = 0, None
-        for tax, cnt in tax_ctrs.items():
-            taxa.add(tax)
-            if cnt > cnt_major:
-                cnt_major, tax_major = cnt, tax
-        if tax_major not in tax2stats:
-            tax2stats[(primerID, tax_major)] = stats()
-            labels[(primerID, tax_major)] = [seqhash]
-        else:
-            labels[(primerID, tax_major)].append(seqhash)
-        for tax, cnt in tax_ctrs.items():
-            if tax == tax_major:
-                tax2stats[(primerID, tax_major)].TP += cnt
+        print(tax_ctrs)
+        if len(tax_ctrs) == 0:
+            continue
+        else:   # majority vote for cluster, tax_major is cluster label
+            cnt_major, tax_major = 0, None
+            for tax, cnt in tax_ctrs.items():
+                taxa.add(tax)
+                if cnt >= cnt_major:
+                    cnt_major, tax_major = cnt, tax
+            if tax_major not in tax2stats:
+                tax2stats[(primerID, tax_major)] = stats()
+                labels[(primerID, tax_major)] = [seqhash]
             else:
-                tax2stats[(primerID, tax_major)].FP += cnt
-    # now count FN and TN in other classes after labeling is done
+                labels[(primerID, tax_major)].append(seqhash)
+            for tax, cnt in tax_ctrs.items():
+                if tax == tax_major:
+                    tax2stats[(primerID, tax_major)].TP += cnt
+                else:
+                    tax2stats[(primerID, tax_major)].FP += cnt
+    # now count FN and TN in other classes/clusters after labeling is done
     for tax in taxa:
         for primerID in primerIDs:
             key = (primerID, tax)
@@ -150,6 +153,9 @@ def bin_class_counts(acc2tax, seqhash2accs, tax2ptax, level = 0):
                 tax2stats[key] = stats()
             for label, seqhash_list in labels.items():  # label = (primerID, tax)
                 for seqhash in seqhash_list:
+                    # primer ID not found in this cluster => continue
+                    if (primerID, seqhash) not in seqhash2accs:
+                        continue
                     tax_ctrs = Counter([acc2tax[acc] for acc in seqhash2accs[(primerID, seqhash)] if acc2tax[acc] in tax2ptax])
                     tax_ctr = tax_ctrs.get(tax, 0) # all accessions assigned to tax
                     tax_all = functools.reduce(lambda acc, ctr: acc + ctr, tax_ctrs.values(), 0) # count all
@@ -202,6 +208,34 @@ def purity(acc2tax, seqhash2accs, tax2ptax):
         purity_genera[PID][1] += 1
     return purity_species, purity_genera
 
+
+def print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity_species, purity_genera):
+    print("Primer\t\tTaxID\tTP\tTN\tFP\tFN\taccuracy\tprecision\trecall\tpurity (sp)\tpurity (genus)")
+    p_len = max([len(primer) for primer in primers])
+    appendix = []
+    primer_with_stats = set([primer for primer, tax in tax2stats.items()])
+    for primer in primers:
+        if primer not in primer_with_stats:
+            appendix.append(primer)
+            continue
+        print(primer)
+        for key, stat in tax2stats.items():
+            primer2, tax = key[0], key[1]
+            if primer == primer2:
+
+                print(primer + " " * (p_len - len(primer)), '\t', tax, '\t', stat.TP, '\t', stat.TN, '\t', stat.FP, '\t', stat.FN,
+                round(accuracy(stat), 2), '\t', round(precision(stat), 2), '\t', round(recall(stat)) , '\t',
+                round(purity_species[primer][0]/purity_species[primer][1], 2), "(", purity_species[primer][0], '/', purity_species[primer][1], "),\t",
+                round(purity_genera[primer][0]/purity_genera[primer][1], 2), "(", purity_genera[primer][0], '/', purity_genera[primer][1], ")")
+
+    print("Primers without matches: ")
+    if len(appendix) is 0:
+        print("None")
+    else:
+        for primer in appendix:
+            print(primer)
+
+
 '''
 expect for cluster1 = (A1, A2, C1) and cluster2 = (B1, B2)
     tax = 1: TP = 2 , TN = 2 , FP = 1 , FN = 0
@@ -238,13 +272,15 @@ def test_bin_class_counts():
                                 purity_genera['Primer1'][0]/purity_genera['Primer1'][1])
 
 if __name__ == "__main__":
-    test_bin_class_counts()
-    # args = parser.parse_args()
-    # print(args)
-    # primers = read_primers(args.primers[0])
-    # # primers_denovo = read_primers(args.primers_denovo[0])
-    # seqhash2accs = dereplication(args.library[0], primers)
-    # tax2ptax, acc2tax = read_taxa(args.taxfile[0], args.accfile[0])
-    # tax2stats = bin_class_counts(acc2tax, seqhash2accs, tax2ptax, 0)
-    # for tax, stat in tax2stats.items():
-    #     print(tax, ": ", stat.to_string())
+    # test_bin_class_counts()
+    args = parser.parse_args()
+    print(args)
+    primers = read_primers(args.primers[0])
+    # primers_denovo = read_primers(args.primers_denovo[0])
+    seqhash2accs = dereplication(args.library[0], primers)
+    tax2ptax, acc2tax = read_taxa(args.taxfile[0], args.accfile[0])
+    tax2stats = bin_class_counts(acc2tax, seqhash2accs, tax2ptax, 0)
+    purity_species, purity_genera =  purity(acc2tax, seqhash2accs, tax2ptax)
+    for tax, stat in tax2stats.items():
+        print(tax, ": ", stat.to_string())
+    print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity_species, purity_genera)
