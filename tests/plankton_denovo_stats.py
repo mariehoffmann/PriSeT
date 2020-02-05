@@ -109,6 +109,7 @@ def dereplication(libraryFile, primers):
             else:
                 ref[1] += line.strip()
             line = f.readline()
+    # print(seqhash2accs)
     return seqhash2accs
 
 # return counts from binary classification, consider multi-class problem as one taxID = class
@@ -126,7 +127,7 @@ def bin_class_counts(acc2tax, seqhash2accs, tax2ptax, level = 0):
         primerID, seqhash = key[0], key[1]
         primerIDs.add(primerID)
         tax_ctrs = Counter([acc2tax[acc] for acc in accs if acc2tax[acc] in tax2ptax]) # tax: ctr on species level!
-        print(tax_ctrs)
+        # print(tax_ctrs)
         if len(tax_ctrs) == 0:
             continue
         else:   # majority vote for cluster, tax_major is cluster label
@@ -164,8 +165,8 @@ def bin_class_counts(acc2tax, seqhash2accs, tax2ptax, level = 0):
                         tax2stats[key].TN += tax_all - tax_ctr
 
     for label, seqhash_list in  labels.items():
-        print('tax = ', label[1], ', num clusters = ', len(seqhash_list))
-    return tax2stats
+        print('label = ', label, ', num clusters = ', len(seqhash_list))
+    return tax2stats, labels
 
 # compute accuracy, i.e. sum of correctly labeled samples divided by total number of samples
 def accuracy(stats):
@@ -187,53 +188,80 @@ def recall(stats):
 # cluster labels assigned based on majority vote
 def purity(acc2tax, seqhash2accs, tax2ptax):
     purity_species = {}    # pure, total on species level
-    purity_genera = {}     # pure, total on genus level
+    # purity_genera = {}     # pure, total on genus level
     for key, accs in seqhash2accs.items():
         PID, seqhash = key[0], key[1]
+        # print("PID = ", PID, ", seqhash = ", seqhash)
         if PID not in purity_species:
             purity_species[PID] = [0, 0]
-        if PID not in purity_genera:
-            purity_genera[PID] = [0, 0]
+        # if PID not in purity_genera:
+        #     purity_genera[PID] = [0, 0]
         species = set([acc2tax[acc] for acc in accs if acc2tax[acc] in tax2ptax])
+        # no species, but only higher taxa identified => skip
+        if len(species) is 0:
+            continue
         if len(species) == 1:
             purity_species[PID][0] += 1
         purity_species[PID][1] += 1
         # select those which are species and assign their parent taxa
-        genera = [tax2ptax[acc2tax[acc]] for acc in accs if acc2tax[acc] in tax2ptax]
-        # add those already assigned to genus level
-        genera += [acc2tax[acc] for acc in accs if acc2tax[acc] in tax2ptax.values()]
-        counts_genera = Counter(genera)
-        if len(counts_genera) == 1:
-            purity_genera[PID][0] += 1
-        purity_genera[PID][1] += 1
-    return purity_species, purity_genera
+        # genera = [tax2ptax[acc2tax[acc]] for acc in accs if acc2tax[acc] in tax2ptax]
+        # # add those already assigned to genus level
+        # genera += [acc2tax[acc] for acc in accs if acc2tax[acc] in tax2ptax.values()]
+        # counts_genera = Counter(genera)
+        # if len(counts_genera) == 1:
+        #     purity_genera[PID][0] += 1
+        # purity_genera[PID][1] += 1
+    return purity_species  #, purity_genera
 
 
-def print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity_species, purity_genera):
-    print("Primer\t\tTaxID\tTP\tTN\tFP\tFN\taccuracy\tprecision\trecall\tpurity (sp)\tpurity (genus)")
+def print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity):
+    print("Primer\t\tTaxID\t\tTP\tTN\tFP\tFN\tacc\tprec\trecall\tpurity (sp)")
     p_len = max([len(primer) for primer in primers])
+    t_len = 10
     appendix = []
     primer_with_stats = set([primer for primer, tax in tax2stats.items()])
+    # print(primer_with_stats)
+    # print(primers)
     for primer in primers:
-        if primer not in primer_with_stats:
+        if primer not in [pws[0] for pws in primer_with_stats]:
             appendix.append(primer)
             continue
         print(primer)
         for key, stat in tax2stats.items():
             primer2, tax = key[0], key[1]
             if primer == primer2:
-
-                print(primer + " " * (p_len - len(primer)), '\t', tax, '\t', stat.TP, '\t', stat.TN, '\t', stat.FP, '\t', stat.FN,
+                # print(purity[primer])
+                print(primer + " " * (p_len - len(primer)), '\t', str(tax) + " "*(t_len - len(str(tax))), '\t',
+                stat.TP, '\t', stat.TN, '\t', stat.FP, '\t', stat.FN, '\t',
                 round(accuracy(stat), 2), '\t', round(precision(stat), 2), '\t', round(recall(stat)) , '\t',
-                round(purity_species[primer][0]/purity_species[primer][1], 2), "(", purity_species[primer][0], '/', purity_species[primer][1], "),\t",
-                round(purity_genera[primer][0]/purity_genera[primer][1], 2), "(", purity_genera[primer][0], '/', purity_genera[primer][1], ")")
+                round(0 if purity[primer][0] is 0 else purity[primer][0]/purity[primer][1], 2), "(", purity[primer][0], '/', purity[primer][1], ")\t")
+                # round(purity_genera[primer][0]/purity_genera[primer][1], 2), "(", purity_genera[primer][0], '/', purity_genera[primer][1], ")")
+    #
+    # print("Primers without matches: ")
+    # if len(appendix) is 0:
+    #     print("None")
+    # else:
+    #     for primer in appendix:
+    #         print(primer)
+    taxa_with_accs = len(set(acc2tax.values()))
+    print("\nMeta Stats\n")
+    print("Primer\t\tFrequency\tCoverage (wrt taxa with accs)")
+    primer2fc = {}
+    for key, accs in seqhash2accs.items():
+        primer, seqhash = key[0], key[1]
+        if primer not in appendix:
+            if (primer not in primer2fc):
+                primer2fc[primer] = [0, 0]
+            unique_taxa = set([acc2tax[acc] for acc in accs])  # independent of taxonomic level!
+            primer2fc[primer][0] += len(accs)  # add all accessions for this primer and this cluster
+            primer2fc[primer][1] += len(unique_taxa)  # add all accessions for this primer and this cluster
 
-    print("Primers without matches: ")
-    if len(appendix) is 0:
-        print("None")
-    else:
-        for primer in appendix:
-            print(primer)
+    print(primer2fc)
+    primer_fc = [(primer, fc[0], fc[1]) for primer, fc in primer2fc.items()]
+    primer_fc.sort(key=lambda item: item[1], reverse=True)
+    print(primer_fc)
+    for item in primer_fc:
+        print(item[0] + " "*(p_len - len(item[0])), "\t", item[1], "\t\t", round(item[2]/taxa_with_accs, 4), "(", item[2], "/", taxa_with_accs, ")")
 
 
 '''
@@ -253,8 +281,8 @@ def test_bin_class_counts():
     acc2tax = {'A1': 1, 'A2': 1, 'B1': 2, 'B2': 2, 'C1': 3}
     seqhash2accs = {('Primer1','X34_seq'): ['A1', 'A2', 'C1'], ('Primer1','Y56_seq'): ['B1', 'B2']}
     tax2ptax = {1: 11, 2: 22, 3: 11}  # all species
-    tax2stats = bin_class_counts(acc2tax, seqhash2accs, tax2ptax)
-    purity_species, purity_genera = purity(acc2tax, seqhash2accs, tax2ptax)
+    tax2stats, labels = bin_class_counts(acc2tax, seqhash2accs, tax2ptax)
+    purity = purity(acc2tax, seqhash2accs, tax2ptax)
     key1, key2, key3 = ('Primer1', 1), ('Primer1', 2), ('Primer1', 3)
     print('tax = 1:\t', tax2stats[key1].to_string())
     print('tax = 2:\t', tax2stats[key2].to_string())
@@ -268,8 +296,8 @@ def test_bin_class_counts():
     print('recall =\t',     round(recall(tax2stats[key1]), 2), "\t",
                             round(recall(tax2stats[key2]), 2), "\t",
                             round(recall(tax2stats[key3]), 2))
-    print('purity species =\t', purity_species['Primer1'][0]/purity_species['Primer1'][1], "\tgenera =\t",
-                                purity_genera['Primer1'][0]/purity_genera['Primer1'][1])
+    print('purity species =\t', purity['Primer1'][0]/purity['Primer1'][1])
+    # , "\tgenera =\t", purity_genera['Primer1'][0]/purity_genera['Primer1'][1])
 
 if __name__ == "__main__":
     # test_bin_class_counts()
@@ -278,9 +306,11 @@ if __name__ == "__main__":
     primers = read_primers(args.primers[0])
     # primers_denovo = read_primers(args.primers_denovo[0])
     seqhash2accs = dereplication(args.library[0], primers)
+
     tax2ptax, acc2tax = read_taxa(args.taxfile[0], args.accfile[0])
-    tax2stats = bin_class_counts(acc2tax, seqhash2accs, tax2ptax, 0)
-    purity_species, purity_genera =  purity(acc2tax, seqhash2accs, tax2ptax)
+    tax2stats, labels = bin_class_counts(acc2tax, seqhash2accs, tax2ptax, 0)
+    purity =  purity(acc2tax, seqhash2accs, tax2ptax)
     for tax, stat in tax2stats.items():
         print(tax, ": ", stat.to_string())
-    print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity_species, purity_genera)
+
+    print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity)
