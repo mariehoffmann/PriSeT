@@ -14,7 +14,7 @@ TRANSCRIPT_MAX_LEN = 800
 '''
 taxid=2825
 lib=/Volumes/plastic_data/tactac/subset
-python ../PriSeT/tests/plankton_denovo_stats.py --library $lib/$taxid/root_$taxid.fasta --accfile $lib/$taxid/root_$taxid.acc --taxfile $lib/$taxid/root_$taxid.tax --primers /Volumes/plastic_data/priset/primers.csv
+python ../PriSeT/tests/plankton_denovo_stats.py --library $lib/$taxid/root_$taxid.fasta --accfile $lib/$taxid/root_$taxid.acc --taxfile $lib/$taxid/root_$taxid.tax --primers /Volumes/plastic_data/priset/primers.csv --primers_denovo /Volumes/plastic_data/priset/work/$taxid/denovo/primers.csv
 '''
 
 parser = argparse.ArgumentParser(description = 'Compute cluster statistics for primer pairs.')
@@ -44,9 +44,9 @@ def read_primers(filename):
     primers = {}
     with open(filename, 'r') as f:
         for line in f.readlines():
-            if (line.startswith('#')):
+            if (line.startswith('#') or len(line.strip()) is 0):
                 continue
-            ID, seq1, seq2 = line.strip().split(',')
+            ID, seq1, seq2 = line.strip().split(',')[:3]
             primers[ID] = (seq1, seq2)
     return primers
 
@@ -103,8 +103,6 @@ def dereplication(libraryFile, primers):
                             seqhash2accs[key].append(ref[0])
                         else:
                             seqhash2accs[key] = [ref[0]]
-                        if key is None:
-                            sys.exit()
                 ref = [line.split(' ')[0][1:], ""]
             else:
                 ref[1] += line.strip()
@@ -219,14 +217,13 @@ def print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity):
     p_len = max([len(primer) for primer in primers])
     t_len = 10
     appendix = []
+
+    # primer with stats only considers species-level taxa!
     primer_with_stats = set([primer for primer, tax in tax2stats.items()])
-    # print(primer_with_stats)
-    # print(primers)
     for primer in primers:
         if primer not in [pws[0] for pws in primer_with_stats]:
             appendix.append(primer)
             continue
-        print(primer)
         for key, stat in tax2stats.items():
             primer2, tax = key[0], key[1]
             if primer == primer2:
@@ -236,7 +233,7 @@ def print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity):
                 round(accuracy(stat), 2), '\t', round(precision(stat), 2), '\t', round(recall(stat)) , '\t',
                 round(0 if purity[primer][0] is 0 else purity[primer][0]/purity[primer][1], 2), "(", purity[primer][0], '/', purity[primer][1], ")\t")
                 # round(purity_genera[primer][0]/purity_genera[primer][1], 2), "(", purity_genera[primer][0], '/', purity_genera[primer][1], ")")
-    #
+
     # print("Primers without matches: ")
     # if len(appendix) is 0:
     #     print("None")
@@ -245,23 +242,24 @@ def print_stats(primers, acc2tax, seqhash2accs, tax2ptax, tax2stats, purity):
     #         print(primer)
     taxa_with_accs = len(set(acc2tax.values()))
     print("\nMeta Stats\n")
-    print("Primer\t\tFrequency\tCoverage (wrt taxa with accs)")
-    primer2fc = {}
+    print("Primer\t\tFrequency\tCoverage (wrt taxa with accs)\tUnique Transcripts")
+    primer2fc = {} # dictionary for primer: (frequency, coverage, seqhash_ctr)
     for key, accs in seqhash2accs.items():
         primer, seqhash = key[0], key[1]
-        if primer not in appendix:
-            if (primer not in primer2fc):
-                primer2fc[primer] = [0, 0]
-            unique_taxa = set([acc2tax[acc] for acc in accs])  # independent of taxonomic level!
-            primer2fc[primer][0] += len(accs)  # add all accessions for this primer and this cluster
-            primer2fc[primer][1] += len(unique_taxa)  # add all accessions for this primer and this cluster
+        # print(primer, seqhash)
+        # if primer not in appendix:
+        if primer not in primer2fc:
+            primer2fc[primer] = [0, 0, 0]
+        unique_taxa = set([acc2tax[acc] for acc in accs])  # independent of taxonomic level!
+        primer2fc[primer][0] += len(accs)  # add all accessions for this primer and this cluster
+        primer2fc[primer][1] += len(unique_taxa)  # add all accessions for this primer and this cluster
+        primer2fc[primer][2] += 1  # add all accessions for this primer and this cluster
 
-    print(primer2fc)
-    primer_fc = [(primer, fc[0], fc[1]) for primer, fc in primer2fc.items()]
-    primer_fc.sort(key=lambda item: item[1], reverse=True)
-    print(primer_fc)
+    primer_fc = [(primer, fc[0], fc[1], fc[2]) for primer, fc in primer2fc.items()]
+    primer_fc.sort(key=lambda item: item[2], reverse=True)
     for item in primer_fc:
-        print(item[0] + " "*(p_len - len(item[0])), "\t", item[1], "\t\t", round(item[2]/taxa_with_accs, 4), "(", item[2], "/", taxa_with_accs, ")")
+        print(item[0].replace(' ', '_') + " "*(p_len - len(item[0])), "\t", item[1], "\t", \
+        "{} ({}/{})\t\t{}".format(round(item[2]/taxa_with_accs, 4), item[2], taxa_with_accs, item[3]))
 
 
 '''
@@ -303,12 +301,15 @@ if __name__ == "__main__":
     # test_bin_class_counts()
     args = parser.parse_args()
     print(args)
-    primers = read_primers(args.primers[0])
-    # primers_denovo = read_primers(args.primers_denovo[0])
+    primers_est = read_primers(args.primers[0])
+    print(args.primers_denovo)  # note: with nargs=1, this would be a list!
+    primers_denovo = read_primers(args.primers_denovo)
+    primers = {**primers_est, **primers_denovo}
     seqhash2accs = dereplication(args.library[0], primers)
-
+    # print(seqhash2accs)
     tax2ptax, acc2tax = read_taxa(args.taxfile[0], args.accfile[0])
     tax2stats, labels = bin_class_counts(acc2tax, seqhash2accs, tax2ptax, 0)
+    # print(tax2stats)
     purity =  purity(acc2tax, seqhash2accs, tax2ptax)
     for tax, stat in tax2stats.items():
         print(tax, ": ", stat.to_string())
