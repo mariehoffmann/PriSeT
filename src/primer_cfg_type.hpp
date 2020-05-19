@@ -12,7 +12,6 @@
 
 #include <seqan/basic.h>
 
-//#include "chemistry.hpp"
 #include "types.hpp"
 
 namespace priset
@@ -35,8 +34,6 @@ namespace priset
 
 // The maximal primer length (or a kmer). Recommended: 22.
 #define PRIMER_MAX_LEN 25ULL
-
-/* Primer Verification */
 
 // The minimal transcript length.
 #define TRANSCRIPT_MIN_LEN 30
@@ -64,7 +61,7 @@ namespace priset
 #define TRAP_DIST 400
 
 // Lower kmer frequency cutoff in percentage, i.e. all kmer occurences below will be dropped.
-#define FREQ_KMER_MIN_PERCENT 10
+#define DIGAMMA_PERCENT 10
 
 // Lower k-mer frequency cutoff.
 #define FREQ_KMER_MIN 50
@@ -122,10 +119,13 @@ private:
     // Number of positions varying from kmer sequence, i.e. number of permitted primer errors.
     size_type E{0};
 
+    // Absolute frequency cutoff for k-mer occurrences.
+    size_type digamma;
+
 public:
     // Constructors, destructor and assignment
     // Default constructor.
-    constexpr primer_cfg_type() = default;
+    primer_cfg_type() = default;
 
     // Default copy constructor.
     constexpr primer_cfg_type(primer_cfg_type const &) = default;
@@ -148,6 +148,19 @@ public:
     // Use default deconstructor.
     ~primer_cfg_type() = default;
     //!\}
+
+    // Set absolute frequency cutoff for k-mers given DIGAMMA_PERCENT.
+    // digamma = |species|*DIGAMMA_PERCENT
+    void set_digamma(uint64_t library_size)
+    {
+        digamma = size_type(float(DIGAMMA_PERCENT)/float(100) * float(library_size));
+    }
+
+    // Get absolute frequency cutoff for
+    constexpr size_type get_digamma() const noexcept
+    {
+        return digamma;
+    }
 
     //
     constexpr void set_root_taxid(taxid_type taxid)

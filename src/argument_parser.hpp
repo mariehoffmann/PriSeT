@@ -96,6 +96,8 @@ public:
     options(int argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
     {
         parse_arguments(argc, argv, primer_cfg, io_cfg);
+        // library successfully read, set absolute k-mer frequency cutoff
+        primer_cfg.set_digamma(io_cfg.get_library_size());
     }
 
 };

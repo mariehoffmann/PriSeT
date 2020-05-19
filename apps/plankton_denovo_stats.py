@@ -12,9 +12,10 @@ TRANSCRIPT_MIN_LEN = 30
 TRANSCRIPT_MAX_LEN = 800
 
 '''
-taxid=2825
-lib=/Volumes/plastic_data/tactac/subset
-python ../PriSeT/tests/plankton_denovo_stats.py --library $lib/$taxid/root_$taxid.fasta --accfile $lib/$taxid/root_$taxid.acc --taxfile $lib/$taxid/root_$taxid.tax --primers /Volumes/plastic_data/priset/primers.csv --primers_denovo /Volumes/plastic_data/priset/work/$taxid/denovo/primers.csv
+taxid=<taxid>
+lib_dir=<lib_dir>
+work_dir=<work_dir>
+python ../PriSeT/app/plankton_denovo_stats.py --library $lib/$taxid/root_$taxid.fasta --accfile $lib/$taxid/root_$taxid.acc --taxfile $lib/$taxid/root_$taxid.tax --primers <path_primers_pub.csv> --primers_denovo <path_primers_denovo.csv>
 '''
 
 parser = argparse.ArgumentParser(description = 'Compute cluster statistics for primer pairs.')

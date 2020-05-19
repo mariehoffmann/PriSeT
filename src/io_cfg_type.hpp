@@ -188,9 +188,20 @@ public:
     }
 
 
-    constexpr unsigned get_freq_kmer_min() const noexcept
+    size_t get_number_species()
     {
-        return unsigned(float(FREQ_KMER_MIN_PERCENT)/float(100) * library_size);
+        if (number_species)
+            return number_species;
+        std::ifstream stream(tax_file.string().c_str(), std::ios::in);
+        std::string row;
+        // count listed species in tax file with row format "taxid,parent_taxid,is_species"
+        std::string const is_species = "1\n";
+        while (std::getline(stream, row))
+        {
+            if (row.compare(row.size() - 3, 2, is_species) == 0)
+                ++number_species;
+        }
+        return number_species;
     }
 
     // Return template file for shiny app.
@@ -306,6 +317,8 @@ private:
     std::string ext_id = ".id";
     // Library size in terms of number of accessions (= fasta entries)
     uint64_t library_size{0};
+    // Number of species (extracted from tax_file.
+    size_t number_species{0};
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
     // R script for launching shiny app.

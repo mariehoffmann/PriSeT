@@ -27,56 +27,11 @@ namespace fs = std::experimental::filesystem;
 
 using namespace priset;
 
-// g++ ../PriSeT/tests/plankton_denovo.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o denovo
-
-// ./denovo $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
-
-struct setup
-{
-    std::string lib_dir;
-    std::string work_dir;
-
-    fs::path idx_dir;
-    fs::path idx_zip;
-    fs::path tmp_dir;
-
-    setup(std::string lib_dir, std::string work_dir)
-    {
-        lib_dir = fs::canonical(lib_dir).string();
-        work_dir = fs::canonical(work_dir).string();
-        idx_dir = work_dir + "/index";
-        tmp_dir = work_dir + "/tmp";
-
-        std::cout << "lib_dir in setup = " << lib_dir << std::endl;
-        std::cout << "work_dir in setup = " << work_dir << std::endl;
-        if (!fs::exists(tmp_dir))
-            fs::create_directory(tmp_dir);
-    }
-};
-
-struct TPrimerKey
-{
-    uint64_t fwd;
-    uint64_t rev;
-    TPrimerKey(uint64_t fwd_, uint64_t rev_) : fwd(fwd_), rev(rev_) {}
-    bool operator==(TPrimerKey const & lhs) const
-    {
-        return (fwd == lhs.fwd && rev == lhs.rev);
-    }
-};
-
-// hash defining in global namespace is ill-formed, needs to be declared in same namespace like std::hash!
-//namespace std
-//{ // doesn't work with struct hash, overwriting the one in std::hash
-struct hash_pp
-{
-
-    template<typename TPrimerKey>
-    std::size_t operator()(TPrimerKey const & key) const
-    {
-        return std::hash<std::string>()(std::to_string(key.fwd) + std::to_string(key.rev));
-    }
-};
+// lib_dir=<lib_dir>
+// taxid=<taxid>
+// work_dir=<work_dir>
+// g++ ../PriSeT/apps/plankton_denovo.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~/include -L~/lib -lsdsl -ldivsufsort -o denovo
+// ./denovo $taxid $lib_dir $work_dir
 
 
 int main(int argc, char ** argv)
@@ -86,7 +41,7 @@ int main(int argc, char ** argv)
         std::cout << "Give taxid, and paths to lib and work dirs.\n";
         exit(-1);
     }
-    setup su{argv[2], argv[3]};
+    // setup su{argv[2], argv[3]};
     std::string taxid = argv[1];
     unsigned const priset_argc = 6;
     char * const priset_argv[priset_argc] = {"priset", "-l", argv[2], "-w", argv[3], "-s"};
@@ -187,7 +142,7 @@ int main(int argc, char ** argv)
 
     // get timestamp and output primers in csv format #primerID,fwd,rev
     auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    fs::path primer_file = su.tmp_dir / ("primers_" + std::string(timestamp, 10));
+    fs::path primer_file = io_cfg.get_work_dir() / ("primers_" + std::string(timestamp, 10));
     std::ofstream ofs;
     ofs.open(primer_file);
     ofs << "#PrimerID, fwd (3' to 5'), rev (3' to 5')\n";

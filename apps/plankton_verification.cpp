@@ -24,37 +24,13 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/tests/plankton_verification.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o verif
-
-// ./verif $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+// g++ ../PriSeT/apps/plankton_verification.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~ -L~/lib -lsdsl -ldivsufsort -o verif
+// ./verif $taxid $lib_dir $work_dir
 
 using namespace priset;
 
 std::string dna_decoder(uint64_t, uint64_t const);
 
-struct setup
-{
-    std::string lib_dir;
-    std::string work_dir;
-
-    fs::path idx_dir;
-    fs::path idx_zip;
-    fs::path tmp_dir;
-
-    setup(std::string lib_dir, std::string work_dir)
-    {
-        lib_dir = fs::canonical(lib_dir).string();
-        work_dir = fs::canonical(work_dir).string();
-        idx_dir = work_dir + "/index";
-        tmp_dir = work_dir + "/tmp";
-
-        std::cout << "lib_dir in setup = " << lib_dir << std::endl;
-        std::cout << "work_dir in setup = " << work_dir << std::endl;
-        if (!fs::exists(tmp_dir))
-            fs::create_directory(tmp_dir);
-
-    }
-};
 
 struct TPrimerKey
 {
@@ -288,7 +264,7 @@ int main(int argc, char ** argv)
         std::cout << "Give taxid, and paths to lib and work dirs.\n";
         exit(-1);
     }
-    setup su{argv[2], argv[3]};
+    // setup su{argv[2], argv[3]};
     std::string taxid = argv[1];
     unsigned const priset_argc = 6;
     char * const priset_argv[priset_argc] = {"priset", "-l", argv[2], "-w", argv[3], "-s"};
