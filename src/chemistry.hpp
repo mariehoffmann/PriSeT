@@ -78,10 +78,6 @@ extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID cons
     return std::abs(2 * AT + 4 * CG);
 }
 
-// AT   AT = 2
-//
-// CG      CG = -2
-
 /*
  * Compute melting temperature of an encoded oligomer. The oligomer is trimmed
  * to the length indicated by bit mask, otherwise (mask = 0) to the smallest encoded
@@ -189,33 +185,28 @@ std::string kmerID2str(TKmerID kmerID);
  */
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
-    // std::cout << "\tenter filter_repeats_runs ...\n";
     auto [prefix, code] = split_kmerID(kmerID);
     if (!code)
         throw std::invalid_argument("Expected kmerID non zero!");
     if (!prefix)
     {
-        // std::cout << "prefix is already 0 \n";
         return;
     }
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
     kmerID = code; // save trimmed kmer-code part
-    uint64_t const k = (63 - __builtin_clzl(code)) >> 1;
-    for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
+    uint64_t k = encoded_length(code);
+    uint64_t tail_10;
+    while (code >= (1 << 10))
     {
-        uint64_t tail_10 = tail_selector_10 & code;
-        // XOR tail with A_4, C_4, G_4, T_4
-        if ((tail_10 == 0b00000000) || (tail_10 == 0b01010101) || (tail_10 == 0b10101010) || (tail_10 == 0b11111111))
+        tail_10 = tail_selector_10 & code;
+        // XOR tail with A_5, C_5, G_5, T_5
+        if ((tail_10 == 0b0000000000) || (tail_10 == 0b0101010101) || (tail_10 == 0b1010101010) || (tail_10 == 0b1111111111))
         {
-            // note that (x >> 64) won't be executed
-            uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
-            // delete all k bits ≥ len_selector
-            prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
-            // std::cout << "\t4-run found\n";
+            prefix = erase_bits(prefix, k);
         }
         // at least 10 characters left to test for di-nucleotide repeats of length 5
-        if (k - i > 9)
+        if (code >= (1ULL << 20))
         {
             uint64_t tail_20 = code & tail_selector_20;
             // AT_5, TA_5, AC_5, CA_5, AG_5, GA_5, CG_5, GC_5, CT_5, TC_5, GT_5, TG_5
@@ -227,24 +218,17 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
                  (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
             {
                 // delete all k bits ≥ len_selector
-                uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
-                // delete all k bits ≥ len_selector
-                prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
-                // std::cout << "\tdi-nucleotide run found\n";
+                prefix = erase_bits(prefix, k);
             }
         }
         if (!prefix)
-        {
-            // std::cout << "\tprefix is 0\n";
             break;
-        }
 
+        ----k;
         code >>= 2;
     }
     // add updated prefix
-
     kmerID |= prefix;
-    // std::cout << "\tored kmerID = " << kmerID2str(kmerID) << std::endl;
 }
 
 // Check if not more than 3 out of the 5 last bases at the 3' end are CG.
@@ -253,7 +237,7 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
 extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint64_t const mask = 0)
 {
     auto [prefix, code] = split_kmerID(kmerID);
-    uint64_t enc_l = WORD_SIZE - __builtin_clzll(code) - 1; // in bits
+    uint64_t enc_l = encoded_length(code);  // in bits
     if (sense == '-')
         code >>= enc_l - 10; // shift right to have prefix of length 10
     else
@@ -328,8 +312,6 @@ extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l);
 // l1, l2 refer to kmer lengths including dimerizing 4-mer
 extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kmerID2, uint8_t l2)
 {
-
-    // std::cout << "l1 = " << int(l1) << ", l2 = " << int(l2) << ", kmerID2 ? " << (kmerID2 ? 1 : 0)  << std::endl;
     if (!kmerID2) // first 4-mer occurrence significant
         delete_length_bits(kmerID1, std::min(l1, l2));
     else
@@ -337,19 +319,16 @@ extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
         // case: l1 <= 16 and l2 > 16 or l1 > 16 and l2 > 16
         if (l2 > (PRIMER_MIN_LEN << 1) && l2 > l1)
         {
-            // std::cout << "l1 > primer_min_len\n";
             delete_length_bits(kmerID2, l2);
         }
         // case: l1 > 16 and l2 <= 16 or l1 > 16 and l2 > 16
         if (l1 > (PRIMER_MIN_LEN << 1) && l1 > l2)
         {
-            // std::cout << "l1 > primer_min_len\n";
             delete_length_bits(kmerID1, l1);
         }
         // case: l1 <= 16 and l2 <= 16
         if (l1 <= (PRIMER_MIN_LEN << 1) && l2 <= (PRIMER_MIN_LEN << 1))
         {
-            // std::cout << "both kmers in prefixes\n";
             delete_length_bits(kmerID1, l1);
             delete_length_bits(kmerID2, l2);
         }
@@ -370,13 +349,13 @@ extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
 extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
 {
 
+    trim_to_true_length(kmerID1);
+    trim_to_true_length(kmerID2);
     uint64_t const fourmer_mask = 0b11111111;
     auto [prefix1, code1] = split_kmerID(kmerID1);
     auto [prefix2, code2] = (kmerID2) ? split_kmerID(kmerID2) : split_kmerID(kmerID1);
     if (!prefix1 || !prefix2)
         return;
-    trim_to_true_length(kmerID1);
-    trim_to_true_length(kmerID2);
     uint64_t const code2_rev = reverse(code2);
     uint8_t const l1 = WORD_SIZE - __builtin_clzll(code1) - 1;
     uint8_t const l2 = WORD_SIZE - __builtin_clzll(code2) - 1;
@@ -390,15 +369,12 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
         if (ctr < 0)
             exit(0);
         --ctr;
-        // overlap_mask = (1ULL << overlap) - 1;
         // prefix of code1 and suffix of code2
         prefix = (code1 >> (l1 - overlap));
-        // suffix = code2; // & overlap_mask; // needed?
-        // suffix_rev = code2_rev;// & overlap_mask;
         // handle case l1 > l2, trim leading bits from 1st code
         if (kmerID2 && overlap > l2 && l2 < l1)
             overlap_mask = (1 << l2) - 1;
-        // std::cout << "overlap_mask = " << std::bitset<36>(overlap_mask).to_string() << std::endl;
+
         auto x = (prefix ^ code2) & overlap_mask;
         auto y = (prefix ^ code2_rev) & overlap_mask;
 
@@ -478,48 +454,36 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
 {
     if (!(kmerID1 & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
         return;
-    // std::cout << "l1 before trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
 
     trim_to_true_length(kmerID1);
-    // std::cout << "l1 after trim: " << WORD_SIZE - __builtin_clzll(kmerID1&~PREFIX_SELECTOR) - 1 << std::endl;
+
     if (kmerID2)
         trim_to_true_length(kmerID2);
     auto [prefix1, code1] = split_kmerID(kmerID1);
     auto [prefix2, code2] = (kmerID2) ? split_kmerID(kmerID2) : split_kmerID(kmerID1);
     uint64_t code2_rev = reverse(code2);
-    uint8_t l1 =  WORD_SIZE - __builtin_clzll(code1) - 1;
-    uint8_t l2 =  WORD_SIZE - __builtin_clzll(code2) - 1;
+    uint8_t l1 =  encoded_length(code1);
+    uint8_t l2 =  encoded_length(code2);
 
-    // std::cout << "l1 = " << int(l1) << ", l2 = "  << int(l2) << std::endl;
-    // std::cout << std::bitset<64>(code1) << std::endl;
     uint8_t overlap = 20;
     uint64_t overlap_mask;
     uint64_t prefix, x, y;
 
     // Due to symmetry we need to test only the first half of possible overlapping positions
-    // std::cout << std::bitset<50>((1ULL << (std::min(l1, l2) - 2)) - 1) << std::endl;
-    // std::cout << "init overlap mask = " << std::bitset<50>((1ULL << (overlap << 1)) - 1) << std::endl;
-    // std::cout << "maximal forward overlap = " << std::min(l1, l2) - 2 << std::endl;
-    // std::cout << "initial overlap = " << overlap << std::endl;
     for (overlap = 20; (overlap_mask = (1ULL << overlap) - 1) <= (1ULL << (std::min(l1, l2) - 2)) - 1; ++++overlap)
     {
         // prefix of code1 and suffix of code2
         prefix = (code1 >> (l1 - overlap));
         // creates 11 patterns with even offsets for complementary bases
         x = (prefix ^ code2) & overlap_mask;
-        // std::cout << "x1 = " << std::bitset<50>(x) << std::endl;
-
         y = (prefix ^ code2_rev) & overlap_mask;
 
         // count ones every two bits and store in 2 bits, 011011 -> 010110
         x = x - ((x >> 1) & 0x1555555555555);
-        // std::cout << "x2 = " << std::bitset<50>(x) << std::endl;
 
         // filter every second set bit
         x &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{50}
-        // std::cout << "x3 = " << std::bitset<50>(x) << std::endl;
         auto annealings_x = __builtin_popcountll(x);
-        // std::cout << "overlap = " << int(overlap) << ", annealings_x = " << annealings_x << std::endl;
         if (annealings_x >= 8)
             annealing_helper(kmerID1, overlap, kmerID2, l2);
         y = y - ((y >> 1) & 0x1555555555555);
@@ -530,12 +494,9 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
             annealing_helper(kmerID1, overlap, kmerID2, l2);
     }
 
-    // std::cout << "-------------------------------------------------------\n";
     if (kmerID1 & PREFIX_SELECTOR)
     {
-        // std::cout << "l1 = " << WORD_SIZE - __builtin_clzll(code1) - 1 << std::endl;
         overlap = (l1 <= l2) ? l1 : l2;
-        // std::cout << "initial overlap = " << int(overlap) << std::endl;
         while (overlap >= 20)
         {
             overlap_mask = (1ULL << overlap) - 1;
@@ -544,7 +505,6 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
                 x = (code1 ^ code2) & overlap_mask;
                 x = x - ((x >> 1) & 0x1555555555555);
                 x &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{50}
-                // std::cout << "x3 = " << std::bitset<50>(x) << std::endl;
                 auto annealings_x = __builtin_popcountll(x);
                 if (annealings_x >= 8)
                 {
@@ -553,16 +513,10 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
                     break;
                 }
             }
-            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
             y = (code1 ^ code2_rev) & overlap_mask;
-            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
             y = y - ((y >> 1) & 0x1555555555555);
-            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
             y &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{42}
-            // std::cout << "y = " << std::bitset<50>(y) << std::endl;
             auto annealings_y = __builtin_popcountll(y);
-            // std::cout << "overlap = " << int(overlap) << ", annealings = " << int(annealings_y) << std::endl;
-            // std::cout << "reverse 2nd half: " << std::bitset<50>(y) << std::endl;
             // TODO: in case l1 < l2, for (l2-l1) iterations l2 is smaller, but then increases to l2
             if (annealings_y >= 8)
             {
@@ -571,19 +525,10 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
                 break;
             }
             code2 >>= 2;
-            // std::cout << "code2 = " <<  kmerID2str(code2) << std::endl;
             overlap = std::min(WORD_SIZE - __builtin_clzll(code2) - 1, int(l1));
         }
     }
 }
-
-/*
-extern inline void filter_annealing(TKmerID & kmerID) // function overload for self-annealing
-{
-    static TKmerID const kmerID2{0};
-    filter_annealing(kmerID, kmerID2);
-}
-*/
 
 // test forward and reverse cross annealing between two kmers. Two kmers cross-anneal
 // if there are at least 4 nts complementary to each other.
@@ -650,11 +595,15 @@ void chemical_filter_single_pass(TKmerID & kmerID)
 {
     // TKmerID code = kmerID & ~PREFIX_SELECTOR;
     auto [prefix, code] = split_kmerID(kmerID);
+    if (!prefix)
+    {
+        return;
+    }
     assert(kmerID > 0 && code > 0);
     uint8_t AT = 0; // counter 'A'|'T'
     uint8_t CG = 0; // counter 'C'|'G'
 
-    uint64_t enc_l = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
+    uint64_t enc_l = encoded_length(kmerID);
     // sum CG, AT content for longest kmer
     while (code != 1)
     {
@@ -665,12 +614,12 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             default: ++AT;
         }
         // TATA box test
-
         if ((code > (1ULL << 9)) && (((code & 0b11111111) == 0b11001100) || ((code & 0b11111111) == 0b00110011)))
         {
             if (enc_l <= PRIMER_MIN_LEN) // delete all length bits to discard this kmer
             {
                 kmerID &= ~PREFIX_SELECTOR;
+                // std::cout << "TATA box found\n";
                 return;
             }
             else // delete all length bits between current encoded length and larger ones
@@ -702,7 +651,9 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             {
                 float CG_content = float(CG) / (float(__builtin_clzl(mask) + PRIMER_MIN_LEN));
                 if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
+                {
                     kmerID ^= mask;
+                }
             }
         }
         switch(3 & code)
@@ -717,35 +668,13 @@ void chemical_filter_single_pass(TKmerID & kmerID)
 
     // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
-    // if (!(kmerID & PREFIX_SELECTOR) && passed)
-    // {
-    //     std::cout << "Did not pass filter_repeats_runs." << std::endl;
-    //     passed = 0;
-    // }
+
     // // Check for self-annealing
-    // filter_annealing_connected(kmerID);
-    // if (!(kmerID & PREFIX_SELECTOR) && passed)
-    // {
-    //     passed = 0;
-    //     std::cout << "Did not pass filter_annealing_connected." << std::endl;
-    // }
-    // filter_annealing_disconnected(kmerID);
-    // if (!(kmerID & PREFIX_SELECTOR) && passed)
-    // {
-    //     std::cout << "Did not pass filter_annealing_disconnected." << std::endl;
-    // }
+    filter_annealing_connected(kmerID);
 
+    filter_annealing_disconnected(kmerID);
 }
 
-/*
- * Test for self-annealing.
- *
- */
-/*void chemical_filter_square(TKmerID & kmerID)
-{
-
-}
-*/
 
 /* Helper function for computing the convolution of two sequences. For each overlap
  *position the Gibb's free energy is computed and the minimum returned;

@@ -31,31 +31,23 @@
 #define split_kmerID(kmerID) std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR}
 
 // The longest encoded k-mer length expressed in 2 bit format, i.e. 16 bp are 32 bits.
-#define encoded_length(kmerID) WORD_SIZE - 1 - __builtin_clzl(kmerID & ~PREFIX_SELECTOR);
+#define encoded_length(kmerID) WORD_SIZE - 1 - __builtin_clzl(kmerID & ~PREFIX_SELECTOR)
+
+// Erase length bits for positions [k:PRIMER_MAX_LEN] in prefix, k-mer length given in 2 bit format
+#define erase_bits(prefix, k) ((k >> 1) <= PRIMER_MIN_LEN) ? 0 : ((PREFIX_SELECTOR << (PRIMER_MAX_LEN - (k >> 1) + 1)) & prefix)
+
+// Get largest k from prefix. Returns PRIMER_MAX_LEN + 1 if prefix is null.
+#define get_largest_k(kmerID) PRIMER_MAX_LEN - ffsll(kmerID >> 54) + 1
 
 namespace priset
 {
 
-// Identify highest set bit without loop
-// TODO: cmp number of CPU cycles with fct for leading zeros (+1)
-/*
-static inline uint64_t log2_asm(uint64_t const x) {
-  uint64_t y;
-  asm( "\tbsr %1, %0\n"
-        : "=r"(y)
-        : "r" (x));
-  return y;
-}
-*/
 
 std::string kmerID2str(TKmerID kmerID);
-
-// extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
 
 // helper: delete lengths bits including the one representing 2bit encode l and larger ones
 extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
 {
-    // std::cout << "call delete_length_bits with l = " << int(l) << std::endl;
     auto [prefix, code] = split_kmerID(kmerID);
     if (l <= (PRIMER_MIN_LEN << 1))
         kmerID = code;
@@ -64,7 +56,6 @@ extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
         uint64_t offset = PRIMER_MAX_LEN + 1 - (l >> 1);
         kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
     }
-    // std::cout << "delete_length_bits: " << kmerID2str(kmerID) << std::endl;
 }
 
 // Execute in terminal and collect command return value.
@@ -84,8 +75,6 @@ std::string exec(char const * cmd) {
 // Trim to true length
 extern inline void trim_to_true_length(TKmerID & kmerID)
 {
-    // std::cout << "trim2tl input: ";
-    // std::cout << kmerID2str(kmerID) << std::endl;
     auto [prefix, code] = split_kmerID(kmerID);
     if (!prefix)
         return;
@@ -96,12 +85,6 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
     code >>= (l_enc - l_max);
     kmerID = prefix | code;
 }
-
-// extern inline std::pair<uint64_t, uint64_t> split(TKmerID kmerID)
-// {
-//     //std::cout << "split: " << bits2str(kmerID) << std::endl;
-//     return std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR};
-// }
 
 // forward declaration
 struct primer_cfg_type;
@@ -373,7 +356,6 @@ void split(std::string const & line, std::vector<std::string> & tokens, std::str
 template<typename io_cfg_type>
 void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, std::unordered_map<TAcc, TAccID> & acc2accID, io_cfg_type const & io_cfg)
 {
-    //std::cout << "create_accID2acc_map\n";
     std::ifstream id_file(io_cfg.get_id_file());
     std::vector<std::string> tokens;
     std::string line;
@@ -390,19 +372,15 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
         {
             accID2acc[accID] = tokens[i];
             acc2accID[tokens[i]] = accID;
-            //std::cout << "filled both dictionaries with " << accID << " <-> " << tokens[i] << std::endl;
         }
     }
-    std::cout << "... done\n";
 }
 
 // create_table helper to build accession ID to taxon ID map
 template<typename io_cfg_type>
 void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, std::unordered_set<TTaxid> & taxid_set, std::unordered_map<TAcc, TAccID> const & acc2accID, io_cfg_type const & io_cfg)
 {
-    std::cout << "create_accID2taxID\n";
     std::ifstream acc_file(io_cfg.get_acc_file());
-    std::cout << "load acc_file: " << io_cfg.get_acc_file() << std::endl;
     std::vector<std::string> tokens;
     // taxid: (ctr_match, ctr_total), ctrs for accessions
     std::string line;
@@ -414,26 +392,22 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 
         split(line, tokens);
         TTaxid taxid = std::stoi(tokens[0]);
-        //std::cout << "taxid = " << taxid << std::endl;
         taxid_set.insert(taxid);
         for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
         {
             TAcc acc = tokens[token_idx];
-            //std::cout << "acc = " << acc << std::endl;
             // TODO: observation - there are accessions (without version suffix) that do not have fasta entries in DB
             if (acc2accID.find(acc) == acc2accID.end())
                 continue; //std::cout << "ERROR: accession " << acc << " not in acc2accID dictionary!" << std::endl, exit(0);
             accID2taxID[acc2accID.at(acc)] = taxid;
         }
     }
-    std::cout << "... done\n";
 }
 
 // load taxonomy from file and store as map {taxid: p_taxid}
 template<typename io_cfg_type>
 void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type const & io_cfg)
 {
-    std::cout << "create_tax_map\n";
     std::ifstream tax_file(io_cfg.get_tax_file());
     size_t pos;
     std::string line;
@@ -447,7 +421,6 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
             continue;
         tax_map[std::stoi(line.substr(0, pos))] = std::stoi(line.substr(pos + 1, std::string::npos));
     }
-    std::cout << "... done\n";
 }
 
 // accumulate statistics upstream for both container types - TKmerLocations and TKmerPairs
@@ -498,7 +471,6 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 
             // accumulate stats for upstream until root
             TTaxid taxid_aux = taxid;
-//            auto p_it{tax_map.find(taxid_aux)};
             while (tax_map.find(taxid_aux) != tax_map.end())
             {
                 // proceed with taxonomic parent
@@ -523,17 +495,15 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
     table.open(io_cfg.get_result_file(), std::ios_base::app);
 
     // flush leave node results
-    for (TResult result : results){
-        //std::cout << result.to_string() << std::endl;
+    for (TResult result : results)
+    {
         table << result.to_string();
     }
     // flush inner node results
     for (auto const & [key, value] : upstream_map)
     {
-        //std::cout << key << "," << value.first << "," << value.second << "\n";
         table << key << "," << value.first << "," << value.second << "\n";
     }
-
     table.close();
 }
 
@@ -543,7 +513,6 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
 template<typename TKmerIDs>
 void unique_kmers(TKmerIDs const & kmerIDs, std::set<uint64_t> & set)
 {
-    //std::vector<std::deque<TKmerID>> TKmerIDs;
     for (auto it_ref = kmerIDs.begin(); it_ref < kmerIDs.end(); ++it_ref)
     {
         for (auto it_kmerID = it_ref->begin(); it_kmerID <= it_ref->end(); ++it_kmerID)
@@ -604,8 +573,6 @@ void unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, std::unorde
         uint64_t code_fwd, code_rev;
         for (std::pair<TKmerLength, TKmerLength> c : combinations)
         {
-        //    std::cout << "pair.reference = " << pair.reference << ", size kmerIDs of this reference = " << kmerIDs.at(pair.reference).size();
-        //    std::cout << ", try to access r_fwd = " << pair.r_fwd - 1 << ", r_rev = " << pair.r_rev - 1 << std::endl;
             code_fwd = get_code(kmerIDs.at(pair.reference).at(pair.r_fwd - 1), ONE_LSHIFT_63 >> c.first);
             code_rev = get_code(kmerIDs.at(pair.reference).at(pair.r_rev - 1), ONE_LSHIFT_63 >> c.second);
             uint64_t key = hash_pair(code_fwd, code_rev);

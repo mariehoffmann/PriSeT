@@ -14,8 +14,18 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
+//TODO: this ordering does not work, how to make define directive be found (and that it does not occur too late in translation unit)
+// #include "../src/combine_types.hpp"
+// #include "../src/filter.hpp"
+// #include "../src/primer_cfg_type.hpp"
+// #include "../src/types.hpp"
+// #include "../src/utilities.hpp"
+
+#include "../src/argument_parser.hpp"
 #include "../src/combine_types.hpp"
 #include "../src/filter.hpp"
+#include "../src/fm.hpp"
+#include "../src/io_cfg_type.hpp"
 #include "../src/primer_cfg_type.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
@@ -30,34 +40,60 @@ using namespace priset;
 void test_dTM()
 {
     // 4, 12, 8
-    TKmerID kmerID1 = 1513342761473819536;
-    uint64_t mask1 = ONE_LSHIFT_63 >> 3;
-    TKmerID kmerID2 = 288235407220622179;
-    uint64_t mask2 = ONE_LSHIFT_63 >> 5;
-    float d = dTm(kmerID1, mask1, kmerID2, mask2);
-    if (d != 4)
+    // TKmerID kmerID1 = 1513342761473819536;
+    // uint64_t mask1 = ONE_LSHIFT_63 >> 3;
+    // TKmerID kmerID2 = 288235407220622179;
+    // uint64_t mask2 = ONE_LSHIFT_63 >> 5;
+    // float d = dTm(kmerID1, mask1, kmerID2, mask2);
+    // if (d != 4)
+    // {
+    //     std::cout << "ERROR: expect 4, got ";
+    //     std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << d << std::endl;
+    //     exit(0);
+    // }
+    // mask1 >>= 2;
+    // d = dTm(kmerID1, mask1, kmerID2, mask2);
+    // if (d != 12)
+    // {
+    //     std::cout << "ERROR: expect 12, got ";
+    //     std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << d << std::endl;
+    //     exit(0);
+    // }
+    // mask1 >>= 2;
+    // d = dTm(kmerID1, mask1, kmerID2, mask2);
+    // if (d != 8)
+    // {
+    //     std::cout << "ERROR: expect 8, got ";
+    //     std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << d << std::endl;
+    //     exit(0);
+    // }
+    // std::cout << "SUCCESS\n";
+
+    TKmerID kmerID3 = (1ULL << 61) | dna_encoder("ATTCCAGCTCCAATAGCG");
+    // AT = 9, GC = 9
+    TKmerID kmerID4 = (1ULL << 59) | dna_encoder("GATTAGATACCATCGTAGTC");
+    // AT = 9-12 = -3, CG = 9-8 = 1    -3*2 + 1*4 = -2, abs(-2) = 2
+    float d = dTm(kmerID3, 1ULL << 61, kmerID4, 1ULL << 59);
+    if (d != 2)
     {
-        std::cout << "ERROR: expect 4, got ";
-        std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << d << std::endl;
+        std::cout << "ERROR: expect 2 Kelvin, got " << d << std::endl;
         exit(0);
     }
-    mask1 >>= 2;
-    d = dTm(kmerID1, mask1, kmerID2, mask2);
-    if (d != 12)
+    std::cout << "SUCCESS for DIAZ\n";
+
+    // same kmers, but as part of larger ones with various lengths
+    // DIAZ fwd contained in kmerID_fwd = 11111100|CTAAACCTCATCATTTAGAGGAAGG
+    // DIAZ rev contained in kmerID_fwd = 1111100000|GTAGGTGAACCTGCAGAAGG
+    TKmerID kmerID5 = (0b111111ULL << 56) | dna_encoder("ATTCCAGCTCCAATAGCGTTTTTTT");
+    TKmerID kmerID6 = (0b11111ULL << 59) | dna_encoder("GATTAGATACCATCGTAGTC");
+    d = dTm(kmerID5, 1ULL << 61, kmerID6, 1ULL << 59);
+    if (d != 2)
     {
-        std::cout << "ERROR: expect 12, got ";
-        std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << d << std::endl;
+        std::cout << "ERROR: expect 2 Kelvin, got " << d << std::endl;
         exit(0);
     }
-    mask1 >>= 2;
-    d = dTm(kmerID1, mask1, kmerID2, mask2);
-    if (d != 8)
-    {
-        std::cout << "ERROR: expect 8, got ";
-        std::cout << "dTm(" << dna_decoder(kmerID1, mask1) << ", " << dna_decoder(kmerID2, mask2) << ") = " << d << std::endl;
-        exit(0);
-    }
-    std::cout << "SUCCESS\n";
+    std::cout << "SUCCESS for DIAZ embedded\n";
+
 }
 
 void filter_repeats_runs_test()
@@ -173,46 +209,65 @@ void chemical_filter_single_pass_test()
     // case: all in range, CG = 9 (0.5625), Tm = 7*2 + 9*4 = 50
     TKmerID kmerID = ONE_LSHIFT_63 + dna_encoder("CCGTACGTAACCGGTT");
     TKmerID kmerID_ref = kmerID;
+    // chemical_filter_single_pass(kmerID);
+    // if (kmerID_ref != kmerID)
+    //     std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
+    // else
+    //     std::cout << "INFO: Success\n";
+    // std::cout << "kmerID as bitstr = " << bits2str(kmerID) << std::endl;
+    //
+    // std::cout << "------------------------------------------\n";
+    // // case: only CG content out of range, CG: 10 (0.625), Tm = 2*6 + 4*10 = 62
+    // kmerID = ONE_LSHIFT_63 + dna_encoder("CCGACCGTAACCGGTT");
+    // kmerID_ref = kmerID - ONE_LSHIFT_63;
+    // chemical_filter_single_pass(kmerID);
+    // if (kmerID_ref != kmerID)
+    //     std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
+    // else
+    //     std::cout << "INFO: Success\n";
+    //
+    // std::cout << "------------------------------------------\n";
+    // // case: only Tm out of range, CG = 7 (0.4375), Tm = 2*9 + 4*7 = 46
+    // kmerID = ONE_LSHIFT_63 + dna_encoder("AACGTAACGTAACGGT");
+    // kmerID_ref = kmerID - ONE_LSHIFT_63;
+    // chemical_filter_single_pass(kmerID);
+    // if (kmerID_ref != kmerID)
+    //     std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
+    // else
+    //     std::cout << "INFO: Success\n";
+    //
+    // // case: Tm out of range for length 16, not for 17
+    // // case: only Tm out of range,
+    // // l = 16: CG = 6 (0.375!), Tm = 4*6 + 2*10 = 44!
+    // // l = 17: CG = 6 (0.35!), Tm = 4*6 + 2*11 = 46!
+    // // l = 25: CG = 8 (0.40), Tm = 2*12 + 4*8 = 56
+    // kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 1) + (ONE_LSHIFT_63 >> 4) + dna_encoder("AACGTAACGTACTATCACTC");
+    // kmerID_ref = kmerID - ONE_LSHIFT_63 - (ONE_LSHIFT_63 >> 1);
+    //
+    // chemical_filter_single_pass(kmerID);
+    // if (kmerID_ref != kmerID)
+    //     std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
+    // else
+    //     std::cout << "INFO: Success\n";
+
+    //11000000|AGAGGGAGCATGAGAAATG to 0|AGAGGGAGCATGAGAAATG
+    // 1100000000|TTATGGTAGAGCTGTAT
+    kmerID = (1ULL << 63) | (1ULL << 62) | dna_encoder("TTATGGTAGAGCTGTAT");
+    auto kmerID_cp{kmerID};
     chemical_filter_single_pass(kmerID);
-    if (kmerID_ref != kmerID)
-        std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
+    if (kmerID != kmerID_cp)
+        std::cout << "ERROR: expect unmodified kmerID, got " << kmerID2str(kmerID) << std::endl;
     else
         std::cout << "INFO: Success\n";
-    std::cout << "kmerID as bitstr = " << bits2str(kmerID) << std::endl;
 
-    std::cout << "------------------------------------------\n";
-    // case: only CG content out of range, CG: 10 (0.625), Tm = 2*6 + 4*10 = 62
-    kmerID = ONE_LSHIFT_63 + dna_encoder("CCGACCGTAACCGGTT");
-    kmerID_ref = kmerID - ONE_LSHIFT_63;
-    chemical_filter_single_pass(kmerID);
-    if (kmerID_ref != kmerID)
-        std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
-    else
-        std::cout << "INFO: Success\n";
 
-    std::cout << "------------------------------------------\n";
-    // case: only Tm out of range, CG = 7 (0.4375), Tm = 2*9 + 4*7 = 46
-    kmerID = ONE_LSHIFT_63 + dna_encoder("AACGTAACGTAACGGT");
-    kmerID_ref = kmerID - ONE_LSHIFT_63;
-    chemical_filter_single_pass(kmerID);
-    if (kmerID_ref != kmerID)
-        std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
-    else
-        std::cout << "INFO: Success\n";
+    // kmerID = (1ULL << 63) | (1ULL << 62) | dna_encoder("GGATAGTTGGGGGCATC");
+    // chemical_filter_single_pass(kmerID);
+    // if (!(kmerID && PREFIX_SELECTOR))
+    //     std::cout << "ERROR: expect invalid kmerID, got " << kmerID2str(kmerID) << std::endl;
+    // else
+    //     std::cout << "INFO: Success\n";
 
-    // case: Tm out of range for length 16, not for 17
-    // case: only Tm out of range,
-    // l = 16: CG = 6 (0.375!), Tm = 4*6 + 2*10 = 44!
-    // l = 17: CG = 6 (0.35!), Tm = 4*6 + 2*11 = 46!
-    // l = 25: CG = 8 (0.40), Tm = 2*12 + 4*8 = 56
-    kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 1) + (ONE_LSHIFT_63 >> 4) + dna_encoder("AACGTAACGTACTATCACTC");
-    kmerID_ref = kmerID - ONE_LSHIFT_63 - (ONE_LSHIFT_63 >> 1);
-
-    chemical_filter_single_pass(kmerID);
-    if (kmerID_ref != kmerID)
-        std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
-    else
-        std::cout << "INFO: Success\n";
 }
 
 void chemical_debug()
@@ -260,18 +315,20 @@ void test_filter_WWW()
     std::cout << "passes WWW filter: " << filter_WWW_tail(kmerID, '+', ONE_LSHIFT_63 >> 2) << std::endl;
 }
 
+void test3()
+{
+    TKmerID kmerID = (1ULL << 63) | (1ULL << 62) | (1ULL << 61) | (1ULL << 60) | (1ULL << 59) | (1ULL << 58) | (1ULL << 57) | dna_encoder("TTATGGTAGAGCTGTATATGAA");
+    auto kmerID_cp{kmerID};
+    chemical_filter_single_pass(kmerID);
+
+    if (kmerID != kmerID_cp)
+        std::cout << "OK: expect modified kmerID, got " << kmerID2str(kmerID) << std::endl;
+    else
+        std::cout << "ERROR\n";
+}
+
 int main()
 {
-//    reverse_complement_test();
-//    complement_test();
-    test_filter_self_annealing();
-//    test_filter_cross_annealing();
-//    test_filter_WWW();
-//    test_reverse_complement();
-//    chemical_debug();
-//    test_dTM();
-//    filter_repeats_runs_test();
-//    filter_CG_clamp_test();
-//    chemical_filter_single_pass_test();
+    filter_CG_clamp_test();
     return 0;
 }

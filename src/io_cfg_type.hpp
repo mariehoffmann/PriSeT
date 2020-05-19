@@ -59,6 +59,7 @@ public:
         skip_idx_flag = skip_idx_flag_;
         index_dir = work_dir;
         mapping_dir = work_dir;
+
         // TODO: path to PriSeT git repos as argument
         genmap_bin = "~/git/PriSet_git2/PriSeT/submodules/genmap/bin/genmap";
 
@@ -66,7 +67,6 @@ public:
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
         for (auto & p : fs::directory_iterator(lib_dir))
         {
-            //std::cout << p << std::endl;
             if (p.path().extension().compare(ext_acc) == 0)
                 acc_file = p;
             else if (p.path().extension().compare(ext_fasta) == 0)
@@ -77,18 +77,15 @@ public:
             {
                 id_file = p;
                 // set library size
-                // faster with  wc -l root_10190.id
-                //std::system("ls -l >test.txt"); // execute the UNIX command "ls -l >test.txt"
-                //std::cout << std::ifstream("test.txt").rdbuf();
-
                 FILE * infile = fopen(id_file.string().c_str(), "r");
                 int c;
                 while (EOF != (c = getc(infile)))
                     if (c == '\n')
                         ++library_size;
                 std::cout << "INFO: library size = " << library_size << std::endl;
-                std::cout << "INFO: frequency cutoff in PriSeT and FM Map =\t" << FREQ_KMER_MIN << std::endl;
-                //std::cout << "INFO: frequency cutoff in PriSeT =\t" << get_freq_kmer_min() << std::endl;
+                std::cout << "INFO: frequency cutoff for k-mers in PriSeT and FM Map =\t" << get_freq_kmer_min() << std::endl;
+                std::cout << "INFO: frequency cutoff for pairs in PriSeT combine =\t" << get_freq_kmer_min() << std::endl;
+
             }
         }
         if (!acc_file.has_filename())
@@ -187,10 +184,16 @@ public:
         return library_size;
     }
 
-
-    constexpr unsigned get_freq_kmer_min() const noexcept
+    // Return FREQ_KMER_MIN_PERCENT relative to library size.
+    unsigned get_freq_kmer_min() const noexcept
     {
         return unsigned(float(FREQ_KMER_MIN_PERCENT)/float(100) * library_size);
+    }
+
+    // Return FREQ_PAIR_MIN_PERCENT relative to library size.
+    unsigned get_freq_pair_min() const noexcept
+    {
+        return (unsigned(float(FREQ_PAIR_MIN_PERCENT)/float(100) * library_size));
     }
 
     // Return template file for shiny app.

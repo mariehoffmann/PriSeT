@@ -111,7 +111,7 @@ int main(/*int argc, char ** argv*/)
 
     combine<TPairList>(references, kmerIDs, pairs, kmerCounts);
 
-    filter_pairs(references, kmerIDs, pairs);
+    filter_pairs(io_cfg, references, kmerIDs, pairs);
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
 

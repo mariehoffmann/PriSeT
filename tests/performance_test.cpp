@@ -31,60 +31,51 @@ using namespace priset;
 
 // -mpopcnt gives speedup of 5, otherwise call __popcountdi2 called for __builtin_popcountll
 // g++ ../PriSeT/tests/performance_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -mpopcnt -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o performance_test
+// ./performance_test $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+// tst on 304574
 
 struct setup
 {
-    std::string lib_dir = fs::canonical("../PriSeT/tests/library/3041").string();
-    //std::cout << "lib_dir = " << lib_dir << std::endl;
-    std::string work_dir = fs::canonical("../PriSeT/tests/work/3041").string();
+    std::string lib_dir;
+    std::string work_dir;
 
-    fs::path idx_dir = work_dir + "/index";
-    fs::path idx_zip = work_dir + "/index.zip";
-    fs::path tmp_dir = work_dir + "/tmp";
+    fs::path idx_dir;
+    fs::path idx_zip;
+    fs::path tmp_dir;
 
-    setup()
+    setup(std::string lib_dir, std::string work_dir)
     {
-        // unzip index.zip into same named directory
-        std::system(("unzip -n -d " + work_dir + " " + idx_zip.string()).c_str());
-        // clear and create tmp dir
-        std::cout << "tmpdir exists: " << fs::exists(tmp_dir) << std::endl;
-        if (fs::exists(tmp_dir))
-        {
-            std::cout << "tmp_dir exists, delete it\n";
-            fs::remove_all(tmp_dir);
-        }
-        if (!fs::create_directory(tmp_dir))
-            std::cout << "ERROR: could not create tmp_dir = " << tmp_dir << std::endl;
+        lib_dir = fs::canonical(lib_dir).string();
+        work_dir = fs::canonical(work_dir).string();
+        idx_dir = work_dir + "/index";
+        tmp_dir = work_dir + "/tmp";
+
         std::cout << "lib_dir in setup = " << lib_dir << std::endl;
         std::cout << "work_dir in setup = " << work_dir << std::endl;
-
-    }
-
-    void down()
-    {
-        // delete index dir
-        if (fs::remove_all(idx_dir))
-            std::cout << "ERROR: could not remove idx_dir = " << idx_dir << std::endl;
-        // delete tmp dir
-        if (fs::remove_all(tmp_dir))
-            std::cout << "ERROR: could not remove tmp_dir = " << tmp_dir << std::endl;
+        if (!fs::exists(tmp_dir))
+            fs::create_directory(tmp_dir);
     }
 };
 
 /* Measure runtime for PriSeT components */
-int main(/*int argc, char ** argv*/)
+int main(int argc, char ** argv)
 {
-    setup su{};
-    std::array<size_t, priset::TIMEIT::SIZE> runtimes;
-
-    unsigned const argc = 6;
-    char * const argv[argc] = {"priset", "-l", &su.lib_dir[0], "-w", &su.work_dir[0], "-s"};
-    for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
+    if (argc != 4)
+    {
+        std::cout << "Give taxid, and paths to lib and work dirs.\n";
+        exit(-1);
+    }
+    setup su{argv[2], argv[3]};
+    std::string taxid = argv[1];
+    unsigned const priset_argc = 6;
+    char * const priset_argv[priset_argc] = {"priset", "-l", argv[2], "-w", argv[3], "-s"};
+    for (unsigned i = 0; i < priset_argc; ++i) std::cout << priset_argv[i] << " ";
     std::cout << std::endl;
 
-    ///////////////////////////////////////////
-    // Store start and finish times for optional runtime measurements
+    // timing
     std::chrono::time_point<std::chrono::system_clock> start, finish;
+    std::array<size_t, TIMEIT::SIZE> runtimes;
+    runtimes.fill(0);
 
     // collect number of kmers or kmer pairs left after relevant processing steps
     TKmerCounts kmerCounts{0, 0, 0, 0};
@@ -96,102 +87,85 @@ int main(/*int argc, char ** argv*/)
     primer_cfg_type primer_cfg{};
 
     // parse options and init io and primer configurators
-    options opt(argc, argv, primer_cfg, io_cfg);
+    options opt(priset_argc, priset_argv, primer_cfg, io_cfg);
 
-    // create FM index if SKIP_IDX not in argument list
-    int ret_code;
-    if (io_cfg.skip_idx())
-    {
-        std::cout << "MESSAGE: skip index recomputation" << std::endl;
-    }
-    else if ((ret_code = fm_index(io_cfg)))
-    {
-        std::cout << "ERROR: " << ret_code << std::endl;
-        exit(-1);
-    }
-    // quit here for index computation without subsequent mappability
-    if (io_cfg.idx_only())
-    {
-        std::cout << "MESSAGE: index recomputation only" << std::endl;
-        return 0;
-    }
-
-    // dictionary for storing FM mapping results
     TKLocations locations;
-
-    // directory info needed for genmap's fasta file parser
     TDirectoryInformation directoryInformation;
-
-    // container for fasta header lines
     TSequenceNames sequenceNames;
-
-    // container for fasta sequence lengths
     TSequenceLengths sequenceLengths;
 
-    start = std::chrono::high_resolution_clock::now();
     // compute k-mer mappings
+    start = std::chrono::high_resolution_clock::now();
     fm_map(io_cfg, primer_cfg, locations);
     finish = std::chrono::high_resolution_clock::now();
-    // duration obj
-    //auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
-    runtimes[TIMEIT::MAP] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    runtimes.at(TIMEIT::MAP) += std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
 
-    // Do not modify or delete STATS lines, since they are captured for statistical analysis
-    std::cout << "\nINFO: kmers init = " << locations.size() << std::endl;
+    std::cout << "INFO: kmers init = " << std::accumulate(locations.begin(), locations.end(), 0, [](unsigned ctr, auto & location){return ctr + location.second.first.size();}) << std::endl;
 
-    // filter k-mers by frequency and chemical properties
-    // TODO: result structure for references and k-mer pairs: candidates/matches
-    // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
-    start = std::chrono::high_resolution_clock::now();
     TReferences references;
     TKmerIDs kmerIDs;
-    // TSeqNoMap seqNoMap;
-    filter_and_transform(io_cfg, locations, references, kmerIDs, &kmerCounts);
-    finish = std::chrono::high_resolution_clock::now();
-    runtimes[TIMEIT::FILTER1_TRANSFORM] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    TSeqNoMap seqNoMap;
+    start = std::chrono::high_resolution_clock::now();
 
-    std::cout << "\nINFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
+    filter_and_transform(io_cfg, locations, references, seqNoMap, kmerIDs);
+    finish = std::chrono::high_resolution_clock::now();
+    runtimes.at(TIMEIT::FILTER1_TRANSFORM) += std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
+    // count k-mers
+    for (auto kmerIDs_per_reference : kmerIDs)
+    {
+        for (TKmerID kmerID : kmerIDs_per_reference)
+            kmerCounts[KMER_COUNTS::FILTER1_CNT] += __builtin_popcountll(kmerID >> 54);
+    }
+
+
+    std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
+    // dictionary collecting (unique) pair frequencies
 
     start = std::chrono::high_resolution_clock::now();
-
     // template<typename TPairList>
-    // void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
-
+    // void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts * kmerCounts = nullptr)
     combine<TPairList>(references, kmerIDs, pairs, &kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
-    runtimes[TIMEIT::COMBINE_FILTER2] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    runtimes.at(TIMEIT::COMBINE_FILTER2) += std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
 
-    std::cout << "INFO: pairs combined = " << get_num_pairs<TPairList>(pairs) << std::endl;
+    std::cout << "INFO: pairs after combiner = " << kmerCounts[KMER_COUNTS::COMBINER_CNT] << std::endl;
 
-    // Decomment the following line for analysing unique kmer combinations.
+    std::vector<TPairFreq> pair_freqs;
     start = std::chrono::high_resolution_clock::now();
-
-// template<typename TPairList, typename TPairFreq>
-// void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::vector<TPairFreq> & pair_freqs, TKmerCounts * kmerCounts = nullptr)
-    // List of unique pair frequencies
-    TPairFreqList pair_freqs;
-
-    filter_pairs<TPairList, TPairFreqList>(references, kmerIDs, pairs, pair_freqs, &kmerCounts);
-
+    filter_pairs<TPairList, TPairFreqList>(io_cfg, references, kmerIDs, pairs, pair_freqs, &kmerCounts);
+    std::cout << "INFO: pairs after pair_freq filter = " << kmerCounts[KMER_COUNTS::FILTER2_CNT] << std::endl;
     finish = std::chrono::high_resolution_clock::now();
-    runtimes[TIMEIT::PAIR_FREQ] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+    runtimes.at(TIMEIT::PAIR_FREQ) += std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
 
-    std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
-
-
-    //////////////////////////////////////////
-    std::cout << "MESSAGE: ... done." << std::endl;
-
-    std::cout << "K\tMAP\t\tFILTER1_TRANSFORM\tCOMBINE_FILTER2\tPAIR_FREQ\t|\tSUM [μs]\n" << std::string(100, '_') << "\n";
+    std::cout << "K\tMAP\t\tFILTER1_TRANSFORM\tCOMBINE_FILTER2\tPAIR_FREQ\t|\tSUM [ms]\n" << std::string(100, '_') << "\n";
     std::cout << "[" << 16 << ":" << 25 << "]\t" << runtimes[priset::TIMEIT::MAP] << "\t" <<
             '\t' << runtimes[priset::TIMEIT::FILTER1_TRANSFORM] <<
             '\t' << runtimes[priset::TIMEIT::COMBINE_FILTER2] << '\t' << runtimes[priset::TIMEIT::PAIR_FREQ] <<
-            "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
+            "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << "\n\n";
 
+    // Sort pairs by frequency
+    std::sort(pair_freqs.begin(), pair_freqs.end(), [&](TPairFreq & p1, TPairFreq & p2){return p1.first > p2.first;});
+    std::stringstream sstream;
+    std::cout << "#ID\tForward\tReverse\tFrequency\tTm\tCG\n";
+
+    for (size_t k = 0; k < std::min(pair_freqs.size(), size_t(10)); ++k)
+    {
+        TPairFreq pf = pair_freqs.at(k);
+        const auto & [code_fwd, mask_fwd, code_rev, mask_rev] = pf.second;
+        std::string fwd = dna_decoder(code_fwd, mask_fwd);
+        std::string rev = dna_decoder(code_rev, mask_rev);
+        sstream << std::hex << std::hash<std::string>()(fwd + rev) << ",";
+        sstream << std::dec << fwd << "," << rev << "," << pf.first << ",";
+        sstream << "\"[" << float(Tm(code_fwd, mask_fwd)) << "," << float(Tm(code_rev, mask_rev)) << "]\",";
+        sstream << "\"[" << CG(code_fwd, mask_fwd) << "," << CG(code_rev, mask_rev) << "]\"" << std::endl;
+
+    }
+    std::string s = sstream.str();
+    std::cout << s << std::endl;
 
     return 0;
 }

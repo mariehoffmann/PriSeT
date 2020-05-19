@@ -27,9 +27,9 @@ namespace fs = std::experimental::filesystem;
 
 using namespace priset;
 
-// g++ ../PriSeT/tests/plankton_denovo.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o denovo
+// g++ ../PriSeT/tests/corona.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o corona
 
-// ./denovo $taxid /Volumes/plastic_data/tactac/subset/$taxid /Volumes/plastic_data/priset/work/$taxid
+// ./corona /Volumes/plastic_data/priset/library/corona/corona19 /Volumes/plastic_data/priset/work/covid19
 
 struct setup
 {
@@ -47,8 +47,10 @@ struct setup
         idx_dir = work_dir + "/index";
         tmp_dir = work_dir + "/tmp";
 
+        std::cout << "idx_dir in setup = " << idx_dir << std::endl;
         std::cout << "lib_dir in setup = " << lib_dir << std::endl;
         std::cout << "work_dir in setup = " << work_dir << std::endl;
+
         if (!fs::exists(tmp_dir))
             fs::create_directory(tmp_dir);
     }
@@ -81,15 +83,14 @@ struct hash_pp
 
 int main(int argc, char ** argv)
 {
-    if (argc != 4)
+    if (argc != 3)
     {
-        std::cout << "Give taxid, and paths to lib and work dirs.\n";
+        std::cout << "Give paths to lib and work dirs.\n";
         exit(-1);
     }
-    setup su{argv[2], argv[3]};
-    std::string taxid = argv[1];
+    setup su{argv[1], argv[2]};
     unsigned const priset_argc = 6;
-    char * const priset_argv[priset_argc] = {"priset", "-l", argv[2], "-w", argv[3], "-s"};
+    char * const priset_argv[priset_argc] = {"priset", "-l", argv[1], "-w", argv[2], "-s"};
     for (unsigned i = 0; i < priset_argc; ++i) std::cout << priset_argv[i] << " ";
     std::cout << std::endl;
 
@@ -164,9 +165,11 @@ int main(int argc, char ** argv)
     std::stringstream sstream;
     std::cout << "#ID\tForward\tReverse\tFrequency\tTm\tCG\n";
 
-    for (size_t k = 0; k < std::min(pair_freqs.size(), size_t(50)); ++k)
+    for (size_t k = 0; k < pair_freqs.size(); ++k)
     {
         TPairFreq pf = pair_freqs.at(k);
+        if (pf.first < 18)
+            continue;
         const auto & [code_fwd, mask_fwd, code_rev, mask_rev] = pf.second;
         std::string fwd = dna_decoder(code_fwd, mask_fwd);
         std::string rev = dna_decoder(code_rev, mask_rev);
@@ -184,6 +187,11 @@ int main(int argc, char ** argv)
     // fs::path primer_file = su.tmp_dir / ("primers_" + std::string(timestamp, 10));
     // std::cout << "primer file = " << primer_file.string() << std::endl;
     // std::ofstream ofs(primer_file.string());
+    // if(!ofs)
+    // {
+	// 	std::cout << "Error opening file: " << primer_file.string() << std::endl ;
+	// 	return -1;
+	// }
     // ofs << s;
     // ofs.close();
     // std::cout << "primer sequences written to " << primer_file.string() << std::endl;
