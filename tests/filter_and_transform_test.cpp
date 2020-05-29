@@ -18,7 +18,6 @@
 #define PRISET_TEST
 
 #include "../src/argument_parser.hpp"
-#include "../src/combine_types.hpp"
 #include "../src/filter.hpp"
 #include "../src/gui.hpp"
 #include "../src/primer_cfg_type.hpp"
@@ -29,7 +28,7 @@ namespace fs = std::experimental::filesystem;
 using namespace priset;
 
 
-// g++ ../PriSeT/tests/filter_and_transform_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o filter_and_transform_test
+// g++ ../PriSeT/tests/transform_and_filter_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o transform_and_filter_test
 
 struct setup
 {
@@ -88,10 +87,10 @@ struct setup
     }
 };
 
-void test_filter_and_transform()
+void test_transform_and_filter()
 {
     setup su{};
-    filter_and_transform(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
+    transform_and_filter(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     std::cout << "References:\n";
     for (TReference reference : su.references)
     {
@@ -124,7 +123,7 @@ void test_filter_and_transform()
 void test_combine()
 {
     setup su{};
-    filter_and_transform(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
+    transform_and_filter(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     //using TPair = TPair;
     using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
@@ -136,7 +135,7 @@ void test_combine()
 
 int main()
 {
-    test_filter_and_transform();
+    test_transform_and_filter();
     //test_combine();
     return 0;
 }

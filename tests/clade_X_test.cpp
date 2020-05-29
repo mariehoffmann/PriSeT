@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "../src/argument_parser.hpp"
-#include "../src/combine_types.hpp"
 #include "../src/filter.hpp"
 #include "../src/fm.hpp"
 #include "../src/io_cfg_type.hpp"
@@ -65,6 +64,6 @@ int main(int argc, char ** argv)
     fs::path primers_known_file = "/Users/troja/git/PriSet_git2/PriSeT/tests/ecology_primers_regex.fasta";
     load_primers_known(primers_known_file, primer_pairs);
     for (auto pp : primer_pairs)
-        std::cout << pp.name_fwd << ": " << pp.code_fwd << "\n" << pp.name_rev << ": " << pp.code_rev << "\n\n"; 
+        std::cout << pp.name_fwd << ": " << pp.code_fwd << "\n" << pp.name_rev << ": " << pp.code_rev << "\n\n";
     return 0;
 }

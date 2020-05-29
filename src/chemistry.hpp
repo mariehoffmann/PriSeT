@@ -1,7 +1,7 @@
 // ============================================================================
 //                    PriSeT - The Primer Search Tool
 // ============================================================================
-//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
 //          Manual: https://github.com/mariehoffmann/PriSeT
 
 // Global Functions for Primer Constraint Checking.

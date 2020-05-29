@@ -1,7 +1,7 @@
 // ============================================================================
 //                    PriSeT - The Primer Search Tool
 // ============================================================================
-//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
 //          Manual: https://github.com/mariehoffmann/PriSeT
 #pragma once
 
@@ -23,7 +23,7 @@ namespace priset
 struct options
 {
 private:
-    std::string usage_string = "Usage: %s -l <dir_library> -w <dir_work> [-K <word_length>] [-E <errors>]\n";
+    std::string usage_string = "Usage: %s -l <dir_library> -w <dir_work> [-K <word_length>] [-i|s] [-E <errors>]\n";
 
     using size_type = primer_cfg_type::size_type;
 
@@ -44,6 +44,7 @@ private:
 
     // Flags for initializing io configurator.
     bool flag_lib{0}, flag_work{0};
+
     // Flags for initializing primer configurator.
     bool flag_E{0};
     //
@@ -96,8 +97,9 @@ public:
     options(int argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
     {
         parse_arguments(argc, argv, primer_cfg, io_cfg);
-        // library successfully read, set absolute k-mer frequency cutoff
-        primer_cfg.set_digamma(io_cfg.get_library_size());
+        // library successfully read, set library and clade sizes
+        primer_cfg.set_library_size(io_cfg.get_library_size());
+        primer_cfg.set_clade_size(io_cfg.get_clade_size());
     }
 
 };

@@ -23,7 +23,6 @@
 #include "../submodules/genmap/src/genmap_helper.hpp"
 
 #include "chemistry.hpp"
-#include "combine_types.hpp"
 #include "io_cfg_type.hpp"
 #include "types.hpp"
 
@@ -105,6 +104,8 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
 
 // forward declaration
 struct primer_cfg_type;
+
+// TODO: move to dna.hpp
 
 /* Encode a single sequence as a 64 bit integer.
  * Details: encoding schme is \sum_i 4^i*x_i, starting with the first character

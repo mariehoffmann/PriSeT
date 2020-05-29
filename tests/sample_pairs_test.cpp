@@ -101,7 +101,7 @@ int main(/*int argc, char ** argv*/)
     TReferences references;
     TKmerIDs kmerIDs;
     TSeqNoMap seqNoMap;
-    filter_and_transform(io_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
+    transform_and_filter(io_cfg, locations, references, kmerIDs, seqNoMap, kmerCounts);
 
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 

@@ -12,7 +12,6 @@
 #include "../submodules/genmap/src/genmap_helper.hpp"
 #include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 
-#include "combine_types.hpp"
 #include "primer_cfg_type.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
@@ -21,7 +20,7 @@ namespace priset
 {
 
 // Filter of single kmers and transform of references to bit vectors.
-void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, TKmerCounts * kmerCounts = nullptr)
+void transform_and_filter(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, TKmerCounts * kmerCounts = nullptr)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -148,7 +147,6 @@ void filter_and_transform(io_cfg_type const & io_cfg, TKLocations & locations, T
             }
             if (references.size() <= seqNoMap[seqNo] || references[seqNoMap[seqNo]].size() <= seqPos)
             {
-                // std::cout << "references.size() = " << references.size() << " and seqNo = " << seqNo << std::endl;
                 if (references.size() > seqNoMap[seqNo])
                     std::cout << "seqPos = " << seqPos << " and references[seqNo].size() = " << references[seqNoMap[seqNo]].size() << std::endl;
                 exit(0);
@@ -289,11 +287,11 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
 }
 
 // Apply frequency cutoff for unique pair occurences
-template<typename TPairList, typename TPairFreqList>
-void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, TPairFreqList & pair_freqs, TKmerCounts * kmerCounts = nullptr)
+template<typename TPairLists, typename TResultList>
+void filter_and_retransform(TReferences & references, TKmerIDs const & kmerIDs, TPairLists & pairs_grouped, TResultList & results)
 {
     std::unordered_map<uint64_t, uint32_t> pairhash2freq;
-    std::cout << "Enter filter_pairs ...\n";
+    std::cout << "STATUS: Enter filter_pairs ...\n";
     // count unique pairs
     for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
     {
@@ -344,8 +342,7 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
                 if (seen.find(h) == seen.end())
                 {
                     // TODO: derive container types from template parameter
-                    std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> pp{kmer_fwd, ONE_LSHIFT_63 >> comb.first,
-                                                            kmer_rev, ONE_LSHIFT_63 >> comb.second};
+                    std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> pp{kmer_fwd, ONE_LSHIFT_63 >> comb.first, kmer_rev, ONE_LSHIFT_63 >> comb.second};
                     std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>> ppf{pairhash2freq.at(h), pp};
                     pair_freqs.push_back(ppf);
                     seen.insert(h);
@@ -354,7 +351,7 @@ void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList 
             }
         }
     }
-    std::cout << "Leaving filter_pairs\n";
+    std::cout << "STATUS: Leaving filter_pairs\n";
 }
 
 }  // namespace priset

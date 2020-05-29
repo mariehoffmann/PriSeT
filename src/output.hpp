@@ -8,7 +8,6 @@
 #include <unordered_set>
 
 #include "chemistry.hpp"
-#include "combine_types.hpp"
 #include "io_cfg_type.hpp"
 #include "primer_cfg_type.hpp"
 #include "types.hpp"

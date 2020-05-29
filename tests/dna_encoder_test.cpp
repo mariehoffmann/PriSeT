@@ -15,7 +15,6 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "../src/combine_types.hpp"
 #include "../src/filter.hpp"
 #include "../src/primer_cfg_type.hpp"
 #include "../src/types.hpp"

@@ -4,7 +4,7 @@
 
 /*!\file
 * \brief Reference type for a taxid and its reference sequences.
-* \author Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+* \author Marie Hoffmann <ozymandiaz147 AT gmail.com>
 */
 
 #pragma once

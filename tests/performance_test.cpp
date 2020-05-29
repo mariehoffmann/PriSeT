@@ -146,7 +146,7 @@ int main(/*int argc, char ** argv*/)
     TReferences references;
     TKmerIDs kmerIDs;
     // TSeqNoMap seqNoMap;
-    filter_and_transform(io_cfg, locations, references, kmerIDs, &kmerCounts);
+    transform_and_filter(io_cfg, locations, references, kmerIDs, &kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
     runtimes[TIMEIT::FILTER1_TRANSFORM] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
 

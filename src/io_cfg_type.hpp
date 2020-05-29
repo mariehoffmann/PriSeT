@@ -1,7 +1,7 @@
 // ============================================================================
 //                    PriSeT - The Primer Search Tool
 // ============================================================================
-//          Author: Marie Hoffmann <marie.hoffmann AT fu-berlin.de>
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
 //          Manual: https://github.com/mariehoffmann/PriSeT
 
 #pragma once
@@ -10,8 +10,6 @@
 #include <experimental/filesystem>
 #include <iostream>
 #include <regex>
-
-#include <seqan/basic.h>
 
 #include "chemistry.hpp"
 #include "errors.hpp"
@@ -23,7 +21,9 @@ namespace priset
 
 #define MAX_PATH_LENGTH 100
 
-struct io_cfg_type
+
+// TODO: rename to io_configurator, instance are then called io_configuration
+struct io_cfg_type : cfg_type
 {
 
 public:
@@ -93,9 +93,12 @@ public:
         }
         if (!acc_file.has_filename())
             std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
+
+
         std::cout << "STATUS\tSet accessions file: \t" << acc_file << std::endl;
         if (!fasta_file.has_filename())
             std::cout << "ERROR: Unable to locate fasta file in: " << lib_dir << std::endl, exit(-1);
+
         std::cout << "STATUS\tSet fasta file: \t" << fasta_file << std::endl;
         if (!tax_file.has_filename())
             std::cout << "ERROR: Unable to locate taxonomy file in: " << lib_dir << std::endl, exit(-1);
@@ -154,6 +157,13 @@ public:
             ofs << "library(shiny)\nrunApp(" << script_file << ")\n";
             ofs.close();
         }
+
+        /* Parse accession and taxonomy file to build species set and taxid to
+        * accessions map. Call first build_species_set to store only taxids of
+        * species (and not of higher order).
+        */
+        build_species_set();
+        build_taxid2accs_map();
     };
 
     // Destructor.
@@ -182,26 +192,20 @@ public:
         return id_file;
     }
 
-    uint64_t get_library_size() const noexcept
+    constexpr uint32_t get_library_size() const noexcept
     {
         return library_size;
     }
 
-
-    size_t get_number_species()
+    constexpr uint32_t get_clade_size() const noexcept
     {
-        if (number_species)
-            return number_species;
-        std::ifstream stream(tax_file.string().c_str(), std::ios::in);
-        std::string row;
-        // count listed species in tax file with row format "taxid,parent_taxid,is_species"
-        std::string const is_species = "1\n";
-        while (std::getline(stream, row))
-        {
-            if (row.compare(row.size() - 3, 2, is_species) == 0)
-                ++number_species;
-        }
-        return number_species;
+        return clade_size;
+    }
+
+    //
+    constexpr size_t get_number_species() const noexcept
+    {
+        return species_set.size();
     }
 
     // Return template file for shiny app.
@@ -315,20 +319,80 @@ private:
     std::string ext_acc = ".acc";
     std::string ext_tax = ".tax";
     std::string ext_id = ".id";
+
     // Library size in terms of number of accessions (= fasta entries)
     uint64_t library_size{0};
-    // Number of species (extracted from tax_file.
-    size_t number_species{0};
+
+    // Species extracted from tax_file.
+    size_t species_set;
+
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
+
     // R script for launching shiny app.
     fs::path script_runner;
+
     // Path to generated copy of R script to be run in terminal.
     fs::path script_file;
+
     // Path to store result tables to load in Shiny.
     fs::path result_file;
+
     // Path to primer info file (sequences and chemical attributes)
     fs::path primer_info_file;
+
+    // Taxid to accessions map.
+    std::unordered_map<taxid_type, std::vector<accession_type>> taxid2accs_map;
+
+    // Species set
+    std::unordered_set<taxid_type> species_set;
+
+    // Fill species set based on taxonomy file with row format taxid,p_taxid,is_species.
+3195,3193,0
+    void build_species_set()
+    {
+        std::ifstream stream(tax_file.string().c_str(), std::ios::in);
+        std::string row;
+        // count listed species in tax file with row format "taxid,parent_taxid,is_species"
+        std::string const is_species = "1";
+        std::getline(stream, row); // ignore header line
+        while (std::getline(stream, row))
+        {
+            if (row.compare(row.size() - 2, 1, is_species) == 1)
+            {
+                taxid_type taxid = std::stoi(row.substr(0, row.find(0, delim)));
+                species_set.insert(taxid);
+            }
+        }
+    }
+
+    // Fill taxid to accessions map
+    // TODO: write test
+    void build_taxid2accs_map()
+    {
+        char const delim = ',';
+        std::ifstream stream(acc_file.string().c_str(), std::ios::in);
+        std::string row;
+        std::getline(stream, row); // ignore header
+        while (std::getline(stream, row))
+        {
+            size_t pos1{0};
+            size_t pos2 = row.find(pos1, delim);
+            taxid_type taxid = std::stoi(row.substr(pos1, pos2));
+            if (species_set.find(taxid) == species_set.end())
+                continue;
+            std::vector<accession_type> accs;
+            pos1 = pos2;
+            pos2 = row.find(pos1, delim);
+            while (pos1 != std::string::npos)
+            {
+                accs.push_back(row.substr(pos1, pos2));
+                pos1 = pos2;
+                pos2 = row.find(pos1, delim);
+            }
+            taxid2accs_map[taxid] = accs;
+        }
+    }
 
 };
 

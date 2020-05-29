@@ -1,30 +1,52 @@
-#include <algorithm>
-#include <array>
-#include <chrono>
-#include <cstdlib>
-#include <ctime>
 #include <iostream>
-#include <experimental/filesystem>
-#include <fstream>
-#include <numeric>
-#include <regex>
-#include <sstream>
-#include <string>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <vector>
 
 #include "../src/argument_parser.hpp"
-#include "../src/filter.hpp"
-#include "../src/fm.hpp"
-#include "../src/io_cfg_type.hpp"
-#include "../src/primer_cfg_type.hpp"
-#include "../src/types.hpp"
-#include "../src/utilities.hpp"
+#include "../src/solver.hpp"
 
-namespace fs = std::experimental::filesystem;
+// g++ ../PriSeT/apps/barcode_miner_bf2.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~/include -L~/lib -ldivsufsort -o barcode_miner_bf2
+// barcode_miner_bf2 -l <dir_library> -w <dir_work> [-m <max_num_primers>] [-s]
 
 using namespace priset;
+using namespace std;
+
+int main(int argc, char ** argv)
+{
+    // set path prefixes for library files
+    io_cfg_type io_cfg{};
+
+    // Default configuration for primer settings.
+    primer_cfg_type primer_cfg{};
+
+    // parse options and init io and primer configurators
+    options opt(argc, argv, primer_cfg, io_cfg);
+
+    // primer_cfg.set_dTm(4);
+    primer_cfg.set_dTm(2);
+
+    // init solver
+    solver_brute_force solver{io_cfg, primer_cfg};
+
+    // solve
+    solver.solve();
+
+    // sort
+    solver.sort_results_by_frequency();
+
+    // output solutions
+    cout << solver.get_header() << endl;
+    std::vector<TResult> results;
+    auto [has_next, results] solver.get_next_result():
+    size_t ctr{0};
+    while (has_next)
+    {
+        cout << "Result #" << ++ctr << ":\n";
+        for (TResult result : results)
+            cout << "\t" << result.to_string() << endl;
+        auto [has_next, results] = solver.get_next_result();
+    }
+    return 0;
+}
+
 
 // lib_dir=<lib_dir>
 // taxid=<taxid>
@@ -114,7 +136,7 @@ int main(int argc, char ** argv)
             '\t' << runtimes[priset::TIMEIT::COMBINE_FILTER2] << '\t' << runtimes[priset::TIMEIT::PAIR_FREQ] <<
             "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
 
-    // Sort pairs by frequency
+    // Sort pairs by frequency of
     std::sort(pair_freqs.begin(), pair_freqs.end(), [&](TPairFreq & p1, TPairFreq & p2){return p1.first > p2.first;});
     std::stringstream sstream;
     std::cout << "ID\tFrequency\tForward\tReverse\tTm\tCG\n";

@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "../src/argument_parser.hpp"
-#include "../src/combine_types.hpp"
 #include "../src/filter.hpp"
 #include "../src/fm.hpp"
 #include "../src/io_cfg_type.hpp"
@@ -24,7 +23,7 @@
 
 namespace fs = std::experimental::filesystem;
 
-// g++ ../PriSeT/apps/plankton_verification.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~ -L~/lib -lsdsl -ldivsufsort -o verif
+// g++ ../PriSeT/apps/plankton_verification.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~ -L~/lib -ldivsufsort -o verif
 // ./verif $taxid $lib_dir $work_dir
 
 using namespace priset;
@@ -299,7 +298,7 @@ int main(int argc, char ** argv)
     TReferences references;
     TKmerIDs kmerIDs;
     TSeqNoMap seqNoMap;
-    filter_and_transform(io_cfg, locations, references, seqNoMap, kmerIDs, &kmerCounts);
+    transform_and_filter(io_cfg, locations, references, seqNoMap, kmerIDs, &kmerCounts);
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
