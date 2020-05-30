@@ -17,8 +17,8 @@
 #include "../src/argument_parser.hpp"
 // #include "../src/filter.hpp"
 // #include "../src/fm.hpp"
-// #include "../src/io_cfg_type.hpp"
-// #include "../src/primer_cfg_type.hpp"
+// #include "../src/IOConfig.hpp"
+// #include "../src/PrimerConfig.hpp"
 #include "../src/solver.hpp"
 // #include "../src/types.hpp"
 // #include "../src/utilities.hpp"
@@ -32,10 +32,10 @@ using namespace std;
 int main(int argc, char ** argv)
 {
     // set path prefixes for library files
-    io_cfg_type io_cfg{};
+    IOConfig io_cfg{};
 
     // Default configuration for primer settings.
-    primer_cfg_type primer_cfg{};
+    PrimerConfig primer_cfg{};
 
     // parse options and init io and primer configurators
     options opt(argc, argv, primer_cfg, io_cfg);
@@ -58,8 +58,8 @@ int main(int argc, char ** argv)
     while (has_next)
     {
 
-        cout << solution.to_string() << endl;
-        auto [has_next, solution] = solver.get_next_result();
+        cout << result.to_string() << endl;
+        auto [has_next, result] = solver.get_next_result();
     }
     return 0;
 }

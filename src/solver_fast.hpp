@@ -4,7 +4,7 @@
 struct solver_fast : solver
 {
 
-    std::vector<std::vector<TResult>> results;
+    std::vector<std::vector<Result>> results;
 
     void solve_fast()
     {

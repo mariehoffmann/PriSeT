@@ -9,8 +9,8 @@
 #include <iostream>
 #include <unistd.h>
 
-#include "io_cfg_type.hpp"
-#include "primer_cfg_type.hpp"
+#include "types/IOConfig.hpp"
+#include "types/PrimerConfig.hpp"
 
 namespace fs = std::experimental::filesystem;
 
@@ -25,7 +25,7 @@ struct options
 private:
     std::string usage_string = "Usage: %s -l <dir_library> -w <dir_work> [-K <word_length>] [-i|s] [-E <errors>]\n";
 
-    using size_type = primer_cfg_type::size_type;
+    using size_type = PrimerConfig::size_type;
 
     // Parsed library directory.
     std::string lib_dir;
@@ -40,7 +40,7 @@ private:
     bool skip_idx{0};
 
     // Number of errors allowed for k-mer.
-    primer_cfg_type::size_type E{0};
+    PrimerConfig::size_type E{0};
 
     // Flags for initializing io configurator.
     bool flag_lib{0}, flag_work{0};
@@ -48,7 +48,7 @@ private:
     // Flags for initializing primer configurator.
     bool flag_E{0};
     //
-    void parse_arguments(unsigned argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
+    void parse_arguments(unsigned argc, char * const * argv, PrimerConfig & primer_cfg, IOConfig & io_cfg)
     {
         int opt;
         for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
@@ -94,12 +94,12 @@ private:
 public:
 
     options() = default;
-    options(int argc, char * const * argv, primer_cfg_type & primer_cfg, io_cfg_type & io_cfg)
+    options(int argc, char * const * argv, PrimerConfig & primer_cfg, IOConfig & io_cfg)
     {
         parse_arguments(argc, argv, primer_cfg, io_cfg);
         // library successfully read, set library and clade sizes
         primer_cfg.set_library_size(io_cfg.get_library_size());
-        primer_cfg.set_clade_size(io_cfg.get_clade_size());
+        primer_cfg.set_species_count(io_cfg.get_species_count());
     }
 
 };

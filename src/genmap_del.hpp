@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include "io_cfg_type.hpp"
+#include "types/IOConfig.hpp"
 
 
 # Build genmap binary used for FM index building
@@ -19,7 +19,7 @@ make genmap
 
 
 // create FM index and map
-int FM_index(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg)
+int FM_index(IOConfig & io_cfg, PrimerConfig & primer_cfg)
 {
 
     // TODO: move directory creation into io configurator
@@ -74,7 +74,7 @@ int FM_index(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg)
     return 0;
 }
 
-int FM_map(io_cfg_type & io_cfg, primer_cfg_type & primer_cfg)
+int FM_map(IOConfig & io_cfg, PrimerConfig & primer_cfg)
 {
     return 0;
 }

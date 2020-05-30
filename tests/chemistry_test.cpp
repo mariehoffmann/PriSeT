@@ -15,7 +15,7 @@
 #include <seqan/stream.h>
 
 #include "../src/filter.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
 
@@ -120,7 +120,7 @@ void filter_repeats_runs_test()
 
 void filter_CG_clamp_test()
 {
-    //primer_cfg_type const & primer_cfg{};
+    //PrimerConfig const & primer_cfg{};
     TKmerID kmerID = ONE_LSHIFT_63 + (ONE_LSHIFT_63 >> 1) + dna_encoder("CACGTACGTAACCGGTT"); // l = 17
     // '+' full length CG_ctr = 3
     bool res = filter_CG_clamp(kmerID, '+', ONE_LSHIFT_63 >> 1);

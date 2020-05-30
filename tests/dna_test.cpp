@@ -1,5 +1,5 @@
 #include "../src/dna.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/utilities.hpp"
 
 #include "gtest/gtest.h"

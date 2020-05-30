@@ -17,8 +17,8 @@
 #include "../src/argument_parser.hpp"
 #include "../src/filter.hpp"
 #include "../src/fm.hpp"
-#include "../src/io_cfg_type.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/IOConfig.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
 
@@ -53,10 +53,10 @@ int main(int argc, char ** argv)
     TKmerCounts kmerCounts{0, 0, 0, 0};
 
     // set path prefixes for library files
-    io_cfg_type io_cfg{};
+    IOConfig io_cfg{};
 
     // get instance to primer sequence settings
-    primer_cfg_type primer_cfg{};
+    PrimerConfig primer_cfg{};
 
     // parse options and init io and primer configurators
     options opt(priset_argc, priset_argv, primer_cfg, io_cfg);
@@ -84,26 +84,26 @@ int main(int argc, char ** argv)
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
-    using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
-    TPairList pairs;
+    using PairList = PairList<Pair<CombinePattern<TKmerID, TKmerLength>>>;
+    PairList pairs;
     // dictionary collecting (unique) pair frequencies
 
     start = std::chrono::high_resolution_clock::now();
-    // template<typename TPairList>
-    // void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts * kmerCounts = nullptr)
-    combine<TPairList>(references, kmerIDs, pairs, &kmerCounts);
+    // template<typename PairList>
+    // void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList & pairs, TKmerCounts * kmerCounts = nullptr)
+    combine<PairList>(references, kmerIDs, pairs, &kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
     runtimes.at(TIMEIT::COMBINE_FILTER2) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
 
     std::cout << "INFO: pairs after combiner = " << kmerCounts[KMER_COUNTS::COMBINER_CNT] << std::endl;
 
     //  <freq, <kmer_fwd, mask_fwd, kmer_rev, mask_rev> >
-    // using TPairFreq = std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>>;
-    std::vector<TPairFreq> pair_freqs;
+    // using PairFreq = std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>>;
+    std::vector<PairFreq> pair_freqs;
     start = std::chrono::high_resolution_clock::now();
-    // template<typename TPairList, typename TPairFreqList>
-    // void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, TPairFreqList & pair_freqs, TKmerCounts * kmerCounts = nullptr)
-    filter_pairs<TPairList, TPairFreqList>(references, kmerIDs, pairs, pair_freqs, &kmerCounts);
+    // template<typename PairList, typename PairFreqList>
+    // void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, PairList & pairs, PairFreqList & pair_freqs, TKmerCounts * kmerCounts = nullptr)
+    filter_pairs<PairList, PairFreqList>(references, kmerIDs, pairs, pair_freqs, &kmerCounts);
     std::cout << "INFO: pairs after pair_freq filter = " << kmerCounts[KMER_COUNTS::FILTER2_CNT] << std::endl;
     finish = std::chrono::high_resolution_clock::now();
     runtimes.at(TIMEIT::PAIR_FREQ) += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
@@ -115,25 +115,25 @@ int main(int argc, char ** argv)
             "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
 
     // Sort pairs by frequency
-    std::sort(pair_freqs.begin(), pair_freqs.end(), [&](TPairFreq & p1, TPairFreq & p2){return p1.first > p2.first;});
+    std::sort(pair_freqs.begin(), pair_freqs.end(), [&](PairFreq & p1, PairFreq & p2){return p1.first > p2.first;});
     std::stringstream sstream;
     std::cout << "ID\tFrequency\tForward\tReverse\tTm\tCG\n";
 
     for (size_t k = 0; k < std::min(pair_freqs.size(), size_t(15)); ++k)
     {
-        TPairFreq pf = pair_freqs.at(k);
+        PairFreq pf = pair_freqs.at(k);
         const auto & [code_fwd, mask_fwd, code_rev, mask_rev] = pf.second;
         std::string fwd = dna_decoder(code_fwd, mask_fwd);
         std::string rev = dna_decoder(code_rev, mask_rev);
         sstream << std::hex << std::hash<std::string>()(fwd + rev) << ",";
         sstream << pf.first << "," << fwd << "," << rev << ",";
         sstream << "\"[" << float(Tm(code_fwd, mask_fwd)) << "," << float(Tm(code_rev, mask_rev)) << "]\",";
-        sstream << "\"[" << CG(code_fwd, mask_fwd) << "," << CG(code_rev, mask_rev) << "]\"" << std::endl;
+        sstream << "\"[" << count_CG(code_fwd, mask_fwd) << "," << count_CG(code_rev, mask_rev) << "]\"" << std::endl;
 
     }
     // std::cout << sstream.str().substr(0,8) << "," << pf.first << "," << fwd << ",";
     // std::cout << rev << ",\"[" << float(Tm(code_fwd, mask_fwd)) << ",";
-    // std::cout << float(Tm(code_rev, mask_rev)) << "]\",\"[" << CG(code_fwd, mask_fwd) << "," << CG(code_rev, mask_rev) << "]\"" << std::endl;
+    // std::cout << float(Tm(code_rev, mask_rev)) << "]\",\"[" << count_CG(code_fwd, mask_fwd) << "," << count_CG(code_rev, mask_rev) << "]\"" << std::endl;
 
     std::cout << sstream.rdbuf();
 

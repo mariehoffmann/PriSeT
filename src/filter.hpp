@@ -12,15 +12,14 @@
 #include "../submodules/genmap/src/genmap_helper.hpp"
 #include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 
-#include "primer_cfg_type.hpp"
-#include "types.hpp"
+#include "types/all.hpp"
 #include "utilities.hpp"
 
 namespace priset
 {
 
 // Filter of single kmers and transform of references to bit vectors.
-void transform_and_filter(io_cfg_type const & io_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, TKmerCounts * kmerCounts = nullptr)
+void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, TKmerCounts * kmerCounts = nullptr)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -220,8 +219,8 @@ void transform_and_filter(io_cfg_type const & io_cfg, TKLocations & locations, T
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
-template<typename TPairList>
-void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts * kmerCounts = nullptr)
+template<typename PairList>
+void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList & pairs, TKmerCounts * kmerCounts = nullptr)
 {
     pairs.clear();
     auto cp_ctr = 0ULL;
@@ -249,7 +248,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
             // note that w_begin/end are updated due to varying kmer length of same kmerID
             for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
             {
-                TCombinePattern<TKmerID, TKmerLength> cp;
+                CombinePattern<TKmerID, TKmerLength> cp;
                 uint64_t mask_fwd = ONE_LSHIFT_63;
                 TKmerID kmerID_rev = kmerIDs.at(seqNo_cx).at(r_rev - 1);
                 filter_cross_annealing(kmerID_fwd, kmerID_rev);
@@ -279,7 +278,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
                 } // length mask_fwd
                 if (cp.is_set())
                 {
-                    pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{seqNo_cx, r_fwd, r_rev, cp});
+                    pairs.push_back(Pair<CombinePattern<TKmerID, TKmerLength>>{seqNo_cx, r_fwd, r_rev, cp});
                 }
             } // kmerID rev
         } // kmerID fwd
@@ -287,8 +286,8 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList
 }
 
 // Apply frequency cutoff for unique pair occurences
-template<typename TPairLists, typename TResultList>
-void filter_and_retransform(TReferences & references, TKmerIDs const & kmerIDs, TPairLists & pairs_grouped, TResultList & results)
+template<typename PairLists, typename ResultList>
+void filter_and_retransform(TReferences & references, TKmerIDs const & kmerIDs, PairLists & pairs_grouped, ResultList & results)
 {
     std::unordered_map<uint64_t, uint32_t> pairhash2freq;
     std::cout << "STATUS: Enter filter_pairs ...\n";

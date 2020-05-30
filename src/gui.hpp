@@ -9,8 +9,7 @@
 #include <unordered_map>
 
 
-#include "io_cfg_type.hpp"
-#include "types.hpp"
+#include "types/all.hpp"
 #include "utilities.hpp"
 
 #define IS_DARWIN 0
@@ -24,7 +23,7 @@ namespace priset::gui
 {
 
 // Compiles Shiny app and starts browser on success.
-bool compile_app(io_cfg_type & io_cfg)
+bool compile_app(IOConfig & io_cfg)
 {
     std::cout << "Enter compile app\n";
     std::string cmd_str = "Rscript " + io_cfg.get_script_file().string() + "\0";
@@ -56,7 +55,7 @@ bool compile_app(io_cfg_type & io_cfg)
 }
 
 // Generates app script from template.
-bool generate_app(io_cfg_type & io_cfg)
+bool generate_app(IOConfig & io_cfg)
 {
     // copy first template into newly created `app` folder in working directory
     fs::path const app_template = io_cfg.get_app_template();

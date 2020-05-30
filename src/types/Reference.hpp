@@ -19,7 +19,7 @@ namespace priset
 /*
 * Struct to associate a taxonomic identifier with a set of accession numbers and sequences.
 */
-template<typename taxid_type=unsigned int, typename accession_type=std::string,  typename sequence_type=std::string>
+template<typename taxid_type=unsigned int, typename Accession=std::string,  typename sequence_type=std::string>
 struct Reference
 {
     //!\brief Taxonomic ID associated to the reference collection.
@@ -41,14 +41,14 @@ struct Reference
     //!\brief Construct by taxid.
     explicit constexpr Reference(taxid_type const _taxid) noexcept : taxid(_taxid) {}
 
-    constexpr bool insert(accession_type const accession, sequence_type const sequence) const noexcept
+    constexpr bool insert(Accession const accession, sequence_type const sequence) const noexcept
     {
         _accessions.push_back(accession);
         _sequences.push_back(sequence);
     }
 
     //!\brief Erase a sequence given its accession.
-    bool erase(accession_type accession)
+    bool erase(Accession accession)
     {
         auto it = std::find(_accessions.begin(), _accessions.end(), accession);
         if (it != _accessions.end())
@@ -64,7 +64,7 @@ struct Reference
 
 private:
     //!\brief Accessions associated to taxid.
-    std::vector<accession_type> _accessions;
+    std::vector<Accession> _accessions;
     //!\brief List of sequences associated to the accessions.
     std::vector<sequence_type> _sequences;
 };

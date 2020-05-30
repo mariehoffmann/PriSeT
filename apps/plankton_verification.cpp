@@ -16,8 +16,8 @@
 #include "../src/argument_parser.hpp"
 #include "../src/filter.hpp"
 #include "../src/fm.hpp"
-#include "../src/io_cfg_type.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/IOConfig.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
 
@@ -187,8 +187,8 @@ void load_primers_known(std::unordered_map<TPrimerKey, std::string, hash_pp> & p
 
 
 // same as combine, but accepts primer pair set to be verified
-template<typename TPairList, typename TPrimerKey>
-void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::unordered_map<TPrimerKey, std::string, hash_pp> & pairs_known, std::unordered_set<std::string> & verified)
+template<typename PairList, typename TPrimerKey>
+void combine2(TReferences const & references, TKmerIDs const & kmerIDs, PairList & pairs, std::unordered_map<TPrimerKey, std::string, hash_pp> & pairs_known, std::unordered_set<std::string> & verified)
 {
     pairs.clear();
     for (uint64_t seqNo = 0; seqNo < references.size(); ++seqNo)
@@ -214,7 +214,7 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
 
             for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
             {
-                TCombinePattern<TKmerID, TKmerLength> cp;
+                CombinePattern<TKmerID, TKmerLength> cp;
                 uint64_t mask_fwd = ONE_LSHIFT_63;
                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
                 {
@@ -243,7 +243,7 @@ void combine2(TReferences const & references, TKmerIDs const & kmerIDs, TPairLis
                 } // length mask_fwd
 
                 if (cp.is_set())
-                    pairs.push_back(TPair<TCombinePattern<TKmerID, TKmerLength>>{seqNo, r_fwd, r_rev, cp});
+                    pairs.push_back(Pair<CombinePattern<TKmerID, TKmerLength>>{seqNo, r_fwd, r_rev, cp});
             } // kmerID rev
         } // kmerID fwd
     }
@@ -274,10 +274,10 @@ int main(int argc, char ** argv)
     TKmerCounts kmerCounts{0, 0, 0, 0};
 
     // set path prefixes for library files
-    io_cfg_type io_cfg{};
+    IOConfig io_cfg{};
 
     // get instance to primer sequence settings
-    primer_cfg_type primer_cfg{};
+    PrimerConfig primer_cfg{};
 
     // parse options and init io and primer configurators
     options opt(priset_argc, priset_argv, primer_cfg, io_cfg);
@@ -302,13 +302,13 @@ int main(int argc, char ** argv)
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
-    using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
-    TPairList pairs;
+    using PairList = PairList<Pair<CombinePattern<TKmerID, TKmerLength>>>;
+    PairList pairs;
 
     std::unordered_set<std::string> verified;
 
-    combine2<TPairList, TPrimerKey>(references, kmerIDs, pairs, pairs_known, verified);
-    std::cout << "INFO: pairs after combiner = " << get_num_pairs<TPairList>(pairs) << std::endl;
+    combine2<PairList, TPrimerKey>(references, kmerIDs, pairs, pairs_known, verified);
+    std::cout << "INFO: pairs after combiner = " << get_num_pairs<PairList>(pairs) << std::endl;
 
     std::cout << "Verified primers for current clade: \n";
     if (!verified.size())

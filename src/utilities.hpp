@@ -23,11 +23,10 @@
 #include "../submodules/genmap/src/genmap_helper.hpp"
 
 #include "chemistry.hpp"
-#include "io_cfg_type.hpp"
-#include "types.hpp"
+#include "types/all.hpp"
 
 // Split prefix and code given a kmerID.
-#define split_kmerID(kmerID) std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR}
+#define split_kmerID(kmerID) std::pair<uint64_t, uint64_t>{(uint64_t)kmerID & PREFIX_SELECTOR, (uint64_t)kmerID & ~PREFIX_SELECTOR}
 
 // The longest encoded k-mer length expressed in 2 bit format, i.e. 16 bp are 32 bits.
 #define encoded_length(kmerID) WORD_SIZE - 1 - __builtin_clzl(kmerID & ~PREFIX_SELECTOR);
@@ -103,7 +102,7 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
 // }
 
 // forward declaration
-struct primer_cfg_type;
+struct PrimerConfig;
 
 // TODO: move to dna.hpp
 
@@ -258,8 +257,8 @@ std::string bits2str(uint_type i)
     return s;
 }
 
-template<typename TPairList>
-void print_combinations(TKmerIDs const & kmerIDs, TPairList const & pairs) noexcept
+template<typename PairList, typename TKmerIDs>
+void print_combinations(TKmerIDs const & kmerIDs, PairList const & pairs) noexcept
 {
     std::cout << "Reference ID\t| KmerID_fwd\t| KmerID_rev\t| Substring Combinations \n";
     std::cout << "----------------------------------------------------------------------\n";
@@ -301,13 +300,13 @@ void print_locations(TLocations & locations)
 }
 
 /*
-void print_kmer_locations(TKmerLocations const & kmer_locations)
+void print_kmer_locations(KmerLocations const & kmer_locations)
 {
-    for (TKmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
+    for (KmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
     {
         auto kmer_ID = kmer_locations[i].get_kmer_ID();
         std::cout << dna_decoder(kmer_ID) << ": [";
-        for (TKmerLocation::size_type j = 0; j < kmer_locations[i].container_size(); ++j)
+        for (KmerLocation::size_type j = 0; j < kmer_locations[i].container_size(); ++j)
             std::cout << "(" << kmer_locations[i].accession_ID_at(j) << ", " << kmer_locations[i].kmer_pos_at(j) << ") ";
         std::cout << "]" << std::endl;
     }
@@ -315,7 +314,7 @@ void print_kmer_locations(TKmerLocations const & kmer_locations)
 
 /*
 // Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
-void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg)
+void lookup_sequences(KmerLocations & kmer_locations, IOConfig const & io_cfg, PrimerConfig const & primer_cfg)
 {
     // load corpus
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
@@ -328,7 +327,7 @@ void lookup_sequences(TKmerLocations & kmer_locations, io_cfg_type const & io_cf
     TKmerLength K;
     // TODO: remove this later, uniqueness should be already ensured by location construction
     std::unordered_set<TKmerID> seen;
-    for (TKmerLocations::iterator kmer_it = kmer_locations.begin(); kmer_it != kmer_locations.end(); ++kmer_it)
+    for (KmerLocations::iterator kmer_it = kmer_locations.begin(); kmer_it != kmer_locations.end(); ++kmer_it)
     {
         acc_ID = kmer_it->accession_ID_at(0);
         kmer_pos = kmer_it->kmer_pos_at(0);
@@ -371,8 +370,8 @@ void split(std::string const & line, std::vector<std::string> & tokens, std::str
 }
 
 // create_table helper to build accession ID to accession number map
-template<typename io_cfg_type>
-void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, std::unordered_map<TAcc, TAccID> & acc2accID, io_cfg_type const & io_cfg)
+template<typename IOConfig>
+void create_accID2acc_map(std::unordered_map<AccessionID, std::string> & accID2acc, std::unordered_map<Accession, AccessionID> & acc2accID, IOConfig const & io_cfg)
 {
     //std::cout << "create_accID2acc_map\n";
     std::ifstream id_file(io_cfg.get_id_file());
@@ -386,7 +385,7 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
         split(line, tokens);
         if (tokens.size() != 2)
             std::cout << "ERROR: unknown id,acc format in " << io_cfg.get_id_file() << std::endl, exit(0);
-        TAccID accID = std::stoi(tokens[0]);
+        AccessionID accID = std::stoi(tokens[0]);
         for (size_t i = 1; i < tokens.size(); ++i)
         {
             accID2acc[accID] = tokens[i];
@@ -398,8 +397,8 @@ void create_accID2acc_map(std::unordered_map<TAccID, std::string> & accID2acc, s
 }
 
 // create_table helper to build accession ID to taxon ID map
-template<typename io_cfg_type>
-void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, std::unordered_set<TTaxid> & taxid_set, std::unordered_map<TAcc, TAccID> const & acc2accID, io_cfg_type const & io_cfg)
+template<typename IOConfig>
+void create_accID2taxID_map(std::unordered_map<AccessionID, Taxid> & accID2taxID, std::unordered_set<Taxid> & taxid_set, std::unordered_map<Accession, AccessionID> const & acc2accID, IOConfig const & io_cfg)
 {
     std::cout << "create_accID2taxID\n";
     std::ifstream acc_file(io_cfg.get_acc_file());
@@ -414,12 +413,12 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
         if (!getline(acc_file, line)) break;
 
         split(line, tokens);
-        TTaxid taxid = std::stoi(tokens[0]);
+        Taxid taxid = std::stoi(tokens[0]);
         //std::cout << "taxid = " << taxid << std::endl;
         taxid_set.insert(taxid);
         for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
         {
-            TAcc acc = tokens[token_idx];
+            Accession acc = tokens[token_idx];
             //std::cout << "acc = " << acc << std::endl;
             // TODO: observation - there are accessions (without version suffix) that do not have fasta entries in DB
             if (acc2accID.find(acc) == acc2accID.end())
@@ -431,8 +430,8 @@ void create_accID2taxID_map(std::unordered_map<TAccID, TTaxid> & accID2taxID, st
 }
 
 // load taxonomy from file and store as map {taxid: p_taxid}
-template<typename io_cfg_type>
-void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type const & io_cfg)
+template<typename IOConfig>
+void create_tax_map(std::unordered_map<Taxid, Taxid> & tax_map, IOConfig const & io_cfg)
 {
     std::cout << "create_tax_map\n";
     std::ifstream tax_file(io_cfg.get_tax_file());
@@ -451,9 +450,9 @@ void create_tax_map(std::unordered_map<TTaxid, TTaxid> & tax_map, io_cfg_type co
     std::cout << "... done\n";
 }
 
-// accumulate statistics upstream for both container types - TKmerLocations and TKmerPairs
-template<typename TKmerContainer, typename io_cfg_type>
-void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::pair<TTaxid, uint16_t>> const & leaves, std::unordered_map<TTaxid, TTaxid> const & tax_map, std::unordered_map<TAccID, TTaxid> const & accID2taxID, std::unordered_map<TAccID, TAcc> const & accID2acc, io_cfg_type const & io_cfg)
+// accumulate statistics upstream for both container types - KmerLocations and TKmerPairs
+template<typename TKmerContainer, typename IOConfig, typename Result>
+void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::pair<Taxid, uint16_t>> const & leaves, std::unordered_map<Taxid, Taxid> const & tax_map, std::unordered_map<AccessionID, Taxid> const & accID2taxID, std::unordered_map<AccessionID, Accession> const & accID2acc, IOConfig const & io_cfg)
 {
     if (!kmer_container.size())
         return;
@@ -462,12 +461,12 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
     // for each taxid, primer_fwd, primer_rev (as string) combination store counters for matches and coverage
     std::unordered_map<TUpstreamKey::THash, TUpstreamValue > upstream_map;
     // temp structure for result row collection
-    std::vector<TResult> results;
+    std::vector<Result> results;
 
     for (auto const & [taxid, level] : leaves)
     {
         // write out single primer results
-        // value_type is either TKmerLocation or TKmerPair
+        // value_type is either KmerLocation or TKmerPair
         for (typename TKmerContainer::value_type kmer_location : kmer_container) // taxid, kmer fixed
         {
             // CHECK: behaviour correct for kmer_locations with only one kmer_ID
@@ -475,15 +474,15 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
             TKmerID kmerID2 = kmer_location.get_kmer_ID2();
 
             // collect all accessions (not accession IDs) assigned to current taxid where kmer matches
-            std::vector<TAcc> acc_by_tax;
-            for (typename TKmerLocation::size_type i = 0; i < kmer_location.container_size(); ++i)  //TLocation location : kmer_location.second) // loc = seqan::Pair<TSeqNo, TSeqPos>
+            std::vector<Accession> acc_by_tax;
+            for (typename KmerLocation::size_type i = 0; i < kmer_location.container_size(); ++i)  //TLocation location : kmer_location.second) // loc = seqan::Pair<TSeqNo, TSeqPos>
             {
                 TSeqNo accID = kmer_location.accession_ID_at(i);  //seqan::getValueI1<TSeqNo, TSeqPos>(location);
                 if (accID2taxID.at(accID) == taxid)
                     acc_by_tax.push_back(accID2acc.at(accID));
             }
             uint16_t match_ctr = acc_by_tax.size() > 0;
-            TResult result{taxid, kmerID1, kmerID2, match_ctr, 1, acc_by_tax};
+            Result result{taxid, kmerID1, kmerID2, match_ctr, 1, acc_by_tax};
             // we may write back accumulated stats if current node is in lineage of already processed, lower-level node
             if (level)
             {
@@ -498,7 +497,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
             results.push_back(result);
 
             // accumulate stats for upstream until root
-            TTaxid taxid_aux = taxid;
+            Taxid taxid_aux = taxid;
 //            auto p_it{tax_map.find(taxid_aux)};
             while (tax_map.find(taxid_aux) != tax_map.end())
             {
@@ -524,7 +523,7 @@ void accumulation_loop(TKmerContainer const & kmer_container, std::vector<std::p
     table.open(io_cfg.get_result_file(), std::ios_base::app);
 
     // flush leave node results
-    for (TResult result : results){
+    for (Result result : results){
         //std::cout << result.to_string() << std::endl;
         table << result.to_string();
     }
@@ -579,8 +578,8 @@ uint64_t get_num_kmers(TKmerIDs const & kmerIDs)
 }
 
 // Count pairs, i.e. sum of all combination pattern bits of each pair.
-template<typename TPairList>
-uint64_t get_num_pairs(TPairList const & pairs)
+template<typename PairList>
+uint64_t get_num_pairs(PairList const & pairs)
 {
     uint64_t ctr = 0;
     for (auto pair : pairs)
@@ -595,8 +594,8 @@ extern inline uint64_t hash_pair(uint64_t i, uint64_t j)
 }
 
 // Collect hash values of unique pairs and their frequencies.
-template<typename TPairList, typename TKmerIDs, typename TKmerLength>
-void unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, std::unordered_map<uint64_t, uint32_t> & code_pairs)
+template<typename PairList, typename TKmerIDs, typename TKmerLength>
+void unique_pairs(PairList const & pairs, TKmerIDs const & kmerIDs, std::unordered_map<uint64_t, uint32_t> & code_pairs)
 {
     for (auto pair : pairs)
     {
@@ -619,11 +618,11 @@ void unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs, std::unorde
 }
 
 // Accumulate unique pair frequencies.
-template<typename TPairList, typename TKmerIDs, typename TKmerLength>
-void count_unique_pairs(TPairList const & pairs, TKmerIDs const & kmerIDs)
+template<typename PairList, typename TKmerIDs, typename TKmerLength>
+void count_unique_pairs(PairList const & pairs, TKmerIDs const & kmerIDs)
 {
     std::unordered_map<uint64_t, uint32_t> code_pairs;
-    unique_pairs<TPairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
+    unique_pairs<PairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
     // count frequencies
     std::map<uint64_t, uint64_t> freq_ctrs;
     for (auto it = code_pairs.begin(); it != code_pairs.end(); ++it)

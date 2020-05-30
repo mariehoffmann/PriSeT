@@ -8,9 +8,7 @@
 
 #pragma once
 
-#include <unordered_map>
-
-#include "types.hpp"
+#include <iostream>
 
 namespace priset
 {
@@ -22,10 +20,10 @@ namespace priset
 
 // The number of leading bits reserved in a KmerID to store kmer lengths (= primer_max_length - primer_min_length + 1).
 // Maximal possible length is 64 - CODE_SIZE.
-#define PREFIX_SIZE ((uint64_t)10)
+#define PREFIX_SIZE ((uint8_t)10)
 
 // Mask selection, i.e. 10 leading bits and rest 0 or ~(1 << 54) - 1)
-#define PREFIX_SELECTOR ((uint64_t)18428729675200069632)
+#define PREFIX_SELECTOR ((uint64_t)(0b1111111111ULL << 54))
 
 // Primer set size we seek to optimize towards coverage.
 #define PRIMER_SET_SIZE ((uint8_t)1)
@@ -56,7 +54,7 @@ namespace priset
 #define CG_MIN_CONTENT ((float).4)
 
 // The upper bound for relative CG content. Default is 60 %.
-#define CG_MAX_CONTENT ((float.6)
+#define CG_MAX_CONTENT ((float).6)
 
 // The minimal distance (bp) between two identical kmers on same reference.
 #define TRAP_DIST ((uint32_t)400)
@@ -71,7 +69,7 @@ namespace priset
 #define FREQ_PAIR_MIN ((uint32_t)5)
 
 
-struct primer_cfg_type : cfg_type
+struct PrimerConfig
 {
 public:
     // Member types
@@ -92,8 +90,8 @@ private:
     // Library size in terms of number of sequences.
     size_type library_size{0};
 
-    // Clade size in terms of number of species with at least one reference assigned to it.
-    size_type clade_size{0};
+    // Number of species with at least one reference assigned to it.
+    size_type species_count{0};
 
     uint8_t primer_set_size{PRIMER_SET_SIZE};
 
@@ -122,7 +120,7 @@ private:
     float CG_min_content = CG_MIN_CONTENT;
 
     // The upper bound for relative CG content. Recommended: 0.6.
-    flaot CG_max_content = CG_MAX_CONTENT;
+    float CG_max_content = CG_MAX_CONTENT;
 
     // The minimal distance (bp) between two identical kmers on same reference.
     size_type trap_dist = TRAP_DIST;
@@ -141,28 +139,28 @@ private:
 public:
     // Constructors, destructor and assignment
     // Default constructor.
-    primer_cfg_type() = default;
+    PrimerConfig() = default;
 
     // Default copy constructor.
-    constexpr primer_cfg_type(primer_cfg_type const &) = default;
+    constexpr PrimerConfig(PrimerConfig const &) = default;
 
     // Default copy construction via assignment.
-    primer_cfg_type & operator=(primer_cfg_type const &) = default;
+    PrimerConfig & operator=(PrimerConfig const &) = default;
 
     // Move constructor.
-    constexpr primer_cfg_type(primer_cfg_type && rhs) = default;
+    constexpr PrimerConfig(PrimerConfig && rhs) = default;
 
     // Move assignment.
-    primer_cfg_type & operator=(primer_cfg_type && rhs) = default;
+    PrimerConfig & operator=(PrimerConfig && rhs) = default;
 
     // Init with user defined k-mer length and error number
-    primer_cfg_type(error_type E_)
+    PrimerConfig(error_type E_)
     {
         E = E_;
     }
 
     // Use default deconstructor.
-    ~primer_cfg_type() = default;
+    ~PrimerConfig() = default;
     //!\}
 
     // Set primer set size for which coverage is optimized other than default.
@@ -192,7 +190,7 @@ public:
         {
             std::cerr << "ERROR: Possible primer length range is [" << PRIMER_MIN_LEN;
             std::cerr << ":" << PRIMER_MAX_LEN << "]. Your request will be ignored!";
-            std::cerr << endl;
+            std::cerr << std::endl;
             return false;
         }
         primer_min_len = l;
@@ -218,7 +216,7 @@ public:
         if (l > PRIMER_MAX_LEN || l < PRIMER_MIN_LEN)
         {
             std::cerr << "Possible primer length range is [" << PRIMER_MIN_LEN;
-            std::cer << ":" << PRIMER_MAX_LEN << "] °C. Your request will be ignored!";
+            std::cerr << ":" << PRIMER_MAX_LEN << "] °C. Your request will be ignored!";
             std::cerr << std::endl;
             return false;
         }
@@ -242,7 +240,9 @@ public:
     {
         if (l == 0)
         {
-            std::cerr << "Possible transcript length range is [1:" << ((1<<32)-1) << "]. Your request will be ignored!" << std::endl;
+            std::cerr << "Possible transcript length range is [1:";
+            std::cerr << ((1UL << 32) - 1) << "]. Your request will be ignored!";
+            std::cerr << std::endl;
             return false;
         }
         if (transcript_min_len > transcript_max_len)
@@ -266,7 +266,9 @@ public:
     {
         if (l == 0)
         {
-            std::cerr << "ERROR: Possible transcript length range is [1:" << ((1<<32)-1) << "]. Your request will be ignored!" << std::endl;
+            std::cerr << "ERROR: Possible transcript length range is [1:";
+            std::cerr  << ((1UL << 32) - 1) << "]. Your request will be ignored!";
+            std::cerr << std::endl;
             return false;
         }
         if (transcript_min_len > transcript_max_len)
@@ -354,7 +356,7 @@ public:
         {
             std::cerr << "WARNING: CG_min_content is currently exceeding CG_max_content = ";
             std::cerr << CG_max_content << ". Set CG_max_content to some value larger than ";
-            std::cerr << CG << endl;
+            std::cerr << CG << std::endl;
         }
         CG_min_content = CG;
     }
@@ -372,7 +374,7 @@ public:
         {
             std::cerr << "WARNING: CG_max_content is currently subceeding CG_min_content = ";
             std::cerr << CG_min_content << ". Set CG_min_content to some value smaller than ";
-            std::cerr << CG << endl;
+            std::cerr << CG << std::endl;
         }
         CG_min_content = CG;
     }
@@ -407,15 +409,15 @@ public:
     }
 
     // Set number of taxa with references.
-    void set_clade_size(uint64_t const _clade_size)
+    void set_species_count(uint64_t const _species_count)
     {
-        clade_size = _clade_size;
+        species_count = _species_count;
     }
 
     // Get number of taxa with references.
-    constexpr uint64_t get_clade_size() const noexcept
+    constexpr uint64_t get_species_count() const noexcept
     {
-        return clade_size;
+        return species_count;
     }
 
     // Set absolute frequency cutoff other than default, which is clade_size*digamma_percent.
@@ -428,7 +430,7 @@ public:
     constexpr uint64_t get_digamma() noexcept
     {
         if (!digamma) // if not set, compute based on clade_size
-            digamma = size_type(float(digamma_percent)/float(100) * float(clade_size));
+            digamma = size_type(float(digamma_percent)/float(100) * float(species_count));
         return digamma;
     }
 

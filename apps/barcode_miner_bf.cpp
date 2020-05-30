@@ -17,8 +17,8 @@
 #include "../src/argument_parser.hpp"
 #include "../src/filter.hpp"
 #include "../src/fm.hpp"
-#include "../src/io_cfg_type.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/types/IOConfig.hpp"
+#include "../src/types/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
 

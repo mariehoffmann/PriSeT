@@ -5,7 +5,7 @@
 struct solver_matchting_statistics : solver
 {
 
-    std::vector<std::vector<TResult>> results;
+    std::vector<std::vector<Result>> results;
 
     void solve()
     {

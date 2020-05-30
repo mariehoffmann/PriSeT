@@ -20,7 +20,7 @@
 #include "../src/argument_parser.hpp"
 #include "../src/filter.hpp"
 #include "../src/gui.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
 
@@ -35,8 +35,8 @@ struct setup
     // TODO: make this runnable with arbitrarily located build folders
     std::string lib_dir = (fs::canonical("../PriSeT/tests/library/one_seq")).string();
     std::string work_dir = (fs::canonical("../PriSeT/tests/work/one_seq")).string();
-    io_cfg_type io_cfg{};
-    primer_cfg_type primer_cfg{};
+    IOConfig io_cfg{};
+    PrimerConfig primer_cfg{};
     TKLocations locations{};
     using TLocationPair = std::pair<std::vector<TLocation>, std::vector<TLocation>>;
 
@@ -125,9 +125,9 @@ void test_combine()
     setup su{};
     transform_and_filter(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     //using TPair = TPair;
-    using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
+    using TPairList = TPairList<TPair<CombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
-    //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::primer_cfg_type&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::TCombinePattern<long long unsigned int, long long int> > >&)'
+    //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::PrimerConfig&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::CombinePattern<long long unsigned int, long long int> > >&)'
 //     print_combinations<>(su.primer_cfg, su.kmerIDs, pairs);
     combine(su.references, su.kmerIDs, pairs, su.kmerCounts);
     print_combinations<TPairList>(su.kmerIDs, pairs);

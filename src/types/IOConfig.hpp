@@ -10,9 +10,12 @@
 #include <experimental/filesystem>
 #include <iostream>
 #include <regex>
+#include <unordered_set>
 
-#include "chemistry.hpp"
-#include "errors.hpp"
+// #include "chemistry.hpp"
+#include "Errors.hpp"
+#include "simple_types.hpp"
+
 
 namespace fs = std::experimental::filesystem;
 
@@ -23,24 +26,24 @@ namespace priset
 
 
 // TODO: rename to io_configurator, instance are then called io_configuration
-struct io_cfg_type : cfg_type
+struct IOConfig
 {
 
 public:
     // Default constructor.
-    io_cfg_type() = default;
+    IOConfig() = default;
 
     // Default copy constructor.
-    io_cfg_type(io_cfg_type const &) = default;
+    IOConfig(IOConfig const &) = default;
 
     // Default copy construction via assignment.
-    io_cfg_type & operator=(io_cfg_type const &) = default;
+    IOConfig & operator=(IOConfig const &) = default;
 
     // Move constructor.
-    io_cfg_type(io_cfg_type && rhs) = default;
+    IOConfig(IOConfig && rhs) = default;
 
     // Move assignment.
-    io_cfg_type & operator=(io_cfg_type && rhs) = default;
+    IOConfig & operator=(IOConfig && rhs) = default;
 
     // Set library and working directory paths.
     void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const idx_only_flag_, bool const skip_idx_flag_)
@@ -60,7 +63,7 @@ public:
         index_dir = work_dir;
         mapping_dir = work_dir;
         // TODO: path to PriSeT git repos as argument
-        genmap_bin = "~/git/PriSet_git2/PriSeT/submodules/genmap/bin/genmap";
+        // genmap_bin = "~/git/PriSet_git2/PriSeT/submodules/genmap/bin/genmap";
 
         if (!fs::exists(lib_dir))
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
@@ -87,8 +90,6 @@ public:
                     if (c == '\n')
                         ++library_size;
                 std::cout << "INFO: library size = " << library_size << std::endl;
-                std::cout << "INFO: frequency cutoff in PriSeT and FM Map =\t" << FREQ_KMER_MIN << std::endl;
-                //std::cout << "INFO: frequency cutoff in PriSeT =\t" << get_freq_kmer_min() << std::endl;
             }
         }
         if (!acc_file.has_filename())
@@ -167,7 +168,7 @@ public:
     };
 
     // Destructor.
-    ~io_cfg_type() = default;
+    ~IOConfig() = default;
 
     // Return skip_idx flag.
     bool idx_only() const noexcept
@@ -197,13 +198,8 @@ public:
         return library_size;
     }
 
-    constexpr uint32_t get_clade_size() const noexcept
-    {
-        return clade_size;
-    }
-
-    //
-    constexpr size_t get_number_species() const noexcept
+    // Return number of species.
+    size_t get_species_count() const noexcept
     {
         return species_set.size();
     }
@@ -223,7 +219,7 @@ public:
     // Return path of genmap binary
     fs::path get_genmap_binary() const noexcept
     {
-        return genmap_bin;
+        return work_dir / "genmap_bin";
     }
 
     // Return directory where FM index is stored
@@ -304,6 +300,7 @@ private:
     fs::path acc_file{};
     // Sequence library file in fasta format (set by PriSeT).
     fs::path fasta_file{};
+
     // 1-based IDs and accession numbers.
     fs::path id_file{};
     // Taxonomy file in csv format (set by PriSeT).
@@ -312,8 +309,7 @@ private:
     fs::path index_dir;
     // Working subdirectory for FM index mappings (set by PriSeT).
     fs::path mapping_dir;
-    // Path to genmap binary (set by PriSeT).
-    fs::path genmap_bin;
+
     // Library file extensions.
     std::string ext_fasta = ".fasta";
     std::string ext_acc = ".acc";
@@ -324,7 +320,10 @@ private:
     uint64_t library_size{0};
 
     // Species extracted from tax_file.
-    size_t species_set;
+    std::unordered_set<Taxid> species_set;
+
+    // Taxid to accessions map.
+    std::unordered_map<Taxid, std::vector<Accession>> taxid2accs_map;
 
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
@@ -341,16 +340,10 @@ private:
     // Path to primer info file (sequences and chemical attributes)
     fs::path primer_info_file;
 
-    // Taxid to accessions map.
-    std::unordered_map<taxid_type, std::vector<accession_type>> taxid2accs_map;
-
-    // Species set
-    std::unordered_set<taxid_type> species_set;
-
     // Fill species set based on taxonomy file with row format taxid,p_taxid,is_species.
-3195,3193,0
     void build_species_set()
     {
+        char const delim = ',';
         std::ifstream stream(tax_file.string().c_str(), std::ios::in);
         std::string row;
         // count listed species in tax file with row format "taxid,parent_taxid,is_species"
@@ -360,7 +353,7 @@ private:
         {
             if (row.compare(row.size() - 2, 1, is_species) == 1)
             {
-                taxid_type taxid = std::stoi(row.substr(0, row.find(0, delim)));
+                Taxid taxid = std::stoi(row.substr(0, row.find(delim)));
                 species_set.insert(taxid);
             }
         }
@@ -377,18 +370,18 @@ private:
         while (std::getline(stream, row))
         {
             size_t pos1{0};
-            size_t pos2 = row.find(pos1, delim);
-            taxid_type taxid = std::stoi(row.substr(pos1, pos2));
+            size_t pos2 = row.find(delim, pos1);
+            Taxid taxid = std::stoi(row.substr(pos1, pos2));
             if (species_set.find(taxid) == species_set.end())
                 continue;
-            std::vector<accession_type> accs;
+            std::vector<Accession> accs;
             pos1 = pos2;
-            pos2 = row.find(pos1, delim);
+            pos2 = row.find(delim, pos1);
             while (pos1 != std::string::npos)
             {
                 accs.push_back(row.substr(pos1, pos2));
                 pos1 = pos2;
-                pos2 = row.find(pos1, delim);
+                pos2 = row.find(delim, pos1);
             }
             taxid2accs_map[taxid] = accs;
         }

@@ -19,8 +19,7 @@
 #include <seqan/basic.h>
 
 #include "dna.hpp"
-#include "primer_cfg_type.hpp"
-#include "types.hpp"
+#include "types/all.hpp"
 #include "utilities.hpp"
 
 namespace priset  //::chemistry TODO: introduce chemistry namespace
@@ -118,7 +117,7 @@ extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
 }
 
 // CG content computation for output
-extern inline float CG(TKmerID const kmerID, uint64_t const mask)
+extern inline float count_CG(TKmerID const kmerID, uint64_t const mask)
 {
     auto [prefix, code] = split_kmerID(kmerID);
     auto target_l = PRIMER_MIN_LEN;
@@ -165,7 +164,7 @@ extern inline float primer_melt_salt(TKmerID code, float const Na)
  * is 5°C below the Tｍ of the sequence.
  * TODO: implement Zuker Recursion
  */
-/*bool filter_hairpin(primer_cfg_type const & primer_cfg, seqan::String<priset::dna> const & sequence)
+/*bool filter_hairpin(PrimerConfig const & primer_cfg, seqan::String<priset::dna> const & sequence)
 {
     float Ta = get_Tm(primer_cfg, sequence) - 5;
     // check for hairpins
@@ -367,7 +366,7 @@ extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
  // combining 16-17 and vice versa, and 16 - 16, deleting length bit 17 in one kmer may exclude
  // one ore more possible combinations, better directly receeive combiner struct to set
  // combination bits instead of post-processing length bits of both k-mers
-extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
+extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = 0)
 {
 
     uint64_t const fourmer_mask = 0b11111111;
@@ -474,7 +473,7 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
 // code2   -------------->
 //         |||||||||||||
 // code3 >--------------
-extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
+extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & kmerID2 = 0)
 {
     if (!(kmerID1 & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
         return;

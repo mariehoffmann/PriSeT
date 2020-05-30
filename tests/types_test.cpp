@@ -15,7 +15,7 @@
 #include <seqan/stream.h>
 
 #include "../src/filter.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
 
@@ -23,9 +23,9 @@ using namespace priset;
 
 // g++ ../PriSeT/tests/types_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -I .. -o types_test
 
-void test_TCombinePattern()
+void test_CombinePattern()
 {
-    TCombinePattern<TKmerID, TKmerLength> cp{};
+    CombinePattern<TKmerID, TKmerLength> cp{};
 
     std::vector<std::pair<uint8_t, uint8_t>> cs;
     for (uint8_t i = 0; i < PREFIX_SIZE; ++i)
@@ -61,6 +61,6 @@ void test_TCombinePattern()
 
 int main()
 {
-    test_TCombinePattern();
+    test_CombinePattern();
     return 0;
 }

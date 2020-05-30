@@ -17,9 +17,9 @@
 #include "../src/filter.hpp"
 #include "../src/fm.hpp"
 #include "../src/gui.hpp"
-#include "../src/io_cfg_type.hpp"
+#include "../src/IOConfig.hpp"
 #include "../src/output.hpp"
-#include "../src/primer_cfg_type.hpp"
+#include "../src/PrimerConfig.hpp"
 #include "../src/taxonomy.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
@@ -90,10 +90,10 @@ int main(/*int argc, char ** argv*/)
     TKmerCounts kmerCounts{0, 0, 0, 0};
 
     // set path prefixes for library files
-    io_cfg_type io_cfg{};
+    IOConfig io_cfg{};
 
     // get instance to primer sequence settings
-    primer_cfg_type primer_cfg{};
+    PrimerConfig primer_cfg{};
 
     // parse options and init io and primer configurators
     options opt(argc, argv, primer_cfg, io_cfg);
@@ -153,7 +153,7 @@ int main(/*int argc, char ** argv*/)
     std::cout << "\nINFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
-    using TPairList = TPairList<TPair<TCombinePattern<TKmerID, TKmerLength>>>;
+    using TPairList = TPairList<TPair<CombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;
 
     start = std::chrono::high_resolution_clock::now();
