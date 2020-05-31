@@ -41,7 +41,7 @@ struct Reference
     //!\brief Construct by taxid.
     explicit constexpr Reference(taxid_type const _taxid) noexcept : taxid(_taxid) {}
 
-    constexpr bool insert(Accession const accession, sequence_type const sequence) const noexcept
+    void insert(Accession const accession, sequence_type const sequence) noexcept
     {
         _accessions.push_back(accession);
         _sequences.push_back(sequence);

@@ -33,3 +33,41 @@ template<typename Pair>
 using PairList = std::vector<Pair>;
 
 }
+
+struct PairUnpacked
+{
+    PairUnpacked() = default;
+    PairUnpacked(size_t const _reference_count) : reference_count(_reference_count)
+    {
+        references.resize(reference_count, 0);
+    };
+
+    // Set flag in reference vector if this pair has a match in a reference
+    // with ID = seqNo_cx.
+    void set_reference_match(size_t const seqNo_cx)
+    {
+        if (references.size() <= seqNo_cx)
+            references.resize(seqNo_cx + 1);
+        references[seqNo_cx] = 1;
+    }
+
+    // Get flag for match of reference sequence with ID = seqNo_cx.
+    bool get_reference_match(size_t seqNo_cx) const noexcept
+    {
+        return ((references.size() <= seqNo_cx) ? 0 : references[seqNo_cx];
+    }
+
+    // Return
+    size_t get_reference_count()
+
+private:
+    TKmerID fwd;
+    uint64_t mask_fwd;
+    TKmerID rev;
+    uint64_t mask_rev;
+
+    size_t reference_count;
+    std::vector<bool> references;
+};
+
+}

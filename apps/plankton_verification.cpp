@@ -298,7 +298,7 @@ int main(int argc, char ** argv)
     TReferences references;
     TKmerIDs kmerIDs;
     TSeqNoMap seqNoMap;
-    transform_and_filter(io_cfg, locations, references, seqNoMap, kmerIDs, &kmerCounts);
+    transform_and_filter(io_cfg, primer_cfg, locations, references, seqNoMap, kmerIDs, &kmerCounts);
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations

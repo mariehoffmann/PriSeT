@@ -19,11 +19,12 @@
 namespace priset
 {
 
-enum TIMEIT {
-    MAP, // mappability computation
-    FILTER1_TRANSFORM, //
-    COMBINE_FILTER2, // kmer combiner
-    PAIR_FREQ, // Pair frequency cutoff
+// Enums to address kmer_counts array for collecting statistics.
+enum STEPS {
+    FREQUENCY,
+    TRANSFORM_AND_FILTER,
+    COMBINE,
+    FILTER_AND_RETRANSFORM,
     SIZE
 };
 
@@ -34,9 +35,10 @@ using TSeqPos = uint64_t;
 using TKmerLength = int64_t;
 
 // The type for storing up to 10 k-mers which are prefixes from each other.
-typedef uint64_t TKmerID;
+using TKmerID = uint64_t;
 
-// static TKmerID NULL_TKMERID = 0;
+// A NULL KmerID.
+static TKmerID NULL_TKMERID = 0;
 
 // The taxonomic identifier type.
 using Taxid = uint64_t;
@@ -47,15 +49,12 @@ using Accession = std::string;
 // The type for identifying numerically an accession.
 using AccessionID = uint32_t;
 
-// The type for numerical accession identifiers, 1-based.
-// typedef uint64_t AccessionID;
-
-// The type of an accession
-// typedef std::string Accession;
+// The identifier type for references.
+using ReferenceID = uint32_t;
 
 // A bit vector for each reference, with 1 indicating a kmer starting position.
-typedef sdsl::bit_vector TReference;
-typedef std::vector<TReference> TReferences;
+using TReference = sdsl::bit_vector;
+using TReferences = std::vector<TReference>;
 
 // Upstream result collection as map. Since tuples are not hashable, it is converted into a string before hashing.
 struct TUpstreamKey

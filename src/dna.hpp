@@ -20,7 +20,86 @@
 namespace priset
 {
 
-// std::pair<uint64_t, uint64_t> split(TKmerID kmerID);
+/* Encode a single sequence as a 64 bit integer.
+ * Details: encoding schme is \sum_i 4^i*x_i, starting with the first character
+ * (little endian) and x_i being the 2 bit representation of 'A' (=0), 'C' (=1),
+ * 'G' (=2), and 'T' (=4) ..., 3 = 'G'. E.g., ACGT is encoded as 0*4^0 + 1*4^1 + 2*4^2 + 3*4^2.
+ * Non-zero encoded character ('C') is added because of flexible sequence lengths
+ * and therefore the necessity to differentiate 'XA' from 'XAA'.
+ * Since multiple kmers may start at one position in the reference (which means that they all
+ * share the same prefix), the code stores in its 12 highest bits flags for which length
+ * the code represents. E.g. if the 1st bit is set, the code represents a string
+ * with the length of the shortest possible primer length, if the 5th bit is set, the code also represents
+ * a string of minimal primer length plus 4, and so forth.
+ *
+ * Bit layout:
+ * bits [0 .. |seq|-1]  complete sequence
+ * bit [|seq|]          closure symbol 'C'
+ * bits [60:64]         lower sequence length bound in case of variable length
+ */
+
+uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
+{
+    uint64_t code(0);
+     for (uint64_t i = 0; i < seqan::length(seq); ++i)
+     {
+         switch (char(seqan::getValue(seq, i)))
+         {
+             case 'C': code |= 1ULL; break;
+             case 'G': code |= 2ULL; break;
+             case 'T': code |= 3ULL;
+         }
+         code <<= 2;
+
+     }
+     code >>= 2;
+     code |= 1ULL << uint64_t(seqan::length(seq) << 1); // stop symbol 'C' = 1
+     return code;
+}
+
+// with length bit in prefix
+uint64_t dna_encoder_with_lbit(seqan::String<priset::dna> const & seq)
+{
+    uint64_t code(0);
+    auto l = seqan::length(seq);
+    for (uint64_t i = 0; i < l; ++i)
+    {
+         switch (char(seqan::getValue(seq, i)))
+         {
+             case 'C': code |= 1ULL; break;
+             case 'G': code |= 2ULL; break;
+             case 'T': code |= 3ULL;
+         }
+         code <<= 2;
+     }
+     // revert last shift
+     code >>= 2;
+     // add length bit and stop symbol 'C' = 1
+     code |= 1ULL << (63 - (l - PRIMER_MIN_LEN)) | (1ULL << uint64_t(l << 1));
+     return code;
+}
+
+// return full length sequence, ignore variable length info in leading bits if present.
+// Note: kmer code is only length trimmed when a mask is given.
+std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
+{
+    // note that assert converted to nop due to seqan's #define NDEBUG
+    if (code_ == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder, code == 0.");
+    uint64_t code = code_;
+    if (mask)
+        code = get_code(code_, mask);
+    else
+        code &= ~PREFIX_SELECTOR;
+
+    // TODO: use global
+    std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
+    uint8_t n = (63 - __builtin_clzl(code)) >> 1;
+    char seq[n];
+    for (uint8_t i = 1; i <= n; ++i, code >>= 2)
+        seq[n - i] = alphabet[3 & code];
+    return std::string(seq, n);
+}
 
 extern inline uint64_t complement(uint64_t const code_)
 {

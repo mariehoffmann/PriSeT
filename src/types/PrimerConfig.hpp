@@ -66,7 +66,7 @@ namespace priset
 #define DIGAMMA_PERCENT ((uint8_t)10)
 
 // Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
-#define FREQ_PAIR_MIN ((uint32_t)5)
+#define FREQ_PAIR_MIN ((uint32_t)2)
 
 
 struct PrimerConfig
@@ -134,7 +134,7 @@ private:
     uint64_t digamma{0};
 
     // The lower kmer pair frequency cutoff.
-    uint64_t freq_pair_min = FREQ_PAIR_MIN;
+    uint64_t digamma_pairs = FREQ_PAIR_MIN;
 
 public:
     // Constructors, destructor and assignment
@@ -403,7 +403,7 @@ public:
         library_size = _library_size;
     }
 
-    constexpr uint64_t get_library_size() const noexcept
+    uint64_t get_library_size() const noexcept
     {
         return library_size;
     }
@@ -415,7 +415,7 @@ public:
     }
 
     // Get number of taxa with references.
-    constexpr uint64_t get_species_count() const noexcept
+    uint64_t get_species_count() const noexcept
     {
         return species_count;
     }
@@ -427,11 +427,23 @@ public:
     }
 
     // Get absolute frequency cutoff for k-mers.
-    constexpr uint64_t get_digamma() noexcept
+    uint64_t get_digamma() noexcept
     {
         if (!digamma) // if not set, compute based on clade_size
             digamma = size_type(float(digamma_percent)/float(100) * float(species_count));
         return digamma;
+    }
+
+    // Set absolut frequency cutoff for k-mer pairs.
+    void set_digamma_pairs(uint64_t const _digamma_pairs)
+    {
+        digamma_pairs = _digamma_pairs;
+    }
+
+    // Get absolut frequency cutoff for k-mer pairs.
+    constexpr const uint32_t get_digamma_pairs() const noexcept
+    {
+        return digamma_pairs;
     }
 
     // Set primer error number (E parameter for genmap's mapping).

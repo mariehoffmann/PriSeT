@@ -90,7 +90,7 @@ struct setup
 void test_transform_and_filter()
 {
     setup su{};
-    transform_and_filter(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
+    transform_and_filter(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     std::cout << "References:\n";
     for (TReference reference : su.references)
     {
@@ -123,7 +123,7 @@ void test_transform_and_filter()
 void test_combine()
 {
     setup su{};
-    transform_and_filter(su.io_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
+    transform_and_filter(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     //using TPair = TPair;
     using TPairList = TPairList<TPair<CombinePattern<TKmerID, TKmerLength>>>;
     TPairList pairs;

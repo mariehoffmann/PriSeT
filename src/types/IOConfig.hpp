@@ -325,6 +325,9 @@ private:
     // Taxid to accessions map.
     std::unordered_map<Taxid, std::vector<Accession>> taxid2accs_map;
 
+    // For accession/reference ID store assigned taxid.
+    std::unordered_map<Accession, Taxid> acc2taxid_map;
+
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
 
@@ -379,9 +382,11 @@ private:
             pos2 = row.find(delim, pos1);
             while (pos1 != std::string::npos)
             {
-                accs.push_back(row.substr(pos1, pos2));
+                Accession acc = row.substr(pos1, pos2);
+                accs.push_back(acc);
                 pos1 = pos2;
                 pos2 = row.find(delim, pos1);
+                acc2taxid_map[acc] = taxid;
             }
             taxid2accs_map[taxid] = accs;
         }

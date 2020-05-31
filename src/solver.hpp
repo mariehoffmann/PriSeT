@@ -56,6 +56,10 @@ private:
     // reserved in its bit transformation.
     using TSeqNoMap = std::unordered_map<TSeqNo, TSeqNo>;
 
+    // Stores for each sequence its assigned taxon. The index corresponds to the
+    // continuous range of sequence identifiers accessable via the seqNoMap.
+    std::vector<Taxid> taxa_by_seqNo_cx;
+
     // Reference to io configurator.
     IOConfig & io_cfg;
 
@@ -67,13 +71,14 @@ private:
     // vector<vector<bool>> & solutions;  // optimal primer combination
     size_t C_max{0};              // maximal score
 
-    PairList pairs;               // list of type Pair
-
     // Result collector.
     std::vector<std::vector<Result>> & solutions;
 
     // Map of sorted solution indices. key = size, value = solution index.
     std::map<size_t, size_t> solutions_srtd;
+
+    // K-mer counts at each step for analysis purposes.
+    uint64_t kmer_counts[4] = {};
 
     // State variable for looping over results, either solutions or sorted solutions.
     std::pair<size_t, std::map<size_t, size_t>> state{0, solutions.rbegin()};
@@ -150,6 +155,14 @@ public:
         }
     }
 
+    std::string generate_statistics()
+    {
+        std::string info = "Frequency Step,Transform and Filter Step,Combine Step,Pair Filter Step\n";
+        info += to_string(kmer_counts[0]) + "," + to_string(kmer_counts[1]) + ",";
+        info += to_string(kmer_counts[2]) + "," + to_string(kmer_counts[3]) + ",";
+        return info;
+    }
+
     bool generate_table()
     {
         state{0, solutions.rbegin()};
@@ -181,23 +194,34 @@ private:
         TReferences references;
         TKmerIDs kmerIDs;
         TSeqNoMap seqNoMap;
-        transform_and_filter(io_cfg, locations, references, seqNoMap, kmerIDs);
 
-        // 4. Combine frequent pairs reference-wise.
-        using PairList = PairList<Pair<CombinePattern<TKmerID, TKmerLength>>>;
+        transform_and_filter<TKLocations, TSeqNoMap, TKmerIDs>(io_cfg, locations, references, seqNoMap, kmerIDs, taxa_by_seqNo_cx, kmer_counts);
+
+        // 4. Combine frequent k-mers to form pairs reference-wise.
+        // Container type for storing Pairs.
+        using PairList = vector<Pair<CombinePattern<TKmerID, TKmerLength>>>;
         PairList pairs;
-        combine<PairList>(references, kmerIDs, pairs);
+        combine<PairList>(references, kmerIDs, pairs, kmer_counts);
 
-        // 5. Maximize for coverage
-        using PairLists = std::vector<PairList>;
-        PairLists pairs_grouped;
-        optimize_coverage<PairList, PairLists>(pairs, primer_cfg.get_primer_s, pairs_grouped);
+        // 5. Filter and unpack
+        using PairUnpackedList = std::vector<PairUnpacked>;
+        PairUnpackedList pairs_unpacked;
+        filter_and_unpack_pairs<PairList, PairUnpackedList>(primer_cfg, pairs, pairs_unpacked);
 
-        // 6. Filter pairs.
-        ResultList results;
+        // TODO: continue here
+        // 6. Maximize for coverage
+        using Groups = std::vector<Group>;
+        Groups groups;
+        optimize_coverage<PairList, Groups>(io_cfg, primer_cfg, pairs_unpacked, groups, kmer_counts);
 
+        // 7. Filter pairs.
         // TODO: rewrite  filter_pairs to work with pair_freqs
-        filter_and_retransform<PairLists, ResultList>(references, kmerIDs, pairs_grouped, results);
+        using PairGroupsUnpack =
+        filter_groups<TKmerIDs, PairGroups, PairGroupsUnpack>(primer_cfg, references, kmerIDs, pairs_grouped, pairs_unpacked_grouped, kmer_counts);
+
+        // 8. convert groups containing KMerID encoded pairs into DNA sequences
+        ResultList results;
+        retransform<ResultList>(pairs_unpacked_grouped, results);
     }
 
 };

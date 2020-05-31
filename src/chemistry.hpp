@@ -208,7 +208,7 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
         if ((tail_10 == 0b00000000) || (tail_10 == 0b01010101) || (tail_10 == 0b10101010) || (tail_10 == 0b11111111))
         {
             // note that (x >> 64) won't be executed
-            uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
+            uint64_t offset = 64 - (std::max((uint64_t)PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
             // delete all k bits ≥ len_selector
             prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
             // std::cout << "\t4-run found\n";
@@ -226,7 +226,7 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
                  (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
             {
                 // delete all k bits ≥ len_selector
-                uint64_t offset = 64 - (std::max(PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
+                uint64_t offset = 64 - (std::max((uint64_t)PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
                 // delete all k bits ≥ len_selector
                 prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
                 // std::cout << "\tdi-nucleotide run found\n";
@@ -366,7 +366,7 @@ extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
  // combining 16-17 and vice versa, and 16 - 16, deleting length bit 17 in one kmer may exclude
  // one ore more possible combinations, better directly receeive combiner struct to set
  // combination bits instead of post-processing length bits of both k-mers
-extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = 0)
+extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
 {
 
     uint64_t const fourmer_mask = 0b11111111;
@@ -473,7 +473,7 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
 // code2   -------------->
 //         |||||||||||||
 // code3 >--------------
-extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & kmerID2 = 0)
+extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & kmerID2 = NULL_TKMERID)
 {
     if (!(kmerID1 & PREFIX_SELECTOR) && !(kmerID2 & PREFIX_SELECTOR))
         return;

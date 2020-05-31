@@ -19,13 +19,15 @@ namespace priset
 {
 
 // Filter of single kmers and transform of references to bit vectors.
-void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, TKmerCounts * kmerCounts = nullptr)
+template<typename TKLocations, typename TSeqNoMap, typename TKmerIDs>
+void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, std::vector<Taxid> & taxa_by_seqNo_cx, uint64_t * kmerCounts = nullptr)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
 
     references.clear();
     kmerIDs.clear();
+    taxa_by_seqNo_cx.clear();
 
     // load corpus for dna to 64 bit conversion
     seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
@@ -40,9 +42,9 @@ void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TRef
     for (typename TKLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
         // resetLimits in mapper may lead to empty kmer occurrences
-        if ((it->second).first.size() < FREQ_KMER_MIN)
+        if ((it->second).first.size() < primer_cfg.get_digamma())
         {
-            std::cout << "continue because FREQ_KMER_MIN = " << FREQ_KMER_MIN << std::endl;
+            std::cout << "continue because digamma = " << primer_cfg.get_digamma() << std::endl;
             continue;
         }
         // const auto & [seqNo, seqPos, K] = it->first;
@@ -76,6 +78,10 @@ void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TRef
         seqNoMap[seqNo] = seqNo_cx++;
         seqNoMap[ONE_LSHIFT_63 | seqNoMap[seqNo]] = seqNo;
         // std::cout << seqNo << " ";
+        // TODO: is seqNo 0-based?
+        Accession acc = seqNo_to_accession_map[seqNo-1];
+        // [taxid_seq0, taxid_seq1, ...]
+        taxa_by_seqNo_cx.push_back(io_cfg.acc2taxid_map[acc]);
     }
     std::cout << std::endl;
 
@@ -107,9 +113,9 @@ void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TRef
     {
         // cleanup in mapper may lead to undercounting kmer occurrences
         // TODO: move kmer frequency cutoff completely into mapper
-        if ((it->second).first.size() < FREQ_KMER_MIN)
+        if ((it->second).first.size() < primer_cfg.get_digamma())
         {
-             std::cout << "WARNING: kmer location sizes undershoots FREQ_KMER_MIN\n";
+             std::cout << "WARNING: kmer location sizes undershoots digamma\n";
              continue;
         }
         const auto & [seqNo, seqPos, K] = (it->first);
@@ -206,10 +212,7 @@ void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TRef
             if (!(PREFIX_SELECTOR & kmerID))
                 references[seqNo_cx][seqPos] = 0;
             else
-            {
-                kmerCounts->at(KMER_COUNTS::FILTER1_CNT) += __builtin_popcountll(kmerID >> 54);
                 kmerIDs[seqNo_cx].push_front(kmerID);
-            }
         }
     }
 }
@@ -219,8 +222,8 @@ void transform_and_filter(IOConfig const & io_cfg, TKLocations & locations, TRef
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
-template<typename PairList>
-void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList & pairs, TKmerCounts * kmerCounts = nullptr)
+template<typename PairList, typename TKmerIDs>
+void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList & pairs, uint64_t * kmer_counts = nullptr)
 {
     pairs.clear();
     auto cp_ctr = 0ULL;
@@ -267,8 +270,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList 
                                 {
                                     // store combination bit
                                     cp.set(mask_fwd, mask_rev);
-
-                                    ++kmerCounts->at(KMER_COUNTS::COMBINER_CNT);
+                                    ++kmer_counts[STEPS::COMBINE];
                                 }
                             }
                             mask_rev >>= 1; // does not affect search window, since starting position is fixed
@@ -285,68 +287,80 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList 
     }
 }
 
-// Apply frequency cutoff for unique pair occurences
-template<typename PairLists, typename ResultList>
-void filter_and_retransform(TReferences & references, TKmerIDs const & kmerIDs, PairLists & pairs_grouped, ResultList & results)
+// Filter pairs by frequency and unpack Pair -> PairUnpacked
+template<typename PairList, typename PairUnpackedList>
+filter_and_unpack_pairs(PrimerConfig const & primer_cfg, PairList const & pairs, PairUnpackedList & pairs_unpacked)
 {
-    std::unordered_map<uint64_t, uint32_t> pairhash2freq;
-    std::cout << "STATUS: Enter filter_pairs ...\n";
-    // count unique pairs
-    for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
-    {
-        std::vector<std::pair<uint8_t, uint8_t>> combinations;
-        it_pairs->cp.get_combinations(combinations);
-        TKmerID kmerID_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
-        TKmerID kmerID_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
+    // TODO: take snippets from below to build this function
+}
 
-        for (auto comb : combinations)
+// Apply frequency cutoff for unique pair occurences and unfold KmerIDs to DNA sequences.
+template<typename TKmerIDs, typename PairGroups, typename ResultList>
+void filter_groups(PrimerConfig const & primer_cfg, TReferences & references, TKmerIDs const & kmerIDs, PairGroups & pairs_grouped, ResultList & results, uint64_t * kmerCounts = nullptr)
+{
+
+    for (PairGroups::value_type group : pairs_grouped)
+    {
+
+        std::unordered_map<uint64_t, uint32_t> pairhash2freq;
+        std::cout << "STATUS: Enter filter_pairs ...\n";
+        // count unique pairs
+        for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
         {
-            auto code_fwd = get_code(kmerID_fwd, ONE_LSHIFT_63 >> comb.first);
-            auto code_rev = get_code(kmerID_rev, ONE_LSHIFT_63 >> comb.second);
-            auto h = hash_pair(code_fwd, code_rev);
-            if (pairhash2freq.find(h) == pairhash2freq.end())
-                pairhash2freq[h] = 1;
-            else
-                pairhash2freq[h]++;
+            std::vector<std::pair<uint8_t, uint8_t>> combinations;
+            it_pairs->cp.get_combinations(combinations);
+            TKmerID kmerID_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
+            TKmerID kmerID_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
+
+            for (auto comb : combinations)
+            {
+                auto code_fwd = get_code(kmerID_fwd, ONE_LSHIFT_63 >> comb.first);
+                auto code_rev = get_code(kmerID_rev, ONE_LSHIFT_63 >> comb.second);
+                auto h = hash_pair(code_fwd, code_rev);
+                if (pairhash2freq.find(h) == pairhash2freq.end())
+                    pairhash2freq[h] = 1;
+                else
+                    pairhash2freq[h]++;
+            }
         }
-    }
 
-    // Reset bits of kmer prefixes if and in references if prefix is finally empty
-    uint64_t ctr_reset = 0;
-    std::unordered_set<uint64_t> seen;
-    for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
-    {
-        TKmerID kmer_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
-        TKmerID kmer_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
-        std::vector<std::pair<uint8_t, uint8_t>> combinations;
-        it_pairs->cp.get_combinations(combinations);
-        for (auto comb : combinations)
+        // Reset bits of kmer prefixes if and in references if prefix is finally empty
+        uint64_t ctr_reset = 0;
+        std::unordered_set<uint64_t> seen;
+        for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
         {
-            uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
-            uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
-            uint64_t h = hash_pair(code_fwd, code_rev);
-            if (pairhash2freq.find(h) == pairhash2freq.end())
+            TKmerID kmer_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
+            TKmerID kmer_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
+            std::vector<std::pair<uint8_t, uint8_t>> combinations;
+            it_pairs->cp.get_combinations(combinations);
+            for (auto comb : combinations)
             {
-                std::cout << "ERROR: unknown pair hash\n";
-                exit(0);
-            }
-            // delete pair if frequency below FREQ_PAIR_MIN
-            if (pairhash2freq.at(h) < FREQ_PAIR_MIN)
-            {
-                ctr_reset++;
-                it_pairs->cp.reset(comb.first, comb.second);
-            }
-            else
-            {
-                if (seen.find(h) == seen.end())
+                uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
+                uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
+                uint64_t h = hash_pair(code_fwd, code_rev);
+                if (pairhash2freq.find(h) == pairhash2freq.end())
                 {
-                    // TODO: derive container types from template parameter
-                    std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> pp{kmer_fwd, ONE_LSHIFT_63 >> comb.first, kmer_rev, ONE_LSHIFT_63 >> comb.second};
-                    std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>> ppf{pairhash2freq.at(h), pp};
-                    pair_freqs.push_back(ppf);
-                    seen.insert(h);
+                    std::cout << "ERROR: unknown pair hash\n";
+                    exit(0);
                 }
-                kmerCounts->at(KMER_COUNTS::FILTER2_CNT)++;
+                // delete pair if frequency below frequency cutoff for pairs
+                if (pairhash2freq.at(h) < primer_cfg.get_digamma_pairs())
+                {
+                    ctr_reset++;
+                    it_pairs->cp.reset(comb.first, comb.second);
+                }
+                else
+                {
+                    if (seen.find(h) == seen.end())
+                    {
+                        // TODO: derive container types from template parameter
+                        std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> pp{kmer_fwd, ONE_LSHIFT_63 >> comb.first, kmer_rev, ONE_LSHIFT_63 >> comb.second};
+                        std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>> ppf{pairhash2freq.at(h), pp};
+                        pairs_grouped.push_back({ppf});
+                        seen.insert(h);
+                    }
+                    ++kmer_counts[STEPS::COMBINE];
+                }
             }
         }
     }

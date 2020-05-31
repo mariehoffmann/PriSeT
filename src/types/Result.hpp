@@ -16,6 +16,8 @@ namespace priset
 struct Result
 {
 
+std::string dna_decoder(uint64_t code, uint64_t const mask);
+
 private:
 
     // List of distinct taxonomic node identifiers in which this pair occurs.
@@ -37,17 +39,20 @@ public:
     Result(TKmerID kmerID_fwd, uint64_t mask_fwd, TKmerID kmerID_rev, uint64_t mask_rev, std::vector<uint64_t> _taxa, std::vector<uint64_t> _references) :
     taxa(_taxa), references(_references)
     {
-        primer_fwd = dna_decode(kmerID_fwd, mask_fwd);
-        primer_rev = dna_decode(kmerID_rev, mask_rev);
-        Tm_fwd = get_Tm(kmerID_fwd, mask_fwd);
-        Tm_rev = get_Tm(kmerID_rev, mask_rev);
+        primer_fwd = dna_decoder(kmerID_fwd, mask_fwd);
+        primer_rev = dna_decoder(kmerID_rev, mask_rev);
+        Tm_fwd = Tm(kmerID_fwd, mask_fwd);
+        Tm_rev = Tm(kmerID_rev, mask_rev);
         CG_fwd = count_CG(kmerID_fwd, mask_fwd);
         CG_rev = count_CG(kmerID_rev, mask_rev);
     }
 
     std::pair<std::string, std::string> get_primer_names() const
     {
-        return std::pair<std::string, std::string>{std::hash<std::string>{}(primer_fwd), std::hash<std::string>{}(primer_rev)};
+        std::stringstream ss_fwd, ss_rev;
+        ss_fwd << std::hex << std::hash<std::string>{}(primer_fwd);
+        ss_rev << std::hex << std::hash<std::string>{}(primer_rev);
+        return std::pair<std::string, std::string>{ss_fwd.str(), ss_rev.str()};
     }
 
     std::pair<std::string, std::string> get_primer_sequences() const
