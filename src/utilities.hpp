@@ -509,57 +509,57 @@ uint64_t get_num_pairs(PairList const & pairs)
 }
 
 // i,j are codes with no prefixes
-extern inline uint64_t hash_pair(uint64_t i, uint64_t j)
-{
-    return (i << __builtin_clzll(i + 1)) ^ j;
-}
+// extern inline uint64_t hash_pair(uint64_t i, uint64_t j)
+// {
+//     return (i << __builtin_clzll(i + 1)) ^ j;
+// }
 
 // Collect hash values of unique pairs and their frequencies.
-template<typename PairList, typename TKmerIDs, typename TKmerLength>
-void unique_pairs(PairList const & pairs, TKmerIDs const & kmerIDs, std::unordered_map<uint64_t, uint32_t> & code_pairs)
-{
-    for (auto pair : pairs)
-    {
-        std::vector<std::pair<uint8_t, uint8_t>> combinations;
-        pair.cp.get_combinations(combinations);
-        uint64_t code_fwd, code_rev;
-        for (std::pair<TKmerLength, TKmerLength> c : combinations)
-        {
-        //    std::cout << "pair.reference = " << pair.reference << ", size kmerIDs of this reference = " << kmerIDs.at(pair.reference).size();
-        //    std::cout << ", try to access r_fwd = " << pair.r_fwd - 1 << ", r_rev = " << pair.r_rev - 1 << std::endl;
-            code_fwd = get_code(kmerIDs.at(pair.reference).at(pair.r_fwd - 1), ONE_LSHIFT_63 >> c.first);
-            code_rev = get_code(kmerIDs.at(pair.reference).at(pair.r_rev - 1), ONE_LSHIFT_63 >> c.second);
-            uint64_t key = hash_pair(code_fwd, code_rev);
-            if (code_pairs.find(key) != code_pairs.end())
-                ++code_pairs[key];
-            else
-                code_pairs[key] = 1;
-        }
-    }
-}
+// template<typename PairList, typename TKmerIDs, typename TKmerLength>
+// void unique_pairs(PairList const & pairs, TKmerIDs const & kmerIDs, std::unordered_map<uint64_t, uint32_t> & code_pairs)
+// {
+//     for (auto pair : pairs)
+//     {
+//         std::vector<std::pair<uint8_t, uint8_t>> combinations;
+//         pair.cp.get_combinations(combinations);
+//         uint64_t code_fwd, code_rev;
+//         for (std::pair<TKmerLength, TKmerLength> c : combinations)
+//         {
+//         //    std::cout << "pair.reference = " << pair.reference << ", size kmerIDs of this reference = " << kmerIDs.at(pair.reference).size();
+//         //    std::cout << ", try to access r_fwd = " << pair.r_fwd - 1 << ", r_rev = " << pair.r_rev - 1 << std::endl;
+//             code_fwd = get_code(kmerIDs.at(pair.reference).at(pair.r_fwd - 1), ONE_LSHIFT_63 >> c.first);
+//             code_rev = get_code(kmerIDs.at(pair.reference).at(pair.r_rev - 1), ONE_LSHIFT_63 >> c.second);
+//             uint64_t key = hash_pair(code_fwd, code_rev);
+//             if (code_pairs.find(key) != code_pairs.end())
+//                 ++code_pairs[key];
+//             else
+//                 code_pairs[key] = 1;
+//         }
+//     }
+// }
 
 // Accumulate unique pair frequencies.
-template<typename PairList, typename TKmerIDs, typename TKmerLength>
-void count_unique_pairs(PairList const & pairs, TKmerIDs const & kmerIDs)
-{
-    std::unordered_map<uint64_t, uint32_t> code_pairs;
-    unique_pairs<PairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
-    // count frequencies
-    std::map<uint64_t, uint64_t> freq_ctrs;
-    for (auto it = code_pairs.begin(); it != code_pairs.end(); ++it)
-    {
-        if (freq_ctrs.find(it->second) != freq_ctrs.end())
-            ++freq_ctrs[it->second];
-        else
-            freq_ctrs[it->second] = 1;
-    }
-    std::cout << "frequency:\t";
-    for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
-        std::cout << it->first << ",";
-    std::cout << "\ncount:\t";
-    for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
-        std::cout << it->second << ",";
-    std::cout << std::endl;
-}
+// template<typename PairList, typename TKmerIDs, typename TKmerLength>
+// void count_unique_pairs(PairList const & pairs, TKmerIDs const & kmerIDs)
+// {
+//     std::unordered_map<uint64_t, uint32_t> code_pairs;
+//     unique_pairs<PairList, TKmerIDs, TKmerLength>(pairs, kmerIDs, code_pairs);
+//     // count frequencies
+//     std::map<uint64_t, uint64_t> freq_ctrs;
+//     for (auto it = code_pairs.begin(); it != code_pairs.end(); ++it)
+//     {
+//         if (freq_ctrs.find(it->second) != freq_ctrs.end())
+//             ++freq_ctrs[it->second];
+//         else
+//             freq_ctrs[it->second] = 1;
+//     }
+//     std::cout << "frequency:\t";
+//     for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
+//         std::cout << it->first << ",";
+//     std::cout << "\ncount:\t";
+//     for (auto it = freq_ctrs.begin(); it != freq_ctrs.end(); ++it)
+//         std::cout << it->second << ",";
+//     std::cout << std::endl;
+// }
 
 }  // namespace priset

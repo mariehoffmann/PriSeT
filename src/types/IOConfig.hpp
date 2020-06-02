@@ -11,6 +11,7 @@
 #include <iostream>
 #include <regex>
 #include <unordered_set>
+#include <stdexcept>
 
 // #include "chemistry.hpp"
 #include "Errors.hpp"
@@ -159,11 +160,13 @@ public:
             ofs.close();
         }
 
-        /* Parse accession and taxonomy file to build species set and taxid to
-        * accessions map. Call first build_species_set to store only taxids of
-        * species (and not of higher order).
+        /* Parse accession, id, and taxonomy files to build species set,
+        * sequence to accession, and taxid to accessions map. Call first
+        * build_species_set to store only taxids of species (and not of higher
+        * order).
         */
         build_species_set();
+        build_seqNo2acc_map();
         build_taxid2accs_map();
     };
 
@@ -328,6 +331,9 @@ private:
     // For accession/reference ID store assigned taxid.
     std::unordered_map<Accession, Taxid> acc2taxid_map;
 
+    // Association between sequence and accession identifiers.
+    std::unordered_map<TSeqNo, Accession> seqNo2acc_map;
+
     // Path to R shiny app template
     fs::path app_template = "../PriSeT/src/app_template.R";
 
@@ -362,6 +368,31 @@ private:
         }
     }
 
+    bool build_seqNo2acc_map()
+    {
+        char const delim = ',';
+        std::ifstream stream(id_file.string().c_str(), std::ios::in);
+        std::string row;
+        size_t pos;
+        while (std::getline(stream, row))
+        {
+            if (row[0] == '#')
+                continue;
+            pos = row.find(delim);
+            TSeqNo seqNo = std::stoi(row.substr(pos));
+            Accession acc = row.substr(pos+1, row.size());
+            try
+            {
+                seqNo2acc_map[seqNo] = acc;
+            }
+            catch (const std::domain_error & e)
+            {
+                std::cerr << "ERROR: duplicate sequence (" << seqNo << ")identifier used in " << id_file.string() << std::endl;
+            }
+        }
+        return (seqNo2acc_map.size()) ? true : false;
+    }
+
     // Fill taxid to accessions map
     // TODO: write test
     void build_taxid2accs_map()
@@ -372,6 +403,8 @@ private:
         std::getline(stream, row); // ignore header
         while (std::getline(stream, row))
         {
+            if (row[0] == '#')
+                continue;
             size_t pos1{0};
             size_t pos2 = row.find(delim, pos1);
             Taxid taxid = std::stoi(row.substr(pos1, pos2));
@@ -391,7 +424,6 @@ private:
             taxid2accs_map[taxid] = accs;
         }
     }
-
 };
 
 } // namespace priset

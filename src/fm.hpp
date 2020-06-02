@@ -10,14 +10,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <map>
+#include <string>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <type_traits>
 #include <unistd.h>
 #include <vector>
-
-
 
 // TODO: place proper seqan version
 #define SEQAN_APP_VERSION "1.0.0"
@@ -64,9 +62,9 @@ int fm_index(IOConfig const & io_cfg)
     int const argc = 5;
     std::string const fasta_file = io_cfg.get_fasta_file().string();
     char const * argv[argc] = {"index",
-    "-F", fasta_file.c_string(),
-    "-I", io_cfg.get_index_dir().c_string());
-    indexMain(argc, char const ** argv);
+        "-F", fasta_file.c_str(),
+        "-I", io_cfg.get_index_dir().c_str()};
+    indexMain(argc, argv);
     return 0;
 }
 
@@ -78,6 +76,7 @@ int fm_index(IOConfig const & io_cfg)
  * TLocations               type for storing locations
  * TDirectoryInformation    directory information type
  */
+template<typename TKLocations>
 int fm_map(IOConfig const & io_cfg, PrimerConfig const & primer_cfg, TKLocations & locations)
 {
     std::string const s1 = io_cfg.get_index_dir().string();
@@ -92,10 +91,10 @@ int fm_map(IOConfig const & io_cfg, PrimerConfig const & primer_cfg, TKLocations
         std::cout << "INFO: K = " << K << std::endl;
         // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
         char const * argv[11] = {"map",
-        "-I", s1.c_str(), "-O", s2.c_str(),
-        "-K", std::to_string(K).c_str(),
-        "-E", std::to_string(primer_cfg.get_error()).c_str(),
-        "--csvRAM", "-fl"};
+            "-I", s1.c_str(), "-O", s2.c_str(),
+            "-K", std::to_string(K).c_str(),
+            "-E", std::to_string(primer_cfg.get_error()).c_str(),
+            "--csvRAM", "-fl"};
 
         mappabilityMain<TLocations>(11, argv, loc_per_K, primer_cfg.get_digamma());
         TKLocations::iterator it_hint = locations.begin();

@@ -73,15 +73,15 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
 
     TSeqNo seqNo_cx = 0;
     // store seqNo -> seqNo_cx and (1<<63 | seqNo_cx) -> seqNo (we never have more than 2^63 sequences)
-    for (auto seqNo : seqNos)
+    for (TSeqNo seqNo : seqNos)
     {
         seqNoMap[seqNo] = seqNo_cx++;
         seqNoMap[ONE_LSHIFT_63 | seqNoMap[seqNo]] = seqNo;
         // std::cout << seqNo << " ";
         // TODO: is seqNo 0-based?
-        Accession acc = seqNo_to_accession_map[seqNo-1];
+        Accession acc = io_cfg.seqNo2acc_map.at(seqNo);
         // [taxid_seq0, taxid_seq1, ...]
-        taxa_by_seqNo_cx.push_back(io_cfg.acc2taxid_map[acc]);
+        taxa_by_seqNo_cx.push_back(io_cfg.acc2taxid_map.at(acc));
     }
     std::cout << std::endl;
 
@@ -288,83 +288,86 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList 
 }
 
 // Filter pairs by frequency and unpack Pair -> PairUnpacked
-template<typename PairList, typename PairUnpackedList>
-filter_and_unpack_pairs(PrimerConfig const & primer_cfg, PairList const & pairs, PairUnpackedList & pairs_unpacked)
+template<typename TKmerIDs, typename PairList, typename PairUnpackedList>
+void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & kmerIDs, PairList const & pairs, PairUnpackedList & pairs_unpacked)
 {
-    // TODO: take snippets from below to build this function
-}
+    std::unordered_map<std::string, uint32_t> pair2freq;
+    std::unordered_map<uint64_t, std::string> primers_memoized;
 
-// Apply frequency cutoff for unique pair occurences and unfold KmerIDs to DNA sequences.
-template<typename TKmerIDs, typename PairGroups, typename ResultList>
-void filter_groups(PrimerConfig const & primer_cfg, TReferences & references, TKmerIDs const & kmerIDs, PairGroups & pairs_grouped, ResultList & results, uint64_t * kmerCounts = nullptr)
-{
-
-    for (PairGroups::value_type group : pairs_grouped)
+    auto pair_key = [](std::string const & p1, std::string const & p2) -> std::string
+        {return p1 + "_" + p2;};
+    std::cout << "STATUS: Enter filter_pairs ...\n";
+    // count unique pairs
+    for (auto it_pairs = pairs.cbegin(); it_pairs != pairs.cend(); ++it_pairs)
     {
+        std::vector<std::pair<uint8_t, uint8_t>> combinations;
+        it_pairs->cp.get_combinations(combinations);
+        TKmerID kmerID_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
+        TKmerID kmerID_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
 
-        std::unordered_map<uint64_t, uint32_t> pairhash2freq;
-        std::cout << "STATUS: Enter filter_pairs ...\n";
-        // count unique pairs
-        for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
+        for (auto comb : combinations)
         {
-            std::vector<std::pair<uint8_t, uint8_t>> combinations;
-            it_pairs->cp.get_combinations(combinations);
-            TKmerID kmerID_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
-            TKmerID kmerID_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
+            uint64_t code_fwd = get_code(kmerID_fwd, ONE_LSHIFT_63 >> comb.first);
+            uint64_t code_rev = get_code(kmerID_rev, ONE_LSHIFT_63 >> comb.second);
+            std::string primer_fwd = dna_decoder(kmerID_fwd, code_fwd);
+            std::string primer_rev = dna_decoder(kmerID_rev, code_rev);
 
-            for (auto comb : combinations)
-            {
-                auto code_fwd = get_code(kmerID_fwd, ONE_LSHIFT_63 >> comb.first);
-                auto code_rev = get_code(kmerID_rev, ONE_LSHIFT_63 >> comb.second);
-                auto h = hash_pair(code_fwd, code_rev);
-                if (pairhash2freq.find(h) == pairhash2freq.end())
-                    pairhash2freq[h] = 1;
-                else
-                    pairhash2freq[h]++;
-            }
+            if (!primers_memoized.count(code_fwd))
+                primers_memoized[code_fwd] = primer_fwd;
+            if (!primers_memoized.count(code_rev))
+                primers_memoized[code_rev] = primer_rev;
+
+            std::string key = pair_key(primer_fwd, primer_rev);
+            if (!pair2freq.count(key))
+                pair2freq[key] = 0;
+            ++pair2freq[key];
         }
+    }
 
-        // Reset bits of kmer prefixes if and in references if prefix is finally empty
-        uint64_t ctr_reset = 0;
-        std::unordered_set<uint64_t> seen;
-        for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
+    // Unpack pairs exceeding minimal pair frequency (digamma_pairs) and store in
+    // pairs_unpacked. Combination bits are not reset.
+    std::unordered_map<std::string, size_t> seen_and_index;
+    for (auto it_pairs = pairs.cbegin(); it_pairs != pairs.cend(); ++it_pairs)
+    {
+        TKmerID kmer_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
+        TKmerID kmer_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
+        std::vector<std::pair<uint8_t, uint8_t>> combinations;
+        it_pairs->cp.get_combinations(combinations);
+        for (auto comb : combinations)
         {
-            TKmerID kmer_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
-            TKmerID kmer_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
-            std::vector<std::pair<uint8_t, uint8_t>> combinations;
-            it_pairs->cp.get_combinations(combinations);
-            for (auto comb : combinations)
+            uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
+            uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
+
+            std::string key = pair_key(primers_memoized[code_fwd], primers_memoized[code_rev]);
+
+            if (pair2freq.at(key) >= primer_cfg.get_digamma_pairs())
             {
-                uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
-                uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
-                uint64_t h = hash_pair(code_fwd, code_rev);
-                if (pairhash2freq.find(h) == pairhash2freq.end())
+                if (!seen_and_index.count(key))
                 {
-                    std::cout << "ERROR: unknown pair hash\n";
-                    exit(0);
+                    PairUnpacked pair_unpacked{pair2freq.at(key)};
+
+                    pairs_unpacked.push_back({pair_unpacked});
+                    seen_and_index[key] = pairs_unpacked.size() - 1;
                 }
-                // delete pair if frequency below frequency cutoff for pairs
-                if (pairhash2freq.at(h) < primer_cfg.get_digamma_pairs())
-                {
-                    ctr_reset++;
-                    it_pairs->cp.reset(comb.first, comb.second);
-                }
-                else
-                {
-                    if (seen.find(h) == seen.end())
-                    {
-                        // TODO: derive container types from template parameter
-                        std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> pp{kmer_fwd, ONE_LSHIFT_63 >> comb.first, kmer_rev, ONE_LSHIFT_63 >> comb.second};
-                        std::pair<uint32_t, std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>> ppf{pairhash2freq.at(h), pp};
-                        pairs_grouped.push_back({ppf});
-                        seen.insert(h);
-                    }
-                    ++kmer_counts[STEPS::COMBINE];
-                }
+                pairs_unpacked.at(seen_and_index.at(key)).set_reference_match(it_pairs->referenceID);
             }
         }
     }
-    std::cout << "STATUS: Leaving filter_pairs\n";
 }
+
+// Apply frequency cutoff for unique pair occurences and unfold KmerIDs to DNA sequences.
+// template<typename TKmerIDs, typename PairGroups, typename ResultList>
+// void filter_groups(PrimerConfig const & primer_cfg, TReferences & references, TKmerIDs const & kmerIDs, PairGroups & pairs_grouped, ResultList & results, uint64_t * kmerCounts = nullptr)
+// {
+//
+//     for (PairGroups::value_type group : pairs_grouped)
+//     {
+//
+//
+//
+//
+//     }
+//     std::cout << "STATUS: Leaving filter_pairs\n";
+// }
 
 }  // namespace priset

@@ -441,7 +441,7 @@ public:
     }
 
     // Get absolut frequency cutoff for k-mer pairs.
-    constexpr const uint32_t get_digamma_pairs() const noexcept
+    constexpr uint32_t get_digamma_pairs() const noexcept
     {
         return digamma_pairs;
     }

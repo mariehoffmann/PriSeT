@@ -46,8 +46,15 @@ private:
     using TKLocations = std::map<TKLocation,
             std::pair<std::vector<TLocation>, std::vector<TLocation>>>;
 
-    // Container type for storing results.
-    using ResultList = std::vector<Result>;
+    // Container type for storing a group of primer_set_size primers.
+    using ResultGroup = std::vector<Result>;
+
+    // Container type for storing list of result groups.
+    using ResultGroups = std::vector<ResultGroup>;
+
+    // The result groups.
+    ResultGroups result_groups;
+
 
     // Translates sequences identifiers (seqNo) in use to a contiguous range (seqNo_cx).
     // Dictionary is bidirectional: seqNo -> seqNo_cx and inverse add a leading one
@@ -64,18 +71,15 @@ private:
     IOConfig & io_cfg;
 
     // Reference to primer configurator.
-    PrimerConfig & primer_cfg;
+    PrimerConfig const & primer_cfg;
 
     vector<size_t> & primerIDs;
 
     // vector<vector<bool>> & solutions;  // optimal primer combination
     size_t C_max{0};              // maximal score
 
-    // Result collector.
-    std::vector<std::vector<Result>> & solutions;
-
     // Map of sorted solution indices. key = size, value = solution index.
-    std::map<size_t, size_t> solutions_srtd;
+    std::map<size_t, size_t> results_srtd;
 
     // K-mer counts at each step for analysis purposes.
     uint64_t kmer_counts[4] = {};
@@ -115,7 +119,7 @@ public:
                 std::vector<uint64_t> taxa = result.get_taxa();
                 taxon_set.insert(taxa.begin(), taxa.end());
             }
-            solutions_srtd[taxon_set.size()] = id;
+            results_srtd[taxon_set.size()] = id;
         }
     }
 
@@ -130,7 +134,7 @@ public:
                 std::vector<uint64_t> refs = result.get_references();
                 taxa_set.insert(refs.begin(), refs.end());
             }
-            solutions_srtd[ref_set.size()] = id;
+            results_srtd[ref_set.size()] = id;
         }
     }
 
@@ -143,9 +147,9 @@ public:
 
     std::pair<bool, ResultList> get_next_result()
     {
-        if (solutions_srtd.size())
+        if (results_srtd.size())
         {
-            if (state.second == solutions_srtd.rend())
+            if (state.second == results_srtd.rend())
                 return pair<bool, ResultList>{false, ResultList(0)};
             return pair<bool, ResultList>{true, solutions.at(state.second++)};
         }
@@ -181,14 +185,14 @@ public:
 
 private:
     // copy app code here
-    run()
+    void run()
     {
         // 1. Optional index computation
         if (!io_cfg.skip_idx_flag)
             fm_index(io_cfg);
 
         // 2. k-mer frequency computation
-        fm_map(io_cfg, primer_cfg, locations);
+        fm_map<TKLocations>(io_cfg, primer_cfg, locations);
 
         // 3. Transform and filter pairs.
         TReferences references;
@@ -201,27 +205,37 @@ private:
         // Container type for storing Pairs.
         using PairList = vector<Pair<CombinePattern<TKmerID, TKmerLength>>>;
         PairList pairs;
-        combine<PairList>(references, kmerIDs, pairs, kmer_counts);
+        combine<PairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
 
         // 5. Filter and unpack
         using PairUnpackedList = std::vector<PairUnpacked>;
         PairUnpackedList pairs_unpacked;
-        filter_and_unpack_pairs<PairList, PairUnpackedList>(primer_cfg, pairs, pairs_unpacked);
+        filter_and_unpack_pairs<TKmerIDs, PairList, PairUnpackedList>(primer_cfg, kmerIDs, pairs, pairs_unpacked);
 
-        // TODO: continue here
-        // 6. Maximize for coverage
-        using Groups = std::vector<Group>;
-        Groups groups;
-        optimize_coverage<PairList, Groups>(io_cfg, primer_cfg, pairs_unpacked, groups, kmer_counts);
-
-        // 7. Filter pairs.
-        // TODO: rewrite  filter_pairs to work with pair_freqs
-        using PairGroupsUnpack =
-        filter_groups<TKmerIDs, PairGroups, PairGroupsUnpack>(primer_cfg, references, kmerIDs, pairs_grouped, pairs_unpacked_grouped, kmer_counts);
-
-        // 8. convert groups containing KMerID encoded pairs into DNA sequences
-        ResultList results;
-        retransform<ResultList>(pairs_unpacked_grouped, results);
     }
+
+    bool as_groups()
+    {
+        if (!pairs_packed.size())
+            return false;
+        std::transform(pairs_unpacked.cbegin(), pairs_unpacked.cend(), result_groups.begin(), [](Pair & pair){return std::vector{pair};});
+        return true;
+    }
+
+    // // TODO: continue here
+    // // 6. Maximize for coverage
+    // using Groups = std::vector<Group>;
+    // Groups groups;
+    // optimize_coverage<PairList, Groups>(io_cfg, primer_cfg, pairs_unpacked, groups, kmer_counts);
+    //
+    // // 7. Filter pairs.
+    // // TODO: rewrite  filter_pairs to work with pair_freqs
+    // using PairGroupsUnpack =
+    // filter_groups<TKmerIDs, PairGroups, PairGroupsUnpack>(primer_cfg, references, kmerIDs, pairs_grouped, pairs_unpacked_grouped, kmer_counts);
+    //
+    // // 8. convert groups containing KMerID encoded pairs into DNA sequences
+    // ResultList results;
+    // retransform<ResultList>(pairs_unpacked_grouped, results);
+
 
 };

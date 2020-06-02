@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "simple_types.hpp"
+
 namespace priset
 {
 /*
@@ -14,17 +16,20 @@ template<typename CombinePattern>
 struct Pair
 {
     Pair() = default;
-    Pair(uint64_t reference_, uint64_t r_fwd_, uint64_t r_rev_, CombinePattern cp_) :
-        reference(reference_), r_fwd(r_fwd_), r_rev(r_rev_), cp(cp_) {}
+    Pair(uint64_t _reference_ID, uint64_t _r_fwd, uint64_t _r_rev, CombinePattern _cp) :
+        reference_ID(_reference_ID), r_fwd(_r_fwd), r_rev(_r_rev), cp(_cp) {}
     //std::tuple<uint64_t, uint64_t, CombinePattern<TKmerID, TKmerLength>> Pair;
     ~Pair() = default;
 
     // Reference identifier (equivalent to position in corpus).
-    uint64_t reference;
+    uint64_t reference_ID;
+
     // Rank of forward kmer.
     uint64_t r_fwd;
+
     // Rank of reverse kmer.
     uint64_t r_rev;
+
     // Length combinations of kmers as bit mask.
     CombinePattern cp;
 };
@@ -32,33 +37,37 @@ struct Pair
 template<typename Pair>
 using PairList = std::vector<Pair>;
 
-}
-
 struct PairUnpacked
 {
     PairUnpacked() = default;
     PairUnpacked(size_t const _reference_count) : reference_count(_reference_count)
     {
-        references.resize(reference_count, 0);
+        reference_IDs.resize(reference_count, 0);
     };
 
     // Set flag in reference vector if this pair has a match in a reference
     // with ID = seqNo_cx.
-    void set_reference_match(size_t const seqNo_cx)
+    void set_reference_match(uint64_t const seqNo_cx)
     {
-        if (references.size() <= seqNo_cx)
-            references.resize(seqNo_cx + 1);
-        references[seqNo_cx] = 1;
+        if (reference_IDs.size() <= seqNo_cx)
+            reference_IDs.resize(seqNo_cx + 1);
+        reference_IDs[seqNo_cx] = 1;
     }
 
     // Get flag for match of reference sequence with ID = seqNo_cx.
     bool get_reference_match(size_t seqNo_cx) const noexcept
     {
-        return ((references.size() <= seqNo_cx) ? 0 : references[seqNo_cx];
+        return (reference_IDs.size() <= seqNo_cx) ? 0 : reference_IDs[seqNo_cx];
     }
 
-    // Return
-    size_t get_reference_count()
+    // Return number of distinct reference_IDs
+    size_t get_reference_count() noexcept
+    {
+        if (reference_count)
+            return reference_count;
+        reference_count = std::accumulate(reference_IDs.begin(), reference_IDs.end(), 1);
+        return reference_count;
+    }
 
 private:
     TKmerID fwd;
@@ -66,8 +75,8 @@ private:
     TKmerID rev;
     uint64_t mask_rev;
 
-    size_t reference_count;
-    std::vector<bool> references;
+    size_t reference_count{0};
+    std::vector<bool> reference_IDs;
 };
 
 }

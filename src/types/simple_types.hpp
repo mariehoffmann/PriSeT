@@ -28,9 +28,12 @@ enum STEPS {
     SIZE
 };
 
-// type declarations
+// The type of a sequence identifier.
 using TSeqNo = uint64_t;
+
+// The type of sequence position.
 using TSeqPos = uint64_t;
+
 // Kmer length type. A negative indicates reverse direction given associated position.
 using TKmerLength = int64_t;
 

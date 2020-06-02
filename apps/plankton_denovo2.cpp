@@ -2,9 +2,10 @@
 
 #include "../src/argument_parser.hpp"
 #include "../src/solver.hpp"
+#include "../src/types/all.hpp"
 
-// g++ ../PriSeT/apps/barcode_miner_bf2.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~/include -L~/lib -ldivsufsort -o barcode_miner_bf2
-// barcode_miner_bf2 -l <dir_library> -w <dir_work> [-m <max_num_primers>] [-s]
+// g++ ../PriSeT/apps/plankton_denovo2.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -lstdc++fs -DNDEBUG -O3 -I~/include -L~/lib -ldivsufsort -o plankton_denovo2
+// plankton_denovo2 -l <dir_library> -w <dir_work> [-m <max_num_primers>] [-s]
 
 using namespace priset;
 using namespace std;
@@ -24,7 +25,7 @@ int main(int argc, char ** argv)
     primer_cfg.set_dTm(2);
 
     // init solver
-    solver_brute_force solver{io_cfg, primer_cfg};
+    solver_fast solver{io_cfg, primer_cfg};
 
     // solve
     solver.solve();
