@@ -10,7 +10,7 @@
 
 #include "../submodules/genmap/src/common.hpp"
 #include "../submodules/genmap/src/genmap_helper.hpp"
-#include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
+// #include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 
 #include "types/all.hpp"
 #include "utilities.hpp"
@@ -222,8 +222,8 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
  * that the k-mer corresponds to a forward primer, and second position indicates reverse
  * primer, i.e. (k1, k2) != (k2, k1).
  */
-template<typename PairList, typename TKmerIDs>
-void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList & pairs, uint64_t * kmer_counts = nullptr)
+template<typename PrimerPairList, typename TKmerIDs>
+void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPairList & pairs, uint64_t * kmer_counts = nullptr)
 {
     pairs.clear();
     auto cp_ctr = 0ULL;
@@ -280,16 +280,16 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PairList 
                 } // length mask_fwd
                 if (cp.is_set())
                 {
-                    pairs.push_back(Pair<CombinePattern<TKmerID, TKmerLength>>{seqNo_cx, r_fwd, r_rev, cp});
+                    pairs.push_back(PrimerPair<CombinePattern<TKmerID, TKmerLength>>{seqNo_cx, r_fwd, r_rev, cp});
                 }
             } // kmerID rev
         } // kmerID fwd
     }
 }
 
-// Filter pairs by frequency and unpack Pair -> PairUnpacked
-template<typename TKmerIDs, typename PairList, typename PairUnpackedList>
-void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & kmerIDs, PairList const & pairs, PairUnpackedList & pairs_unpacked)
+// Filter pairs by frequency and unpack PrimerPair -> PrimerPairUnpacked
+template<typename TSeqNoMap, typename TKmerIDs, typename PrimerPairList, typename PrimerPairUnpackedList>
+void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & kmerIDs, PrimerPairList const & pairs, PrimerPairUnpackedList & pairs_unpacked)
 {
     std::unordered_map<std::string, uint32_t> pair2freq;
     std::unordered_map<uint64_t, std::string> primers_memoized;
@@ -344,23 +344,23 @@ void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & k
             {
                 if (!seen_and_index.count(key))
                 {
-                    PairUnpacked pair_unpacked{pair2freq.at(key)};
+                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{pair2freq.at(key)};
 
                     pairs_unpacked.push_back({pair_unpacked});
                     seen_and_index[key] = pairs_unpacked.size() - 1;
                 }
-                pairs_unpacked.at(seen_and_index.at(key)).set_reference_match(it_pairs->referenceID);
+                pairs_unpacked.at(seen_and_index.at(key)).set_reference_match(it_pairs->seqNo);
             }
         }
     }
 }
 
 // Apply frequency cutoff for unique pair occurences and unfold KmerIDs to DNA sequences.
-// template<typename TKmerIDs, typename PairGroups, typename ResultList>
-// void filter_groups(PrimerConfig const & primer_cfg, TReferences & references, TKmerIDs const & kmerIDs, PairGroups & pairs_grouped, ResultList & results, uint64_t * kmerCounts = nullptr)
+// template<typename TKmerIDs, typename PrimerPairGroups, typename ResultList>
+// void filter_groups(PrimerConfig const & primer_cfg, TReferences & references, TKmerIDs const & kmerIDs, PrimerPairGroups & pairs_grouped, ResultList & results, uint64_t * kmerCounts = nullptr)
 // {
 //
-//     for (PairGroups::value_type group : pairs_grouped)
+//     for (PrimerPairGroups::value_type group : pairs_grouped)
 //     {
 //
 //

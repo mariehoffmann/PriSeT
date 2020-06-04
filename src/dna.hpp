@@ -13,12 +13,14 @@
 #include <unordered_map>
 
 //#include <seqan/basic.h>
-
+#include "common.hpp"
 #include "types/PrimerConfig.hpp"
 #include "utilities.hpp"
 
 namespace priset
 {
+
+uint64_t get_code(uint64_t const code_, uint64_t mask);
 
 /* Encode a single sequence as a 64 bit integer.
  * Details: encoding schme is \sum_i 4^i*x_i, starting with the first character
@@ -104,9 +106,6 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
 extern inline uint64_t complement(uint64_t const code_)
 {
     auto [prefix, code] = split_kmerID(code_);
-    // std::pair<uint64_t, uint64_t> prefix_code = split_kmerID(code_);
-    // uint64_t prefix = prefix_code.first;
-    // uint64_t code = prefix_code.second;
     uint64_t code_c = 0;
     uint8_t offset = 0;
     while (code > 1)

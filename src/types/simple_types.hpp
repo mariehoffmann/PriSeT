@@ -11,8 +11,9 @@
 
 // #include "utilities.hpp"
 
-#include "../../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 #include "../../submodules/genmap/src/common.hpp"
+// #include "../../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
+#include <sdsl/bit_vectors.hpp>
 
 #define ONE_LSHIFT_63 (1ULL << 63)
 
@@ -51,9 +52,6 @@ using Accession = std::string;
 
 // The type for identifying numerically an accession.
 using AccessionID = uint32_t;
-
-// The identifier type for references.
-using ReferenceID = uint32_t;
 
 // A bit vector for each reference, with 1 indicating a kmer starting position.
 using TReference = sdsl::bit_vector;

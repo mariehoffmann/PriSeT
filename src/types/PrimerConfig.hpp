@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <iostream>
 
 namespace priset
@@ -429,7 +430,7 @@ public:
     // Get absolute frequency cutoff for k-mers.
     uint64_t get_digamma() noexcept
     {
-        if (!digamma) // if not set, compute based on clade_size
+        if (!digamma)
             digamma = size_type(float(digamma_percent)/float(100) * float(species_count));
         return digamma;
     }

@@ -68,7 +68,6 @@ int fm_index(IOConfig const & io_cfg)
     return 0;
 }
 
-
 /*
  * Map frequent k-mers to exisiting FM index with `genmap` without file IO
  * IOConfig              I/O configurator type
@@ -77,7 +76,7 @@ int fm_index(IOConfig const & io_cfg)
  * TDirectoryInformation    directory information type
  */
 template<typename TKLocations>
-int fm_map(IOConfig const & io_cfg, PrimerConfig const & primer_cfg, TKLocations & locations)
+int fm_map(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & locations)
 {
     std::string const s1 = io_cfg.get_index_dir().string();
     std::string const s2 = io_cfg.get_mapping_dir().string();
@@ -97,11 +96,11 @@ int fm_map(IOConfig const & io_cfg, PrimerConfig const & primer_cfg, TKLocations
             "--csvRAM", "-fl"};
 
         mappabilityMain<TLocations>(11, argv, loc_per_K, primer_cfg.get_digamma());
-        TKLocations::iterator it_hint = locations.begin();
+        typename TKLocations::iterator it_hint = locations.begin();
         // inserting map pair using hint
         for (auto it = loc_per_K.begin(); it != loc_per_K.end(); ++it)
         {
-            TKLocation const key = std::make_tuple(seqan::getValueI1<TSeqNo, TSeqPos>(it->first), seqan::getValueI2<TSeqNo, TSeqPos>(it->first), K);
+            TKLocationsKey const key = std::make_tuple(seqan::getValueI1<TSeqNo, TSeqPos>(it->first), seqan::getValueI2<TSeqNo, TSeqPos>(it->first), K);
             TKLocationsValue const value = it->second;
             it_hint = locations.insert(it_hint, std::pair<TKLocationsKey, TKLocationsValue>(key, value));
         }

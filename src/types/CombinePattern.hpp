@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "PrimerConfig.hpp"
+
 namespace priset
 {
 

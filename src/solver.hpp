@@ -18,12 +18,9 @@
 #include <unordered_map>
 #include <vector>
 
-// #include "argument_parser.hpp"
 #include "filter.hpp"
 #include "fm.hpp"
 #include "types/all.hpp"
-#include "solver_fast.hpp"
-#include "solver_brute_force.hpp"
 #include "utilities.hpp"
 
 namespace fs = std::experimental::filesystem;
@@ -32,7 +29,7 @@ using namespace priset;
 
 struct Solver
 {
-private:
+public:
 
     // Stores for each reference the encoded kmers in order of occurrence.
     using TKmerIDs = std::vector<std::deque<TKmerID>>;
@@ -46,49 +43,57 @@ private:
     using TKLocations = std::map<TKLocation,
             std::pair<std::vector<TLocation>, std::vector<TLocation>>>;
 
-    // Container type for storing a group of primer_set_size primers.
-    using ResultGroup = std::vector<Result>;
-
-    // Container type for storing list of result groups.
-    using ResultGroups = std::vector<ResultGroup>;
-
-    // The result groups.
-    ResultGroups result_groups;
-
-
     // Translates sequences identifiers (seqNo) in use to a contiguous range (seqNo_cx).
+    using TSeqNoMap = std::unordered_map<TSeqNo, TSeqNo>;
+
+    // The container type for groups. template<typename TSeqNoMap>
+    using Groups = std::vector<Group<TSeqNoMap>>;
+
+    // The container type for unpacked pairs.
+    using PrimerPairUnpackedList = std::vector<PrimerPairUnpacked<TSeqNoMap>>;
+
+
+private:
+    // K-Mer location map.
+    TKLocations locations;
+
     // Dictionary is bidirectional: seqNo -> seqNo_cx and inverse add a leading one
     // to the compressed key: (1 << 63 | seqNo_cx) -> seqNo.
     // Background: some sequences produce no k-mers and therefore no space should be
     // reserved in its bit transformation.
-    using TSeqNoMap = std::unordered_map<TSeqNo, TSeqNo>;
+    TSeqNoMap seqNo_map;
+
+    // The container for groups.
+    Groups groups;
+
+    // The container for PrimerPairUnpacked.
+    PrimerPairUnpackedList pairs_unpacked;
 
     // Stores for each sequence its assigned taxon. The index corresponds to the
-    // continuous range of sequence identifiers accessable via the seqNoMap.
+    // continuous range of sequence identifiers accessable via the seqNo_map.
     std::vector<Taxid> taxa_by_seqNo_cx;
 
-    // Reference to io configurator.
-    IOConfig & io_cfg;
+    std::vector<size_t> & primerIDs();
 
-    // Reference to primer configurator.
-    PrimerConfig const & primer_cfg;
-
-    vector<size_t> & primerIDs;
-
-    // vector<vector<bool>> & solutions;  // optimal primer combination
     size_t C_max{0};              // maximal score
 
-    // Map of sorted solution indices. key = size, value = solution index.
-    std::map<size_t, size_t> results_srtd;
+    // Map of sorted result group indices. key = size, value = index in groups list.
+    std::map<size_t, size_t> group_idcs_srtd;
+
+    // State variable for looping over results, either groups or sorted groups.
+    using State = std::pair<size_t, decltype(std::crbegin(group_idcs_srtd))>;
+
+    // State variable for iterating over results.
+    State state{0, std::crbegin(group_idcs_srtd)};
+
+    // Flag indicating if indices in group_idcs_srtd represent sorting by coverage.
+    bool is_srtd_by_coverage{false};
+
+    // Flag indicating if indices in group_idcs_srtd represent sorting by frequency.
+    bool is_srtd_by_frequency{false};
 
     // K-mer counts at each step for analysis purposes.
     uint64_t kmer_counts[4] = {};
-
-    // State variable for looping over results, either solutions or sorted solutions.
-    std::pair<size_t, std::map<size_t, size_t>> state{0, solutions.rbegin()};
-
-    // K-Mer location map.
-    TKLocations locations;
 
     // TDirectoryInformation directoryInformation;
 
@@ -98,97 +103,101 @@ private:
     // The lengths of the reference sequences.
     TSequenceLengths sequenceLengths;
 
+
 public:
+
+    // Reference to io configurator.
+    IOConfig & io_cfg;
+
+    // Reference to primer configurator.
+    PrimerConfig & primer_cfg;
+
     Solver(IOConfig & _io_cfg, PrimerConfig & _primer_cfg) :
     io_cfg(_io_cfg), primer_cfg(_primer_cfg) {}
 
-    virtual solve();
-
-    void set_solutions(std::vector<ResultList> const & _solutions)
+    virtual void solve()
     {
-        solutions = _solutions;
+        std::cerr << "Missing implementation of void solve() in your derived class!" << std::endl;
+    };
+
+    template<typename TSeqNoMap>
+    void add_group(Group<TSeqNoMap> const & group) noexcept
+    {
+        groups.push_back(group);
     }
 
+    // Sort result groups by taxonomic coverage.
     void sort_results_by_coverage()
     {
-        for (size_t id = 0; id < solutions.size(); ++id)
-        {
-            std::unordered_set<uint64_t> taxon_set;
-            for (Result result : solutions[id])
-            {
-                std::vector<uint64_t> taxa = result.get_taxa();
-                taxon_set.insert(taxa.begin(), taxa.end());
-            }
-            results_srtd[taxon_set.size()] = id;
-        }
+        group_idcs_srtd.clear();
+        for (size_t i = 0; i < groups.size(); ++i)
+            group_idcs_srtd[groups[i].get_taxa_count()] = i;
+        is_srtd_by_coverage = true;
+        is_srtd_by_frequency = false;
     }
 
-    //
+    // Sort result groups by their frequency w.r.t. distinct sequences they match.
     void sort_results_by_frequency()
     {
-        for (size_t id = 0; id < solutions.size(); ++id)
-        {
-            std::unordered_set<uint64_t> ref_set;
-            for (Result result : solutions[id])
-            {
-                std::vector<uint64_t> refs = result.get_references();
-                taxa_set.insert(refs.begin(), refs.end());
-            }
-            results_srtd[ref_set.size()] = id;
-        }
+        group_idcs_srtd.clear();
+        for (size_t i = 0; i < groups.size(); ++i)
+            group_idcs_srtd[groups[i].get_sequence_count()] = i;
+        is_srtd_by_coverage = false;
+        is_srtd_by_frequency = true;
     }
 
     // Get result output header for csv output
-    constexpr std::string get_header() const noexcept
+    const std::string get_header() const noexcept
     {
         return "#name, forward (5'-3'), Tm_fwd, CG_fwd, reverse (5'-3'), Tm_rev, \
         CG_rev, coverage, frequency, [taxa]\n";
     }
 
-    std::pair<bool, ResultList> get_next_result()
+    std::pair<bool, Group<TSeqNoMap>> get_next_result()
     {
-        if (results_srtd.size())
+        if (group_idcs_srtd.size())
         {
-            if (state.second == results_srtd.rend())
-                return pair<bool, ResultList>{false, ResultList(0)};
-            return pair<bool, ResultList>{true, solutions.at(state.second++)};
+            if (state.second == group_idcs_srtd.rend())
+                return std::pair<bool, Group<TSeqNoMap>>{false, Group<TSeqNoMap>()};
+            std::pair<bool, Group<TSeqNoMap>> p{true, groups.at((state.second++)->second)};
+            // ++state.second;
+            return p;
         }
-        if (state == results.size())
-            return pair<bool, ResultList>{false, ResultList(0)};
-        return pair<bool, ResultList>{true, results.at(state.first++)};
-        }
+        if (state.first == groups.size())
+            return std::pair<bool, Group<TSeqNoMap>>{false, Group<TSeqNoMap>()};
+        return std::pair<bool, Group<TSeqNoMap>>{true, groups.at(state.first++)};
+
     }
 
     std::string generate_statistics()
     {
         std::string info = "Frequency Step,Transform and Filter Step,Combine Step,Pair Filter Step\n";
-        info += to_string(kmer_counts[0]) + "," + to_string(kmer_counts[1]) + ",";
-        info += to_string(kmer_counts[2]) + "," + to_string(kmer_counts[3]) + ",";
+        info += std::to_string(kmer_counts[0]) + "," + std::to_string(kmer_counts[1]) + ",";
+        info += std::to_string(kmer_counts[2]) + "," + std::to_string(kmer_counts[3]) + ",";
         return info;
     }
 
     bool generate_table()
     {
-        state{0, solutions.rbegin()};
-        auto [success, result] = get_next_result();
-        ofstream ofs;
+        state = State{0, groups.crbegin()};
+        auto [success, group] = get_next_result();
+        std::ofstream ofs;
         ofs.open(io_cfg.get_result_file());
         while (success)
         {
-            ofs << result.to_string();
-            auto [success, result] = get_next_result();
+            ofs << group.to_string();
+            auto [success, group] = get_next_result();
         }
         ofs.close();
         std::cout << "INFO: output written to " << io_cfg.get_result_file() << std::endl;
         return true;
     }
 
-private:
     // copy app code here
     void run()
     {
         // 1. Optional index computation
-        if (!io_cfg.skip_idx_flag)
+        if (!io_cfg.skip_FM_idx())
             fm_index(io_cfg);
 
         // 2. k-mer frequency computation
@@ -197,45 +206,66 @@ private:
         // 3. Transform and filter pairs.
         TReferences references;
         TKmerIDs kmerIDs;
-        TSeqNoMap seqNoMap;
 
-        transform_and_filter<TKLocations, TSeqNoMap, TKmerIDs>(io_cfg, locations, references, seqNoMap, kmerIDs, taxa_by_seqNo_cx, kmer_counts);
+        transform_and_filter<TKLocations, TSeqNoMap, TKmerIDs>(io_cfg, primer_cfg, locations, references, seqNo_map, kmerIDs, taxa_by_seqNo_cx, kmer_counts);
 
         // 4. Combine frequent k-mers to form pairs reference-wise.
         // Container type for storing Pairs.
-        using PairList = vector<Pair<CombinePattern<TKmerID, TKmerLength>>>;
-        PairList pairs;
-        combine<PairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
+        using PrimerPairC = PrimerPair<CombinePattern<TKmerID, TKmerLength>>;
+        using PrimerPairList = std::vector<PrimerPairC>;
+        PrimerPairList pairs;
+        combine<PrimerPairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
 
         // 5. Filter and unpack
-        using PairUnpackedList = std::vector<PairUnpacked>;
-        PairUnpackedList pairs_unpacked;
-        filter_and_unpack_pairs<TKmerIDs, PairList, PairUnpackedList>(primer_cfg, kmerIDs, pairs, pairs_unpacked);
+        filter_and_unpack_pairs<TSeqNoMap, TKmerIDs, PrimerPairList, PrimerPairUnpackedList>(primer_cfg, kmerIDs, pairs, pairs_unpacked);
 
     }
 
     bool as_groups()
     {
-        if (!pairs_packed.size())
+        if (!pairs_unpacked.size())
             return false;
-        std::transform(pairs_unpacked.cbegin(), pairs_unpacked.cend(), result_groups.begin(), [](Pair & pair){return std::vector{pair};});
+        std::transform(pairs_unpacked.cbegin(), pairs_unpacked.cend(), groups.begin(), [&](PrimerPairUnpacked<TSeqNoMap> & p)
+            {return Group{io_cfg, seqNo_map, p};});
         return true;
+    }
+
+    // greedy grouping by clustering first primer_set_size primers sorted by coverage.
+    virtual bool group_by_max_coverage()
+    {
+        groups.clear();
+        sort(pairs_unpacked.begin(), pairs_unpacked.end(),
+        [](PrimerPairUnpacked<TSeqNoMap> const & p, PrimerPairUnpacked<TSeqNoMap> const & q)
+            {return p.get_coverage() < q.get_coverage();});
+        for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
+            groups.push_back(Group{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()});
+
+    }
+
+    // greedy grouping by clustering first primer_set_size primers sorted by coverage.
+    virtual bool group_by_max_frequency()
+    {
+        groups.clear()
+        sort(pairs_unpacked.begin(), pairs_unpacked.end(),
+        [](PrimerPairUnpacked<TSeqNoMap> const & p, PrimerPairUnpacked<TSeqNoMap> const & q)
+            {return p.get_frequency() < q.get_frequency();});
+        for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
+            groups.push_back(Group{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()});
     }
 
     // // TODO: continue here
     // // 6. Maximize for coverage
     // using Groups = std::vector<Group>;
     // Groups groups;
-    // optimize_coverage<PairList, Groups>(io_cfg, primer_cfg, pairs_unpacked, groups, kmer_counts);
+    // optimize_coverage<PrimerPairList, Groups>(io_cfg, primer_cfg, pairs_unpacked, groups, kmer_counts);
     //
     // // 7. Filter pairs.
     // // TODO: rewrite  filter_pairs to work with pair_freqs
-    // using PairGroupsUnpack =
-    // filter_groups<TKmerIDs, PairGroups, PairGroupsUnpack>(primer_cfg, references, kmerIDs, pairs_grouped, pairs_unpacked_grouped, kmer_counts);
+    // using PrimerPairGroupsUnpack =
+    // filter_groups<TKmerIDs, PrimerPairGroups, PrimerPairGroupsUnpack>(primer_cfg, references, kmerIDs, pairs_grouped, pairs_unpacked_grouped, kmer_counts);
     //
     // // 8. convert groups containing KMerID encoded pairs into DNA sequences
-    // ResultList results;
-    // retransform<ResultList>(pairs_unpacked_grouped, results);
-
+    // Group results;
+    // retransform<Group>(pairs_unpacked_grouped, results);
 
 };

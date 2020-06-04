@@ -17,14 +17,12 @@
 #include "Errors.hpp"
 #include "simple_types.hpp"
 
-
 namespace fs = std::experimental::filesystem;
 
 namespace priset
 {
 
 #define MAX_PATH_LENGTH 100
-
 
 // TODO: rename to io_configurator, instance are then called io_configuration
 struct IOConfig
@@ -47,7 +45,7 @@ public:
     IOConfig & operator=(IOConfig && rhs) = default;
 
     // Set library and working directory paths.
-    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const idx_only_flag_, bool const skip_idx_flag_)
+    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const idx_only_flag_, bool const skip_FM_index_)
     {
         lib_dir = fs::canonical(lib_dir_);
         work_dir = fs::canonical(work_dir_);
@@ -60,7 +58,7 @@ public:
         }
 
         idx_only_flag = idx_only_flag_;
-        skip_idx_flag = skip_idx_flag_;
+        skip_FM_index = skip_FM_index_;
         index_dir = work_dir;
         mapping_dir = work_dir;
         // TODO: path to PriSeT git repos as argument
@@ -120,13 +118,13 @@ public:
 
         // set output directory for FM index, will be created by genmap
         index_dir /= fs::path("/index");
-        if (skip_idx_flag && !fs::exists(index_dir))
+        if (skip_FM_index && !fs::exists(index_dir))
         {
             std::cerr << "ERROR: Index computation flag is set to 0, but index_dir (" << index_dir << ") does not exists!" << std::endl;
             exit(-1);
         }
 
-        if (!skip_idx_flag && fs::exists(index_dir))
+        if (!skip_FM_index && fs::exists(index_dir))
         {
             char cmd[50];
             sprintf(cmd, "rm -r %s", index_dir.c_str());
@@ -180,9 +178,9 @@ public:
     }
 
     // Return skip_idx flag.
-    bool skip_idx() const noexcept
+    bool skip_FM_idx() const noexcept
     {
-        return skip_idx_flag;
+        return skip_FM_index;
     }
 
     // Return accession file with absolute path as filesystem::path object.
@@ -290,13 +288,22 @@ public:
         return work_dir;
     }
 
+    // Get taxid given an uncompressed sequence number.
+    Taxid get_taxid_by_seqNo(TSeqNo seqNo)
+    {
+        return acc2taxid_map.at(seqNo2acc_map.at(seqNo));
+    }
+
 private:
     // Directory that contains library, taxonomy, and taxid to accession files.
     fs::path lib_dir;
+
     // Working base directory for storing FM indices, mappings and results.
     fs::path work_dir;
+
     // Flag for indicating if index computation shall be skipped (because it already exists).
-    bool skip_idx_flag{0};
+    bool skip_FM_index{0};
+
     // Flag for indicating to do index computation exclusively.
     bool idx_only_flag{0};
     // Taxid to accession map in csv format (set by PriSeT).
