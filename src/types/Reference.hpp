@@ -68,4 +68,5 @@ private:
     //!\brief List of sequences associated to the accessions.
     std::vector<sequence_type> _sequences;
 };
+
 } // priset

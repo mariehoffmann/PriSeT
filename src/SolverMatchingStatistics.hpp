@@ -1,8 +1,8 @@
 #pragma once
 
-#include "solver.hpp"
+#include "Solver.hpp"
 
-struct solver_matchting_statistics : solver
+struct SolverMatchtingStatistics : Solver
 {
 
     std::vector<std::vector<Result>> results;
@@ -12,6 +12,6 @@ struct solver_matchting_statistics : solver
         run();
 
         // set results
-        solver::set_results(results);
+        Solver::set_results(results);
     }
 };

@@ -31,7 +31,7 @@ namespace priset
 {
 
 std::string dna_decoder(uint64_t code, uint64_t const mask);
-std::string dna_decoder(uint64_t code);
+// std::string dna_decoder(uint64_t code);
 
 // Identify highest set bit without loop
 // TODO: cmp number of CPU cycles with fct for leading zeros (+1)
@@ -65,7 +65,8 @@ extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
 }
 
 // Execute in terminal and collect command return value.
-std::string exec(char const * cmd) {
+std::string exec(char const * cmd)
+{
     std::cout << "Enter util.exec with cmd = " << std::string(cmd) << std::endl;
     std::array<char, 128> buffer;
     std::string result;
@@ -170,7 +171,7 @@ std::string bits2str(uint_type i)
 // Represent TKmerID as string with length bit prefix and dna suffix.
 std::string kmerID2str(TKmerID kmerID)
 {
-    return bits2str(kmerID >> 54) + "|" + dna_decoder(kmerID);
+    return bits2str(kmerID >> 54) + "|" + dna_decoder(kmerID, 0);
 }
 
 template<typename PairList, typename TKmerIDs>
@@ -186,8 +187,8 @@ void print_combinations(TKmerIDs const & kmerIDs, PairList const & pairs) noexce
         std::cout << pair.reference << "\t | " << kmerID_fwd << "\t | " << kmerID_rev << "\t| ";
         std::vector<std::pair<uint8_t, uint8_t>> combinations;
         pair.cp.get_combinations(combinations);
-        TSeq kmer_fwd = dna_decoder(kmerID_fwd);
-        TSeq kmer_rev = dna_decoder(kmerID_rev);
+        TSeq kmer_fwd = dna_decoder(kmerID_fwd, 0);
+        TSeq kmer_rev = dna_decoder(kmerID_rev, 0);
 
         for (auto lc : combinations)
         {

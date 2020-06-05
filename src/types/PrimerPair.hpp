@@ -44,7 +44,7 @@ template<typename TSeqNoMap>
 struct PrimerPairUnpacked
 {
     PrimerPairUnpacked() = default;
-    PrimerPairUnpacked(IOConfig & _io_cfg, TSeqNoMap const & _seqNo_map, std::vector<bool> const & _seqNo_cx_vector) : io_cfg(_io_cfg), seqNo_map(_seqNo_map), seqNo_cx_vector(_seqNo_cx_vector)
+    PrimerPairUnpacked(IOConfig & _io_cfg, TSeqNoMap const & _seqNo_map, std::vector<bool> & _seqNo_cx_vector) : io_cfg(_io_cfg), seqNo_map(_seqNo_map), seqNo_cx_vector(_seqNo_cx_vector)
     {
         for (TSeqNo seqNo_cx = 0; seqNo_cx < seqNo_cx_vector.size(); ++seqNo_cx)
         {
@@ -54,7 +54,7 @@ struct PrimerPairUnpacked
             TSeqNo seqNo = seqNo_map.at((1ULL << 63) | seqNo_cx);
             taxid_set.insert(io_cfg.get_taxid_by_seqNo(seqNo));
         }
-    };
+    }
 
     // Set flag in reference vector if this pair has a match in a reference
     // with ID = seqNo_cx.

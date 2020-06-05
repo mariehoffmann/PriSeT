@@ -1,7 +1,7 @@
 
 
 
-struct solver_brute_force : solver
+struct SolverBruteForce : Solver
 {
 private:
     vector<bitset<4>> C,

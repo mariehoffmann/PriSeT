@@ -20,7 +20,7 @@ namespace priset
     using TStringSet = seqan::StringSet<TString, seqan::Owner<seqan::ConcatDirect<SizeSpec_<priset::TSeqNo, TSeqPos>>>>;
 
     // The index type. TBiIndexConfig is defined in genmap/src/common.hpp.
-    using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig> >;
+    using TIndex = seqan::Index<TStringSet, TBiIndexConfig<TFMIndexConfig>>;
 
     // The DNA sequence type.
     using TSeq = seqan::String<priset::dna>;

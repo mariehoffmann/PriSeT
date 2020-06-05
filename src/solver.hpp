@@ -25,11 +25,14 @@
 
 namespace fs = std::experimental::filesystem;
 
-using namespace priset;
+namespace priset
+{
 
 struct Solver
 {
-public:
+    // Constructor with member variable setting.
+    Solver(IOConfig & _io_cfg, PrimerConfig _primer_cfg) :
+        io_cfg(_io_cfg), primer_cfg(_primer_cfg) {}
 
     // Stores for each reference the encoded kmers in order of occurrence.
     using TKmerIDs = std::vector<std::deque<TKmerID>>;
@@ -166,7 +169,6 @@ public:
         if (state.first == groups.size())
             return std::pair<bool, Group<TSeqNoMap>>{false, Group<TSeqNoMap>()};
         return std::pair<bool, Group<TSeqNoMap>>{true, groups.at(state.first++)};
-
     }
 
     std::string generate_statistics()
@@ -179,7 +181,7 @@ public:
 
     bool generate_table()
     {
-        state = State{0, groups.crbegin()};
+        state = State{0, std::crbegin(group_idcs_srtd)};
         auto [success, group] = get_next_result();
         std::ofstream ofs;
         ofs.open(io_cfg.get_result_file());
@@ -217,7 +219,7 @@ public:
         combine<PrimerPairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
 
         // 5. Filter and unpack
-        filter_and_unpack_pairs<TSeqNoMap, TKmerIDs, PrimerPairList, PrimerPairUnpackedList>(primer_cfg, kmerIDs, pairs, pairs_unpacked);
+        filter_and_unpack_pairs<TSeqNoMap, TKmerIDs, PrimerPairList, PrimerPairUnpackedList>(io_cfg, primer_cfg, seqNo_map, kmerIDs, pairs, pairs_unpacked);
 
     }
 
@@ -226,31 +228,36 @@ public:
         if (!pairs_unpacked.size())
             return false;
         std::transform(pairs_unpacked.cbegin(), pairs_unpacked.cend(), groups.begin(), [&](PrimerPairUnpacked<TSeqNoMap> & p)
-            {return Group{io_cfg, seqNo_map, p};});
+            {return Group<TSeqNoMap>{io_cfg, seqNo_map, p};});
         return true;
     }
 
     // greedy grouping by clustering first primer_set_size primers sorted by coverage.
     virtual bool group_by_max_coverage()
     {
+        if (!pairs_unpacked.size())
+            return false;
         groups.clear();
         sort(pairs_unpacked.begin(), pairs_unpacked.end(),
-        [](PrimerPairUnpacked<TSeqNoMap> const & p, PrimerPairUnpacked<TSeqNoMap> const & q)
+        [](PrimerPairUnpacked<TSeqNoMap> & p, PrimerPairUnpacked<TSeqNoMap> & q)
             {return p.get_coverage() < q.get_coverage();});
         for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
-            groups.push_back(Group{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()});
-
+            groups.push_back(Group<TSeqNoMap>{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()}});
+        return true;
     }
 
     // greedy grouping by clustering first primer_set_size primers sorted by coverage.
     virtual bool group_by_max_frequency()
     {
-        groups.clear()
+        if (!pairs_unpacked.size())
+            return false;
+        groups.clear();
         sort(pairs_unpacked.begin(), pairs_unpacked.end(),
-        [](PrimerPairUnpacked<TSeqNoMap> const & p, PrimerPairUnpacked<TSeqNoMap> const & q)
+        [](PrimerPairUnpacked<TSeqNoMap> & p, PrimerPairUnpacked<TSeqNoMap> & q)
             {return p.get_frequency() < q.get_frequency();});
         for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
-            groups.push_back(Group{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()});
+            groups.push_back(Group<TSeqNoMap>{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()}});
+        return true;
     }
 
     // // TODO: continue here
@@ -269,3 +276,5 @@ public:
     // retransform<Group>(pairs_unpacked_grouped, results);
 
 };
+
+} // namespace priset

@@ -20,7 +20,7 @@ namespace priset
 
 // Filter of single kmers and transform of references to bit vectors.
 template<typename TKLocations, typename TSeqNoMap, typename TKmerIDs>
-void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNoMap, TKmerIDs & kmerIDs, std::vector<Taxid> & taxa_by_seqNo_cx, uint64_t * kmerCounts = nullptr)
+void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & locations, TReferences & references, TSeqNoMap & seqNo_map, TKmerIDs & kmerIDs, std::vector<Taxid> & taxa_by_seqNo_cx, uint64_t * kmerCounts = nullptr)
 {
     // uniqueness indirectly preserved by (SeqNo, SeqPos) if list sorted lexicographically
     assert(length(locations));
@@ -75,20 +75,20 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
     // store seqNo -> seqNo_cx and (1<<63 | seqNo_cx) -> seqNo (we never have more than 2^63 sequences)
     for (TSeqNo seqNo : seqNos)
     {
-        seqNoMap[seqNo] = seqNo_cx++;
-        seqNoMap[ONE_LSHIFT_63 | seqNoMap[seqNo]] = seqNo;
+        seqNo_map[seqNo] = seqNo_cx++;
+        seqNo_map[ONE_LSHIFT_63 | seqNo_map[seqNo]] = seqNo;
         // std::cout << seqNo << " ";
         // TODO: is seqNo 0-based?
-        Accession acc = io_cfg.seqNo2acc_map.at(seqNo);
+        Accession acc = io_cfg.get_seqNo_by_accession(seqNo); //seqNo2acc_map.at(seqNo);
         // [taxid_seq0, taxid_seq1, ...]
-        taxa_by_seqNo_cx.push_back(io_cfg.acc2taxid_map.at(acc));
+        taxa_by_seqNo_cx.push_back(io_cfg.get_taxid_by_accession(acc)); //acc2taxid_map.at(acc));
     }
     std::cout << std::endl;
 
     // (ii) Create bit vectors in the length of largest kmer occurences, and set
     // bits for kmer occurrences. Collect also kmer lengths encoded in final kmer
     // code of type uint64_t. Final sequence lookup and encoding is done in next step.
-    // seqNoMap.clear();
+    // seqNo_map.clear();
 
     // reserve space for bit vectors
     references.resize(seqNo2maxPos.size());
@@ -97,7 +97,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
     {
         // std::cout << "resize bit vector for seqNo = " << it->first << std::endl;
         sdsl::bit_vector bv(it->second + 1, 0);
-        references[seqNoMap[it->first]] = bv;
+        references[seqNo_map[it->first]] = bv;
     }
 
     std::cout << "STATUS: bit vector reference assignment done\n";
@@ -137,28 +137,28 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
             // std::cout << "a1\n";
             TSeqNo seqNo = seqan::getValueI1<TSeqNo, TSeqPos>(*it_loc_fwd);
             TSeqPos seqPos = seqan::getValueI2<TSeqNo, TSeqPos>(*it_loc_fwd);
-            // if (seqNoMap.find(seqNo) == seqNoMap.end())
-            //     std::cout << "ERROR: cannot find seqNo = " << seqNo << " in seqNoMap\n";
-            // auto seqNo_cx = seqNoMap.at(seqNo); // compressed sequence id
+            // if (seqNo_map.find(seqNo) == seqNo_map.end())
+            //     std::cout << "ERROR: cannot find seqNo = " << seqNo << " in seqNo_map\n";
+            // auto seqNo_cx = seqNo_map.at(seqNo); // compressed sequence id
             // continue and delete previous bit if same kmer occurs within 400 bp
             if (it_loc_fwd > it->second.first.begin() && seqNo_prev == seqNo && seqPos_prev + TRAP_DIST >= seqPos)
             {
                 seqan::DnaString seq = seqan::valueById(text, seqNo);
                 // undo previous kmer bit in reference
-                references[seqNoMap[seqNo]][seqPos_prev] = 0;
+                references[seqNo_map[seqNo]][seqPos_prev] = 0;
                 seqPos_prev = seqPos;
                 debug_drop_kmer_repeats[seqNo]++;
                 continue;
             }
-            if (references.size() <= seqNoMap[seqNo] || references[seqNoMap[seqNo]].size() <= seqPos)
+            if (references.size() <= seqNo_map[seqNo] || references[seqNo_map[seqNo]].size() <= seqPos)
             {
-                if (references.size() > seqNoMap[seqNo])
-                    std::cout << "seqPos = " << seqPos << " and references[seqNo].size() = " << references[seqNoMap[seqNo]].size() << std::endl;
+                if (references.size() > seqNo_map[seqNo])
+                    std::cout << "seqPos = " << seqPos << " and references[seqNo].size() = " << references[seqNo_map[seqNo]].size() << std::endl;
                 exit(0);
             }
-            references[seqNoMap[seqNo]][seqPos] = 1;
+            references[seqNo_map[seqNo]][seqPos] = 1;
             // std::cout << "a10\n";
-            uint64_t loc_key = location_encode(seqNoMap[seqNo], seqPos);
+            uint64_t loc_key = location_encode(seqNo_map[seqNo], seqPos);
             uint64_t loc_val = ONE_LSHIFT_63 >> (K - PRIMER_MIN_LEN); // later prefix of kmerID
             // locations filled for K_min to K_max
             if (loc2k.find(loc_key) == loc2k.end())
@@ -184,7 +184,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
         for (unsigned r = r1s.rank(references[seqNo_cx].size()); r > 0; --r)
         {
             TSeqPos seqPos = s1s.select(r);
-            // TODO: use seqNoMap for all seqNo occurrences
+            // TODO: use seqNo_map for all seqNo occurrences
             uint64_t loc_key = location_encode(seqNo_cx, seqPos);
 
             if (loc2k.find(loc_key) == loc2k.end())
@@ -199,7 +199,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
             TKmerLength k_max = PRIMER_MAX_LEN - ffsll(kmerID >> 54) + 1;
 
             // lookup sequence in corpus and encode
-            seqan::DnaString seq = seqan::valueById(text, seqNoMap[ONE_LSHIFT_63 | seqNo_cx]);
+            seqan::DnaString seq = seqan::valueById(text, seqNo_map[ONE_LSHIFT_63 | seqNo_cx]);
             TSeq const & kmer_str = seqan::infixWithLength(seq, seqPos, k_max);
             kmerID |= dna_encoder(kmer_str);
 
@@ -289,21 +289,23 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
 
 // Filter pairs by frequency and unpack PrimerPair -> PrimerPairUnpacked
 template<typename TSeqNoMap, typename TKmerIDs, typename PrimerPairList, typename PrimerPairUnpackedList>
-void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & kmerIDs, PrimerPairList const & pairs, PrimerPairUnpackedList & pairs_unpacked)
+void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqNoMap const & seqNo_map, TKmerIDs const & kmerIDs, PrimerPairList const & pairs, PrimerPairUnpackedList & pairs_unpacked)
 {
-    std::unordered_map<std::string, uint32_t> pair2freq;
+    std::unordered_map<std::string, std::vector<bool>> pair2seqNo_cx_vector;
     std::unordered_map<uint64_t, std::string> primers_memoized;
+
 
     auto pair_key = [](std::string const & p1, std::string const & p2) -> std::string
         {return p1 + "_" + p2;};
     std::cout << "STATUS: Enter filter_pairs ...\n";
     // count unique pairs
-    for (auto it_pairs = pairs.cbegin(); it_pairs != pairs.cend(); ++it_pairs)
+    for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
     {
+        TSeqNo seqNo_cx = it_pairs->seqNo_cx;
         std::vector<std::pair<uint8_t, uint8_t>> combinations;
         it_pairs->cp.get_combinations(combinations);
-        TKmerID kmerID_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
-        TKmerID kmerID_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
+        TKmerID kmerID_fwd = kmerIDs.at(it_pairs->seqNo_cx).at(it_pairs->r_fwd - 1);
+        TKmerID kmerID_rev = kmerIDs.at(it_pairs->seqNo_cx).at(it_pairs->r_rev - 1);
 
         for (auto comb : combinations)
         {
@@ -318,9 +320,11 @@ void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & k
                 primers_memoized[code_rev] = primer_rev;
 
             std::string key = pair_key(primer_fwd, primer_rev);
-            if (!pair2freq.count(key))
-                pair2freq[key] = 0;
-            ++pair2freq[key];
+            if (!pair2seqNo_cx_vector.count(key))
+                pair2seqNo_cx_vector[key] = std::vector<bool>(0, seqNo_cx);
+            else if (seqNo_cx >= pair2seqNo_cx_vector.at(key))
+                pair2seqNo_cx_vector[key].resize(0, seqNo_cx + 1);
+            pair2seqNo_cx_vector[key] = 1;
         }
     }
 
@@ -339,13 +343,12 @@ void filter_and_unpack_pairs(PrimerConfig const & primer_cfg, TKmerIDs const & k
             uint64_t code_rev = get_code(kmer_rev, ONE_LSHIFT_63 >> comb.second);
 
             std::string key = pair_key(primers_memoized[code_fwd], primers_memoized[code_rev]);
-
-            if (pair2freq.at(key) >= primer_cfg.get_digamma_pairs())
+            size_t bit_count = std::accumulate(pair2seqNo_cx_vector.at(key).begin(), pair2seqNo_cx_vector.at(key).end(), 0);
+            if (bit_count >= primer_cfg.get_digamma_pairs())
             {
                 if (!seen_and_index.count(key))
                 {
-                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{pair2freq.at(key)};
-
+                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{io_cfg, seqNo_map, pair2seqNo_cx_vector.at(key)};
                     pairs_unpacked.push_back({pair_unpacked});
                     seen_and_index[key] = pairs_unpacked.size() - 1;
                 }

@@ -288,8 +288,18 @@ public:
         return work_dir;
     }
 
+    Accession get_seqNo_by_accession(TSeqNo const seqNo) const
+    {
+        return seqNo2acc_map.at(seqNo);
+    }
+
+    Taxid get_taxid_by_accession(Accession acc) const
+    {
+        return acc2taxid_map.at(acc);
+    }
+
     // Get taxid given an uncompressed sequence number.
-    Taxid get_taxid_by_seqNo(TSeqNo seqNo)
+    Taxid get_taxid_by_seqNo(TSeqNo seqNo) const
     {
         return acc2taxid_map.at(seqNo2acc_map.at(seqNo));
     }
@@ -432,5 +442,7 @@ private:
         }
     }
 };
+
+IOConfig NULL_IOConfig = IOConfig{};
 
 } // namespace priset
