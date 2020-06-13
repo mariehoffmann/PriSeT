@@ -106,7 +106,7 @@ int main(/*int argc, char ** argv*/)
     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
-    using TPairList = TPairList<TPair<CombinePattern<TKmerID, TKmerLength>>>;
+    using TPairList = TPairList<TPair<CombinePattern>>;
     TPairList pairs;
 
     combine<TPairList>(references, kmerIDs, pairs, kmerCounts);
@@ -121,7 +121,7 @@ int main(/*int argc, char ** argv*/)
         std::srand(std::time(nullptr) + i);
         uint idx = std::rand() % pairs.size();
         std::cout << "sampled pair index: " << idx << std::endl;
-        TPair<CombinePattern<TKmerID, TKmerLength>> pair = pairs.at(idx);
+        TPair<CombinePattern> pair = pairs.at(idx);
         TKmerID kmer_fwd = kmerIDs[pair.reference][pair.r_fwd];
         TKmerID kmer_rev = kmerIDs[pair.reference][pair.r_rev];
         if (pair.cp.none())

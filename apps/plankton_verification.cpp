@@ -212,7 +212,7 @@
 //
 //             for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
 //             {
-//                 CombinePattern<TKmerID, TKmerLength> cp;
+//                 CombinePattern cp;
 //                 uint64_t mask_fwd = ONE_LSHIFT_63;
 //                 while ((((mask_fwd - 1) << 1) & kmerID_fwd) >> 54)
 //                 {
@@ -241,7 +241,7 @@
 //                 } // length mask_fwd
 //
 //                 if (cp.is_set())
-//                     pairs.push_back(Pair<CombinePattern<TKmerID, TKmerLength>>{seqNo, r_fwd, r_rev, cp});
+//                     pairs.push_back(Pair<CombinePattern>{seqNo, r_fwd, r_rev, cp});
 //             } // kmerID rev
 //         } // kmerID fwd
 //     }
@@ -300,7 +300,7 @@
 //     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 //
 //     // TODO: delete locations
-//     using PairList = PairList<Pair<CombinePattern<TKmerID, TKmerLength>>>;
+//     using PairList = PairList<Pair<CombinePattern>>;
 //     PairList pairs;
 //
 //     std::unordered_set<std::string> verified;

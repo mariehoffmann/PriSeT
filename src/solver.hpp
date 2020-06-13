@@ -30,6 +30,12 @@ namespace priset
 
 struct Solver
 {
+    // Reference to io configurator.
+    IOConfig & io_cfg;
+
+    // Reference to primer configurator.
+    PrimerConfig & primer_cfg;
+
     // Constructor with member variable setting.
     Solver(IOConfig & _io_cfg, PrimerConfig _primer_cfg) :
         io_cfg(_io_cfg), primer_cfg(_primer_cfg) {}
@@ -106,17 +112,7 @@ private:
     // The lengths of the reference sequences.
     TSequenceLengths sequenceLengths;
 
-
 public:
-
-    // Reference to io configurator.
-    IOConfig & io_cfg;
-
-    // Reference to primer configurator.
-    PrimerConfig & primer_cfg;
-
-    Solver(IOConfig & _io_cfg, PrimerConfig & _primer_cfg) :
-    io_cfg(_io_cfg), primer_cfg(_primer_cfg) {}
 
     virtual void solve()
     {
@@ -213,7 +209,7 @@ public:
 
         // 4. Combine frequent k-mers to form pairs reference-wise.
         // Container type for storing Pairs.
-        using PrimerPairC = PrimerPair<CombinePattern<TKmerID, TKmerLength>>;
+        using PrimerPairC = PrimerPair<CombinePattern>;
         using PrimerPairList = std::vector<PrimerPairC>;
         PrimerPairList pairs;
         combine<PrimerPairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
@@ -227,8 +223,9 @@ public:
     {
         if (!pairs_unpacked.size())
             return false;
-        std::transform(pairs_unpacked.cbegin(), pairs_unpacked.cend(), groups.begin(), [&](PrimerPairUnpacked<TSeqNoMap> & p)
-            {return Group<TSeqNoMap>{io_cfg, seqNo_map, p};});
+        std::transform(pairs_unpacked.begin(), pairs_unpacked.end(), groups.begin(),
+            [&](PrimerPairUnpacked<TSeqNoMap> & p)
+            {return Group<TSeqNoMap>(&io_cfg, &seqNo_map, p);});
         return true;
     }
 
@@ -242,7 +239,12 @@ public:
         [](PrimerPairUnpacked<TSeqNoMap> & p, PrimerPairUnpacked<TSeqNoMap> & q)
             {return p.get_coverage() < q.get_coverage();});
         for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
-            groups.push_back(Group<TSeqNoMap>{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()}});
+        {
+            PrimerPairUnpackedList ppu{it, it + primer_cfg.get_primer_set_size()};
+            Group<TSeqNoMap> group{&io_cfg, &seqNo_map, ppu};
+            groups.push_back(group);
+        }
+
         return true;
     }
 
@@ -256,7 +258,11 @@ public:
         [](PrimerPairUnpacked<TSeqNoMap> & p, PrimerPairUnpacked<TSeqNoMap> & q)
             {return p.get_frequency() < q.get_frequency();});
         for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
-            groups.push_back(Group<TSeqNoMap>{io_cfg, seqNo_map, PrimerPairUnpackedList{it, it + primer_cfg.get_primer_set_size()}});
+        {
+            PrimerPairUnpackedList ppu{it, it + primer_cfg.get_primer_set_size()};
+            groups.push_back(Group<TSeqNoMap>{&io_cfg, &seqNo_map, ppu});
+        }
+
         return true;
     }
 

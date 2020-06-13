@@ -84,7 +84,7 @@
 //     std::cout << "INFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 //
 //     // TODO: delete locations
-//     using PairList = PairList<Pair<CombinePattern<TKmerID, TKmerLength>>>;
+//     using PairList = PairList<Pair<CombinePattern>>;
 //     PairList pairs;
 //     // dictionary collecting (unique) pair frequencies
 //

@@ -14,24 +14,39 @@ template<typename TSeqNoMap>
 struct Group
 {
     // Default constructor.
-    Group()
-    {
+    Group() {}
 
-    }
-
-    Group(IOConfig & _io_cfg, TSeqNoMap const & _seqNoMap) :
+    Group(IOConfig * _io_cfg, TSeqNoMap const * _seqNoMap) :
         io_cfg(_io_cfg), seqNoMap(_seqNoMap){}
 
-    Group(IOConfig & _io_cfg, TSeqNoMap const & _seqNoMap,
+    Group(IOConfig * _io_cfg, TSeqNoMap const * _seqNoMap,
         PrimerPairUnpacked<TSeqNoMap> & pair_unpacked) : io_cfg(_io_cfg), seqNoMap(_seqNoMap)
     {
         group.push_back(pair_unpacked);
     }
 
-    Group(IOConfig & _io_cfg, TSeqNoMap const & _seqNoMap,
-        std::vector<PrimerPairUnpacked<TSeqNoMap>> const & _pairs_unpacked) : io_cfg(_io_cfg), seqNoMap(_seqNoMap)
+    Group(IOConfig * _io_cfg, TSeqNoMap const * _seqNoMap,
+        std::vector<PrimerPairUnpacked<TSeqNoMap>> & _pairs_unpacked) : io_cfg(_io_cfg), seqNoMap(_seqNoMap), group(_pairs_unpacked)
     {
-        group.insert(_pairs_unpacked.cbegin(), _pairs_unpacked.cend(), group.begin());
+        // group.insert(_pairs_unpacked.begin(), _pairs_unpacked.end());
+    }
+
+    // Default copy constructor.
+    Group(Group const & rhs) = default;
+
+    // Default move constructor.
+    Group(Group &&) = default;
+
+    // Copy assignment.
+    Group & operator=(Group rhs)
+    {
+        io_cfg = rhs.io_cfg;
+        seqNoMap = rhs.seqNoMap;
+        group = rhs.group;
+        seqNo_cx_vector = rhs.seqNo_cx_vector;
+        taxa_count = rhs.taxa_count;
+        sequence_count = rhs.sequence_count;
+        return *this;
     }
 
     // Add new pair to group.
@@ -53,8 +68,8 @@ struct Group
         {
             if (!seqNo_cx_vector.at(seqNo_cx))
                 continue;
-            TSeqNo seqNo = seqNoMap.at((1ULL << 63) | seqNo_cx);
-            Taxid taxid = io_cfg.get_taxid_by_seqNo(seqNo);
+            TSeqNo seqNo = seqNoMap->at((1ULL << 63) | seqNo_cx);
+            Taxid taxid = io_cfg->get_taxid_by_seqNo(seqNo);
             taxa.insert(taxid);
         }
         taxa_count = taxa.size();
@@ -84,12 +99,12 @@ struct Group
 private:
 
     // Reference to the I/O configurator.
-    IOConfig & io_cfg = NULL_IOConfig;
+    IOConfig * io_cfg = nullptr;
     // bidirectional map for reference identifiers as found in the library and
     // continuous idententifiers as used in e.g. in reference lists.
     // seqNoMap : seqNo -> seqNo_cx
     // seqNoMap : 1 << 63 | seqNo_cx -> seqNo
-    TSeqNoMap const & seqNoMap = TSeqNoMap{};
+    TSeqNoMap const * seqNoMap = nullptr;
 
     // PrimerPrimerPairs that are member of this group.
     std::vector<PrimerPairUnpacked<TSeqNoMap>> group;

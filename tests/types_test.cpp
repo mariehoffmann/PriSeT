@@ -25,7 +25,7 @@ using namespace priset;
 
 void test_CombinePattern()
 {
-    CombinePattern<TKmerID, TKmerLength> cp{};
+    CombinePattern cp{};
 
     std::vector<std::pair<uint8_t, uint8_t>> cs;
     for (uint8_t i = 0; i < PREFIX_SIZE; ++i)

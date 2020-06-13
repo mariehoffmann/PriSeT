@@ -153,7 +153,7 @@ int main(/*int argc, char ** argv*/)
     std::cout << "\nINFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
     // TODO: delete locations
-    using TPairList = TPairList<TPair<CombinePattern<TKmerID, TKmerLength>>>;
+    using TPairList = TPairList<TPair<CombinePattern>>;
     TPairList pairs;
 
     start = std::chrono::high_resolution_clock::now();

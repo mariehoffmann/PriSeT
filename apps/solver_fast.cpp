@@ -8,7 +8,7 @@
  * Compile this app with
  *  g++ ../PriSeT/apps/solver_fast.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -Wno-unknown-pragmas -DNDEBUG -O3 -I ~/include -L ~/lib -lsdsl -ldivsufsort -ldivsufsort64 -g -o solver_fast
 * and execute with
-*   plankton_denovo2 -l <dir_library> -w <dir_work> [-m <max_num_primers>] [-s]
+*   solver_fast -l <dir_library> -w <dir_work> [-m <max_num_primers>] [-s]
 */
 
 int main(int argc, char ** argv)

@@ -251,7 +251,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
             // note that w_begin/end are updated due to varying kmer length of same kmerID
             for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
             {
-                CombinePattern<TKmerID, TKmerLength> cp;
+                CombinePattern cp;
                 uint64_t mask_fwd = ONE_LSHIFT_63;
                 TKmerID kmerID_rev = kmerIDs.at(seqNo_cx).at(r_rev - 1);
                 filter_cross_annealing(kmerID_fwd, kmerID_rev);
@@ -280,7 +280,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
                 } // length mask_fwd
                 if (cp.is_set())
                 {
-                    pairs.push_back(PrimerPair<CombinePattern<TKmerID, TKmerLength>>{seqNo_cx, r_fwd, r_rev, cp});
+                    pairs.push_back(PrimerPair<CombinePattern>{seqNo_cx, r_fwd, r_rev, cp});
                 }
             } // kmerID rev
         } // kmerID fwd
@@ -289,11 +289,11 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
 
 // Filter pairs by frequency and unpack PrimerPair -> PrimerPairUnpacked
 template<typename TSeqNoMap, typename TKmerIDs, typename PrimerPairList, typename PrimerPairUnpackedList>
-void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqNoMap const & seqNo_map, TKmerIDs const & kmerIDs, PrimerPairList const & pairs, PrimerPairUnpackedList & pairs_unpacked)
+void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqNoMap & seqNo_map, TKmerIDs const & kmerIDs, PrimerPairList & pairs, PrimerPairUnpackedList & pairs_unpacked)
 {
     std::unordered_map<std::string, std::vector<bool>> pair2seqNo_cx_vector;
     std::unordered_map<uint64_t, std::string> primers_memoized;
-
+    std::vector<std::pair<uint8_t, uint8_t>> combinations;
 
     auto pair_key = [](std::string const & p1, std::string const & p2) -> std::string
         {return p1 + "_" + p2;};
@@ -301,11 +301,10 @@ void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqN
     // count unique pairs
     for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
     {
-        TSeqNo seqNo_cx = it_pairs->seqNo_cx;
-        std::vector<std::pair<uint8_t, uint8_t>> combinations;
-        it_pairs->cp.get_combinations(combinations);
-        TKmerID kmerID_fwd = kmerIDs.at(it_pairs->seqNo_cx).at(it_pairs->r_fwd - 1);
-        TKmerID kmerID_rev = kmerIDs.at(it_pairs->seqNo_cx).at(it_pairs->r_rev - 1);
+        TSeqNo seqNo_cx = it_pairs->get_seqNo();
+        it_pairs->get_combine_pattern().get_combinations(combinations);
+        TKmerID kmerID_fwd = kmerIDs.at(it_pairs->get_seqNo()).at(it_pairs->get_rank_fwd() - 1);
+        TKmerID kmerID_rev = kmerIDs.at(it_pairs->get_seqNo()).at(it_pairs->get_rank_rev() - 1);
 
         for (auto comb : combinations)
         {
@@ -322,21 +321,20 @@ void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqN
             std::string key = pair_key(primer_fwd, primer_rev);
             if (!pair2seqNo_cx_vector.count(key))
                 pair2seqNo_cx_vector[key] = std::vector<bool>(0, seqNo_cx);
-            else if (seqNo_cx >= pair2seqNo_cx_vector.at(key))
+            else if (seqNo_cx >= pair2seqNo_cx_vector.at(key).size())
                 pair2seqNo_cx_vector[key].resize(0, seqNo_cx + 1);
-            pair2seqNo_cx_vector[key] = 1;
+            pair2seqNo_cx_vector[key][seqNo_cx] = 1;
         }
     }
 
     // Unpack pairs exceeding minimal pair frequency (digamma_pairs) and store in
     // pairs_unpacked. Combination bits are not reset.
     std::unordered_map<std::string, size_t> seen_and_index;
-    for (auto it_pairs = pairs.cbegin(); it_pairs != pairs.cend(); ++it_pairs)
+    for (auto it_pairs = pairs.begin(); it_pairs != pairs.end(); ++it_pairs)
     {
-        TKmerID kmer_fwd = kmerIDs.at(it_pairs->reference).at(it_pairs->r_fwd - 1);
-        TKmerID kmer_rev = kmerIDs.at(it_pairs->reference).at(it_pairs->r_rev - 1);
-        std::vector<std::pair<uint8_t, uint8_t>> combinations;
-        it_pairs->cp.get_combinations(combinations);
+        TKmerID kmer_fwd = kmerIDs.at(it_pairs->get_seqNo()).at(it_pairs->get_rank_fwd() - 1);
+        TKmerID kmer_rev = kmerIDs.at(it_pairs->get_seqNo()).at(it_pairs->get_rank_rev() - 1);
+        it_pairs->get_combine_pattern().get_combinations(combinations);
         for (auto comb : combinations)
         {
             uint64_t code_fwd = get_code(kmer_fwd, ONE_LSHIFT_63 >> comb.first);
@@ -348,11 +346,11 @@ void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqN
             {
                 if (!seen_and_index.count(key))
                 {
-                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{io_cfg, seqNo_map, pair2seqNo_cx_vector.at(key)};
+                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{&io_cfg, &seqNo_map, pair2seqNo_cx_vector.at(key)};
                     pairs_unpacked.push_back({pair_unpacked});
                     seen_and_index[key] = pairs_unpacked.size() - 1;
                 }
-                pairs_unpacked.at(seen_and_index.at(key)).set_reference_match(it_pairs->seqNo);
+                pairs_unpacked.at(seen_and_index.at(key)).set_sequence_match(it_pairs->get_seqNo());
             }
         }
     }

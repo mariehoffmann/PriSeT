@@ -47,7 +47,6 @@ template<typename TKmerIDs, typename PairList>
 void write_primer_file(TKmerIDs const & kmerIDs, PairList const & pairs, fs::path const & primer_file, std::unordered_set<std::string> & kmers_unique_str)
 {
     std::unordered_set<uint64_t> kmers_unique;
-    // Pair<CombinePattern<TKmerID, TKmerLength>>
     for (auto pair : pairs)
     {
         uint64_t kmer_fwd = kmerIDs.at(pair.reference).at(pair.r_fwd - 1);

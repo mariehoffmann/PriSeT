@@ -156,29 +156,7 @@ extern inline uint64_t reverse_complement(uint64_t const code_)
     return prefix | code_rc;
 }
 
-/*
-extern inline std::string reverse_complement(std::string const & seq)
-{
-    char rc[PRIMER_MAX_LEN];
-    uint8_t i = 0;
-    for (char const c : seq)
-    {
-        switch (c)
-        {
-            case 'A': rc[i] = 'T'; break;
-            case 'C': rc[i] = 'G'; break;
-            case 'G': rc[i] = 'C'; break;
-            default: rc[i] = 'A';
-        }
-        ++i;
-    }
-    std::string seq_rc(rc, i);
-    std::reverse(seq_rc.begin(), seq_rc.end());
-    return seq_rc;
-}
-*/
-
-    //using dna = seqan::Dna;
+//using dna = seqan::Dna;
 //!\brief DNA codes as enums.
 // TODO: use seqan Dna
 //enum dna {A, C, G, T, B, CGT, D, AGT, H, ACT, K, GT, M, AC, N, ACGT, R, AG, S, CG, V, ACG, W, AT, Y, CT};
@@ -256,7 +234,5 @@ static constexpr std::array<priset::dna, 26> dna_decode
         bimap[priset::dna::CT] = priset::dna::Y;
         return bimap;
     }()
-
-
 };*/
 }

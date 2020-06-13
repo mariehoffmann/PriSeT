@@ -125,9 +125,9 @@ void test_combine()
     setup su{};
     transform_and_filter(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
     //using TPair = TPair;
-    using TPairList = TPairList<TPair<CombinePattern<TKmerID, TKmerLength>>>;
+    using TPairList = TPairList<TPair<CombinePattern>>;
     TPairList pairs;
-    //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::PrimerConfig&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::CombinePattern<long long unsigned int, long long int> > >&)'
+    //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::PrimerConfig&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::CombinePattern>> &)'
 //     print_combinations<>(su.primer_cfg, su.kmerIDs, pairs);
     combine(su.references, su.kmerIDs, pairs, su.kmerCounts);
     print_combinations<TPairList>(su.kmerIDs, pairs);

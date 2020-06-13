@@ -3,16 +3,17 @@
 #include <vector>
 
 #include "Solver.hpp"
+#include "types/IOConfig.hpp"
+#include "types/PrimerConfig.hpp"
 #include "types/Result.hpp"
 
 namespace priset
 {
 
-// struct solver;
-
 struct SolverFast : Solver
 {
-    // solver_fast() = default;
+    SolverFast(IOConfig & _io_cfg, PrimerConfig & _primer_cfg) :
+        Solver(_io_cfg, _primer_cfg) {}
 
     void solve()
     {
