@@ -209,8 +209,7 @@ public:
 
         // 4. Combine frequent k-mers to form pairs reference-wise.
         // Container type for storing Pairs.
-        using PrimerPairC = PrimerPair<CombinePattern>;
-        using PrimerPairList = std::vector<PrimerPairC>;
+        using PrimerPairList = std::vector<PrimerPair>;
         PrimerPairList pairs;
         combine<PrimerPairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
 

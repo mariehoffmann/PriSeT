@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "../../src/dna.hpp"
-#include "../../src/types/PrimerConfig.hpp"
 #include "../../src/utilities.hpp"
 
 #include "gtest/gtest.h"
@@ -37,7 +36,8 @@ TEST(combine_pattern_test, set)
     cp.set(1ULL << 54, 1ULL << 54);
     std::vector<pair_type> cmb;
     cp.get_combinations(cmb);
-    EXPECT_EQ(3ULL, cmb.size());
+    cmb.resize(2);
+    ASSERT_EQ(3ULL, cmb.size());
     pair_type cmb_0{0, 0};
     pair_type cmb_1{3, 4};
     pair_type cmb_2{9, 9};
@@ -64,7 +64,7 @@ TEST(combine_pattern_test, reset)
     cp.reset(1ULL << 63, 1ULL << 63);
     cp.get_combinations(cmb);
     EXPECT_TRUE(cp.is_set());
-    EXPECT_EQ(1ULL, cmb.size());
+    ASSERT_EQ(1ULL, cmb.size());
     EXPECT_EQ(cmb_0, cmb.at(0));
 
     // remove second combination

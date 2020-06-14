@@ -280,7 +280,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
                 } // length mask_fwd
                 if (cp.is_set())
                 {
-                    pairs.push_back(PrimerPair<CombinePattern>{seqNo_cx, r_fwd, r_rev, cp});
+                    pairs.push_back(PrimerPair{seqNo_cx, r_fwd, r_rev, cp});
                 }
             } // kmerID rev
         } // kmerID fwd

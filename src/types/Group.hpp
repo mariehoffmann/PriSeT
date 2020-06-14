@@ -5,6 +5,7 @@
 
 #include "IOConfig.hpp"
 #include "PrimerPair.hpp"
+#include "PrimerPairUnpacked.hpp"
 #include "PrimerConfig.hpp"
 
 namespace priset
