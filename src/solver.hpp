@@ -61,7 +61,6 @@ struct Solver
     // The container type for unpacked pairs.
     using PrimerPairUnpackedList = std::vector<PrimerPairUnpacked<TSeqNoMap>>;
 
-
 private:
     // K-Mer location map.
     TKLocations locations;

@@ -346,7 +346,7 @@ void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqN
             {
                 if (!seen_and_index.count(key))
                 {
-                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{&io_cfg, &seqNo_map, pair2seqNo_cx_vector.at(key)};
+                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{&io_cfg, &seqNo_map, pair2seqNo_cx_vector.at(key), kmer_fwd, code_fwd, kmer_rev, code_rev};
                     pairs_unpacked.push_back({pair_unpacked});
                     seen_and_index[key] = pairs_unpacked.size() - 1;
                 }

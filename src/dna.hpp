@@ -81,20 +81,13 @@ uint64_t dna_encoder_with_lbit(seqan::String<priset::dna> const & seq)
      return code;
 }
 
-// return full length sequence, ignore variable length info in leading bits if present.
-// Note: kmer code is only length trimmed when a mask is given.
-std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
+// Return dna sequence given code and length mask.
+std::string dna_decoder(uint64_t const _code, uint64_t const mask)
 {
-    // note that assert converted to nop due to seqan's #define NDEBUG
-    if (code_ == 0ULL)
-        throw std::invalid_argument("ERROR: invalid argument for decoder, code == 0.");
-    uint64_t code = code_;
-    if (mask)
-        code = get_code(code_, mask);
-    else
-        code &= ~PREFIX_SELECTOR;
-
-    // TODO: use global
+    if (_code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder(0).");
+    uint64_t code = _code;
+    code = get_code(_code, mask);
     std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
     uint8_t n = (63 - __builtin_clzl(code)) >> 1;
     char seq[n];
@@ -103,9 +96,25 @@ std::string dna_decoder(uint64_t const code_, uint64_t const mask = 0)
     return std::string(seq, n);
 }
 
-extern inline uint64_t complement(uint64_t const code_)
+// return full length sequence, ignore variable length info in leading bits if present.
+// Note: kmer code is only length trimmed when a mask is given.
+std::string dna_decoder(uint64_t const _code)
 {
-    auto [prefix, code] = split_kmerID(code_);
+    if (_code == 0ULL)
+        throw std::invalid_argument("ERROR: invalid argument for decoder(0).");
+    uint64_t code = _code;
+    code &= ~PREFIX_SELECTOR;
+    std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
+    uint8_t n = (63 - __builtin_clzl(code)) >> 1;
+    char seq[n];
+    for (uint8_t i = 1; i <= n; ++i, code >>= 2)
+        seq[n - i] = alphabet[3 & code];
+    return std::string(seq, n);
+}
+
+extern inline uint64_t complement(uint64_t const _code)
+{
+    auto [prefix, code] = split_kmerID(_code);
     uint64_t code_c = 0;
     uint8_t offset = 0;
     while (code > 1)
@@ -124,9 +133,9 @@ extern inline uint64_t complement(uint64_t const code_)
 }
 
 // Preserves length bits and closure.
-extern inline uint64_t reverse(uint64_t const code_)
+extern inline uint64_t reverse(uint64_t const _code)
 {
-    auto [prefix, code] = split_kmerID(code_);
+    auto [prefix, code] = split_kmerID(_code);
     uint64_t code_r = 0b01; // closure
     while (code > 1)
     {
@@ -138,9 +147,9 @@ extern inline uint64_t reverse(uint64_t const code_)
 }
 
 
-extern inline uint64_t reverse_complement(uint64_t const code_)
+extern inline uint64_t reverse_complement(uint64_t const _code)
 {
-    auto [prefix, code] = split_kmerID(code_);
+    auto [prefix, code] = split_kmerID(_code);
     uint64_t code_rc = 0b01; // closure
     while (code > 1)
     {

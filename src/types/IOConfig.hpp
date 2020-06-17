@@ -72,24 +72,20 @@ public:
             if (p.path().extension().compare(ext_acc) == 0)
                 acc_file = p;
             else if (p.path().extension().compare(ext_fasta) == 0)
+            {
                 fasta_file = p;
+                char const start = '>';
+                std::ifstream stream(fasta_file.string().c_str(), std::ios::in);
+                std::string line;
+                while (std::getline(stream, line))
+                {
+                    if (line.at(0) == start)
+                        ++library_size;
+                }
+                std::cout << "INFO\tlibrary size: " << library_size << std::endl;
+            }
             else if (p.path().extension().compare(ext_tax) == 0)
                 tax_file = p;
-            else if (p.path().extension().compare(ext_id) == 0)
-            {
-                id_file = p;
-                // set library size
-                // faster with  wc -l root_10190.id
-                //std::system("ls -l >test.txt"); // execute the UNIX command "ls -l >test.txt"
-                //std::cout << std::ifstream("test.txt").rdbuf();
-
-                FILE * infile = fopen(id_file.string().c_str(), "r");
-                int c;
-                while (EOF != (c = getc(infile)))
-                    if (c == '\n')
-                        ++library_size;
-                std::cout << "INFO: library size = " << library_size << std::endl;
-            }
         }
         if (!acc_file.has_filename())
             std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
@@ -103,9 +99,6 @@ public:
         if (!tax_file.has_filename())
             std::cout << "ERROR: Unable to locate taxonomy file in: " << lib_dir << std::endl, exit(-1);
         std::cout << "STATUS\tSet taxonomy file: \t" << tax_file << std::endl;
-        if (!id_file.has_filename())
-            std::cout << "ERROR: Unable to locate id file in: " << lib_dir << std::endl, exit(-1);
-        std::cout << "STATUS\tSet id file: \t" << id_file << std::endl;
 
         // create working directory if not existing after clearing
         if (!fs::exists(work_dir))
@@ -133,7 +126,7 @@ public:
         }
         // set output directory for FM index mapping
         mapping_dir /= fs::path("/mapping");
-        std::cout << "set mapping_dir = " << mapping_dir << std::endl;
+        std::cout << "STATUS\tSet mapping_dir: " << mapping_dir << std::endl;
 
         // create table output directory
         fs::path result_path = work_dir / "table";
@@ -164,8 +157,8 @@ public:
         * order).
         */
         build_species_set();
-        build_seqNo2acc_map();
         build_taxid2accs_map();
+        build_seqNo2acc_map();
     };
 
     // Destructor.
@@ -187,11 +180,6 @@ public:
     fs::path get_acc_file() const noexcept
     {
         return acc_file;
-    }
-
-    fs::path get_id_file() const noexcept
-    {
-        return id_file;
     }
 
     constexpr uint32_t get_library_size() const noexcept
@@ -301,7 +289,13 @@ public:
     // Get taxid given an uncompressed sequence number.
     Taxid get_taxid_by_seqNo(TSeqNo seqNo) const
     {
+        assert(seqNo2acc_map.count(seqNo));
         return acc2taxid_map.at(seqNo2acc_map.at(seqNo));
+    }
+
+    bool is_species(Taxid const & taxid) const noexcept
+    {
+        return (species_set.find(taxid) == species_set.end()) ? 0 : 1;
     }
 
 private:
@@ -316,17 +310,19 @@ private:
 
     // Flag for indicating to do index computation exclusively.
     bool idx_only_flag{0};
+
     // Taxid to accession map in csv format (set by PriSeT).
     fs::path acc_file{};
+
     // Sequence library file in fasta format (set by PriSeT).
     fs::path fasta_file{};
 
-    // 1-based IDs and accession numbers.
-    fs::path id_file{};
     // Taxonomy file in csv format (set by PriSeT).
     fs::path tax_file{};
+
     // Working subdirectory for FM index (set by PriSeT).
     fs::path index_dir;
+
     // Working subdirectory for FM index mappings (set by PriSeT).
     fs::path mapping_dir;
 
@@ -377,41 +373,16 @@ private:
         std::getline(stream, row); // ignore header line
         while (std::getline(stream, row))
         {
-            if (row.compare(row.size() - 2, 1, is_species) == 1)
+            if (!row.compare(row.size() - 1, 1, is_species))
             {
                 Taxid taxid = std::stoi(row.substr(0, row.find(delim)));
                 species_set.insert(taxid);
             }
         }
-    }
-
-    bool build_seqNo2acc_map()
-    {
-        char const delim = ',';
-        std::ifstream stream(id_file.string().c_str(), std::ios::in);
-        std::string row;
-        size_t pos;
-        while (std::getline(stream, row))
-        {
-            if (row[0] == '#')
-                continue;
-            pos = row.find(delim);
-            TSeqNo seqNo = std::stoi(row.substr(pos));
-            Accession acc = row.substr(pos+1, row.size());
-            try
-            {
-                seqNo2acc_map[seqNo] = acc;
-            }
-            catch (const std::domain_error & e)
-            {
-                std::cerr << "ERROR: duplicate sequence (" << seqNo << ")identifier used in " << id_file.string() << std::endl;
-            }
-        }
-        return (seqNo2acc_map.size()) ? true : false;
+        // std::cout << "species_set size = " << species_set.size() << std::endl;
     }
 
     // Fill taxid to accessions map
-    // TODO: write test
     void build_taxid2accs_map()
     {
         char const delim = ',';
@@ -420,29 +391,68 @@ private:
         std::getline(stream, row); // ignore header
         while (std::getline(stream, row))
         {
-            if (row[0] == '#')
-                continue;
             size_t pos1{0};
-            size_t pos2 = row.find(delim, pos1);
+            size_t pos2 = row.find(delim, pos1 + 1);
             Taxid taxid = std::stoi(row.substr(pos1, pos2));
             if (species_set.find(taxid) == species_set.end())
                 continue;
             std::vector<Accession> accs;
             pos1 = pos2;
-            pos2 = row.find(delim, pos1);
+            pos2 = row.find(delim, pos1 + 1);
             while (pos1 != std::string::npos)
             {
-                Accession acc = row.substr(pos1, pos2);
+                Accession acc = row.substr(pos1 + 1, pos2 - pos1 - 1);
                 accs.push_back(acc);
                 pos1 = pos2;
-                pos2 = row.find(delim, pos1);
+                pos2 = row.find(delim, pos1 + 2);
                 acc2taxid_map[acc] = taxid;
             }
             taxid2accs_map[taxid] = accs;
         }
     }
+
+    // Helper routine to build seqNo2acc_map.
+    // Extract accession ID from FASTA file and use previously built acc2taxid_map
+    // to determine taxid. If taxid corresponds to a species it is written into
+    // dictionary.
+    bool build_seqNo2acc_map()
+    {
+        int seqNo{0};  // 1-based sequence number
+        std::unordered_set<std::string> accs_seen;
+        char const start = '>';
+        char const delim = ' ';
+        std::ifstream stream(fasta_file.string().c_str(), std::ios::in);
+        std::string row;
+        size_t pos;
+        while (std::getline(stream, row))
+        {
+            if (row[0] != start)
+                continue;
+            ++seqNo;
+            pos = row.find(delim);
+            Accession acc = row.substr(1, pos-1);
+            if (accs_seen.find(acc) != accs_seen.end())
+                throw std::domain_error("ERROR: duplicate accession ID (" + acc + ") fasta file");
+            accs_seen.insert(acc);
+            try
+            {
+                Taxid taxid = acc2taxid_map[acc];
+                if (species_set.find(taxid) != species_set.end())
+                {
+                    seqNo2acc_map[seqNo] = acc;
+                }
+            }
+            catch (const std::domain_error & e)
+            {
+                std::cerr << "ERROR: extracted accession from FASTA file is not listed in related accession file!" << std::endl;
+            }
+        }
+        return (seqNo2acc_map.size()) ? true : false;
+    }
+
 };
 
+// The NULL value of an I/O Configurator.
 IOConfig NULL_IOConfig = IOConfig{};
 
 } // namespace priset
