@@ -36,7 +36,7 @@ public:
 
 protected:
     void SetUp() override {
-        io_cfg.assign(lib_dir, work_dir, 0, 0);
+        io_cfg.assign(lib_dir, work_dir, 1);
         // set original seqID to compressed 1 -> 0, 3 -> 1, 5 -> 2, 7 -> 3, ...
         // s.t. only every second seqID is registered
         for (uint32_t seqID_cx = 0; seqID_cx < io_cfg.get_library_size()/2; ++seqID_cx)

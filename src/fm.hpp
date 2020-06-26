@@ -49,16 +49,9 @@ namespace priset
 /*
  * Create FM index with `genmap` binary and store in io_cfg.genmap_idx_dir
  */
-// int fm_index2(IOConfig const & io_cfg)
-// {
-//     std::cout << "MESSAGE: start index recomputation" << std::endl;
-//     std::string cmd = io_cfg.get_genmap_binary().string() + " index -F " + io_cfg.get_fasta_file().string() + " -I " + io_cfg.get_index_dir().string();
-//     std::system(cmd.c_str());
-//     return 0;
-// }
-
 int fm_index(IOConfig const & io_cfg)
 {
+    assert(io_cfg.FM_idx_flag);
     int const argc = 5;
     std::string const fasta_file = io_cfg.get_fasta_file().string();
     char const * argv[argc] = {"index",

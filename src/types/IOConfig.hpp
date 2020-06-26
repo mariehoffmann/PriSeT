@@ -45,7 +45,9 @@ public:
     IOConfig & operator=(IOConfig && rhs) = default;
 
     // Set library and working directory paths.
-    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const idx_only_flag_, bool const skip_FM_index_)
+    // FM_idx_flag = 1  compute FM index
+    // FM_idx_flag = 0  else skip FM index computation and use index in given  directory
+    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const _FM_idx_flag = 1)
     {
         lib_dir = fs::canonical(lib_dir_);
         work_dir = fs::canonical(work_dir_);
@@ -57,18 +59,14 @@ public:
             fs::create_directory(work_dir_);
         }
 
-        idx_only_flag = idx_only_flag_;
-        skip_FM_index = skip_FM_index_;
+        FM_idx_flag = _FM_idx_flag;
         index_dir = work_dir;
         mapping_dir = work_dir;
-        // TODO: path to PriSeT git repos as argument
-        // genmap_bin = "~/git/PriSet_git2/PriSeT/submodules/genmap/bin/genmap";
 
         if (!fs::exists(lib_dir))
             std::cout << "ERROR: " << LIB_DIR_ERROR << std::endl, exit(-1);
         for (auto & p : fs::directory_iterator(lib_dir))
         {
-            //std::cout << p << std::endl;
             if (p.path().extension().compare(ext_acc) == 0)
                 acc_file = p;
             else if (p.path().extension().compare(ext_fasta) == 0)
@@ -110,20 +108,21 @@ public:
         }
 
         // set output directory for FM index, will be created by genmap
-        index_dir /= fs::path("/index");
-        if (skip_FM_index && !fs::exists(index_dir))
+        index_dir /= fs::path("index");
+        if (!FM_idx_flag && !fs::exists(index_dir))
         {
             std::cerr << "ERROR: Index computation flag is set to 0, but index_dir (" << index_dir << ") does not exists!" << std::endl;
             exit(-1);
         }
 
-        if (!skip_FM_index && fs::exists(index_dir))
+        if (FM_idx_flag && fs::exists(index_dir))
         {
             char cmd[50];
             sprintf(cmd, "rm -r %s", index_dir.c_str());
             if (system(cmd))
-                std::cout << "ERROR: Could not remove index directory " << index_dir << std::endl, exit(0);
+                std::cout << "ERROR: Could not remove index directory " << index_dir << std::endl, exit(-1);
         }
+
         // set output directory for FM index mapping
         mapping_dir /= fs::path("/mapping");
         std::cout << "STATUS\tSet mapping_dir: " << mapping_dir << std::endl;
@@ -137,7 +136,7 @@ public:
             if (system(cmd))
                 std::cout << "ERROR: Creating result table directory = " << result_path << std::endl, exit(-1);
         }
-        result_file = result_path / "results.csv";
+        result_file = result_path / "result.csv";
         primer_info_file = result_path / "primer_info.csv";
         script_file = get_work_dir() / "app" / "app.R";
         std::cout << "STATUS\tSet R script file: " << script_file << std::endl;
@@ -164,33 +163,16 @@ public:
     // Destructor.
     ~IOConfig() = default;
 
-    // Return skip_idx flag.
-    bool idx_only() const noexcept
+    // Return FM_idx_flag.
+    bool get_FM_idx_flag() const noexcept
     {
-        return idx_only_flag;
-    }
-
-    // Return skip_idx flag.
-    bool skip_FM_idx() const noexcept
-    {
-        return skip_FM_index;
+        return FM_idx_flag;
     }
 
     // Return accession file with absolute path as filesystem::path object.
     fs::path get_acc_file() const noexcept
     {
         return acc_file;
-    }
-
-    constexpr uint32_t get_library_size() const noexcept
-    {
-        return library_size;
-    }
-
-    // Return number of species.
-    size_t get_species_count() const noexcept
-    {
-        return species_set.size();
     }
 
     // Return template file for shiny app.
@@ -205,28 +187,10 @@ public:
         return fasta_file;
     }
 
-    // Return path of genmap binary
-    fs::path get_genmap_binary() const noexcept
-    {
-        return work_dir / "genmap_bin";
-    }
-
-    // Return directory where FM index is stored
+    // Return directory where FM index is stored.
     fs::path get_index_dir() const noexcept
     {
         return index_dir;
-    }
-
-    // path to index plus basename without suffix, i.e. <path_to_index>/<basename>
-    fs::path get_index_base_path() const noexcept
-    {
-        return index_dir / "index";
-    }
-
-    // path to index plus basename without suffix, i.e. <path_to_index>/<basename>
-    fs::path get_index_base_path_ids() const noexcept
-    {
-        return index_dir / "index.ids";
     }
 
     // return path to concatenation of text corpus stored in two files index.txt.concat and index.txt.limits
@@ -235,6 +199,7 @@ public:
         return index_dir / "index.txt";
     }
 
+    // Return directory for FM mappility results.
     fs::path get_mapping_dir() const noexcept
     {
         return mapping_dir;
@@ -255,7 +220,6 @@ public:
     // Return path to R script file to be run in terminal.
     fs::path get_script_file() const noexcept
     {
-        std::cout << "Enter get_script_file, " << script_file << std::endl;
         return script_file;
     }
 
@@ -271,16 +235,37 @@ public:
         return tax_file;
     }
 
+    // Return working directory.
     fs::path get_work_dir() const noexcept
     {
         return work_dir;
     }
 
-    Accession get_seqNo_by_accession(TSeqNo const seqNo) const
+    // Return the library size, i.e. number sequences in FASTA file.
+    constexpr uint32_t get_library_size() const noexcept
+    {
+        return library_size;
+    }
+
+    // Return number of species.
+    size_t get_species_count() const noexcept
+    {
+        return species_set.size();
+    }
+
+    // Test if given taxonomic ID corresponds to a species.
+    bool is_species(Taxid const & taxid) const noexcept
+    {
+        return (species_set.find(taxid) == species_set.end()) ? 0 : 1;
+    }
+
+    // Given a sequence number return its accession ID based on FASTA file.
+    Accession get_acc_by_seqNo(TSeqNo const seqNo) const
     {
         return seqNo2acc_map.at(seqNo);
     }
 
+    // Given an accession return the taxonomic ID.
     Taxid get_taxid_by_accession(Accession acc) const
     {
         return acc2taxid_map.at(acc);
@@ -293,11 +278,6 @@ public:
         return acc2taxid_map.at(seqNo2acc_map.at(seqNo));
     }
 
-    bool is_species(Taxid const & taxid) const noexcept
-    {
-        return (species_set.find(taxid) == species_set.end()) ? 0 : 1;
-    }
-
 private:
     // Directory that contains library, taxonomy, and taxid to accession files.
     fs::path lib_dir;
@@ -306,10 +286,7 @@ private:
     fs::path work_dir;
 
     // Flag for indicating if index computation shall be skipped (because it already exists).
-    bool skip_FM_index{0};
-
-    // Flag for indicating to do index computation exclusively.
-    bool idx_only_flag{0};
+    bool FM_idx_flag{1};
 
     // Taxid to accession map in csv format (set by PriSeT).
     fs::path acc_file{};
@@ -321,10 +298,10 @@ private:
     fs::path tax_file{};
 
     // Working subdirectory for FM index (set by PriSeT).
-    fs::path index_dir;
+    fs::path index_dir{};
 
     // Working subdirectory for FM index mappings (set by PriSeT).
-    fs::path mapping_dir;
+    fs::path mapping_dir{};
 
     // Library file extensions.
     std::string ext_fasta = ".fasta";
@@ -351,20 +328,21 @@ private:
     fs::path app_template = "../PriSeT/src/app_template.R";
 
     // R script for launching shiny app.
-    fs::path script_runner;
+    fs::path script_runner{};
 
     // Path to generated copy of R script to be run in terminal.
-    fs::path script_file;
+    fs::path script_file{};
 
     // Path to store result tables to load in Shiny.
-    fs::path result_file;
+    fs::path result_file{};
 
     // Path to primer info file (sequences and chemical attributes)
-    fs::path primer_info_file;
+    fs::path primer_info_file{};
 
     // Fill species set based on taxonomy file with row format taxid,p_taxid,is_species.
     void build_species_set()
     {
+        species_set.clear();
         char const delim = ',';
         std::ifstream stream(tax_file.string().c_str(), std::ios::in);
         std::string row;
@@ -379,12 +357,14 @@ private:
                 species_set.insert(taxid);
             }
         }
-        // std::cout << "species_set size = " << species_set.size() << std::endl;
+        stream.close();
     }
 
     // Fill taxid to accessions map
     void build_taxid2accs_map()
     {
+        acc2taxid_map.clear();
+        taxid2accs_map.clear();
         char const delim = ',';
         std::ifstream stream(acc_file.string().c_str(), std::ios::in);
         std::string row;
@@ -409,6 +389,7 @@ private:
             }
             taxid2accs_map[taxid] = accs;
         }
+        stream.close();
     }
 
     // Helper routine to build seqNo2acc_map.
@@ -417,6 +398,7 @@ private:
     // dictionary.
     bool build_seqNo2acc_map()
     {
+        seqNo2acc_map.clear();
         int seqNo{0};  // 1-based sequence number
         std::unordered_set<std::string> accs_seen;
         char const start = '>';
@@ -444,9 +426,11 @@ private:
             }
             catch (const std::domain_error & e)
             {
+                stream.close();
                 std::cerr << "ERROR: extracted accession from FASTA file is not listed in related accession file!" << std::endl;
             }
         }
+        stream.close();
         return (seqNo2acc_map.size()) ? true : false;
     }
 

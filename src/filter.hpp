@@ -79,7 +79,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
         seqNo_map[ONE_LSHIFT_63 | seqNo_map[seqNo]] = seqNo;
         // std::cout << seqNo << " ";
         // TODO: is seqNo 0-based?
-        Accession acc = io_cfg.get_seqNo_by_accession(seqNo); //seqNo2acc_map.at(seqNo);
+        Accession acc = io_cfg.get_acc_by_seqNo(seqNo); //seqNo2acc_map.at(seqNo);
         // [taxid_seq0, taxid_seq1, ...]
         taxa_by_seqNo_cx.push_back(io_cfg.get_taxid_by_accession(acc)); //acc2taxid_map.at(acc));
     }

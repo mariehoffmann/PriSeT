@@ -6,10 +6,7 @@
 
 #pragma once
 
-// #include <stdlib.h>
 #include <vector>
-
-// #include "utilities.hpp"
 
 #include "../../submodules/genmap/src/common.hpp"
 #include "../../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
