@@ -259,6 +259,20 @@ public:
         return (species_set.find(taxid) == species_set.end()) ? 0 : 1;
     }
 
+    // Get next species stored in set. We use the fact that order of unordered_set
+    // is fixed § 23.2.5 [unord.req] once no insertion takes place.
+    Taxid get_next_species()
+    {
+        if (it_species == species_set.cend())
+        {
+            it_species = species_set.cbegin();
+            return Taxid{0};
+        }
+        Taxid taxid = *it_species;
+        ++it_species;
+        return taxid;
+    }
+
     // Given a sequence number return its accession ID based on FASTA file.
     Accession get_acc_by_seqNo(TSeqNo const seqNo) const
     {
@@ -315,6 +329,9 @@ private:
     // Species extracted from tax_file.
     std::unordered_set<Taxid> species_set;
 
+    // Iterator for species set.
+    std::unordered_set<Taxid>::const_iterator it_species = species_set.cbegin();
+
     // Taxid to accessions map.
     std::unordered_map<Taxid, std::vector<Accession>> taxid2accs_map;
 
@@ -358,6 +375,8 @@ private:
             }
         }
         stream.close();
+        // update set iterator
+        it_species = species_set.cbegin();
     }
 
     // Fill taxid to accessions map
