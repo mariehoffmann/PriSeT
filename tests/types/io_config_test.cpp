@@ -216,6 +216,21 @@ TEST_F(io_config_test_f, is_species)
     EXPECT_EQ(true, io_cfg.is_species(1478115));
 }
 
+TEST_F(io_config_test_f, get_next_species)
+{
+    size_t species_count = io_cfg.get_species_count();
+    std::unordered_set<Taxid> species_set;
+    size_t call_ctr{0};
+    Taxid taxid;
+    while ((taxid = io_cfg.get_next_species()))
+    {
+        species_set.insert(taxid);
+        ++call_ctr;
+    }
+    EXPECT_EQ(species_count, call_ctr);
+    EXPECT_EQ(species_count, species_set.size());
+}
+
 TEST_F(io_config_test_f, get_acc_by_seqNo)
 {
     std::vector<std::pair<TSeqNo, Accession>> const accs =
