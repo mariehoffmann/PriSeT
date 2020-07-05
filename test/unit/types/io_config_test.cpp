@@ -4,10 +4,10 @@
 #include <limits>
 #include <vector>
 
-#include "../../src/dna.hpp"
-#include "../../src/types/CombinePattern.hpp"
-#include "../../src/types/IOConfig.hpp"
-#include "../../src/utilities.hpp"
+#include "../../../src/dna.hpp"
+#include "../../../src/types/CombinePattern.hpp"
+#include "../../../src/types/IOConfig.hpp"
+#include "../../../src/utilities.hpp"
 
 #include "gtest/gtest.h"
 

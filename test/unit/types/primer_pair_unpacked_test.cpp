@@ -2,12 +2,13 @@
 #include <experimental/filesystem>
 #include <iostream>
 #include <limits>
+#include <unordered_set>
 #include <vector>
 
-#include "../../src/dna.hpp"
-#include "../../src/types/CombinePattern.hpp"
-#include "../../src/types/IOConfig.hpp"
-#include "../../src/utilities.hpp"
+#include "../../../src/dna.hpp"
+#include "../../../src/types/CombinePattern.hpp"
+#include "../../../src/types/IOConfig.hpp"
+#include "../../../src/utilities.hpp"
 
 #include "gtest/gtest.h"
 
@@ -57,7 +58,6 @@ protected:
         }
         ppu = PrimerPairUnpacked<TSeqNoMap>{&io_cfg, &seqNo_map, seqNo_cx_vector, code_fwd, code_rev};
     }
-
 };
 
 
@@ -118,9 +118,24 @@ TEST_F(primer_pair_unpacked_test_f, get_frequency)
     EXPECT_EQ(frequency + 1, ppu.get_frequency());
 }
 
-TEST_F(primer_pair_unpacked_test_f, get_coverage)
+TEST_F(primer_pair_unpacked_test_f, get_species_count)
 {
-    EXPECT_EQ(species_set.size(), ppu.get_coverage());
+    EXPECT_EQ(species_set.size(), ppu.get_species_count());
+}
+
+TEST_F(primer_pair_unpacked_test_f, get_next_species)
+{
+    size_t species_count = ppu.get_species_count();
+    std::unordered_set<Taxid> species_set;
+    size_t species_ctr{0};
+    Taxid taxid;
+    while ((taxid = ppu.get_next_species()))
+    {
+        species_set.insert(taxid);
+        ++species_ctr;
+    }
+    EXPECT_EQ(species_count, species_ctr);
+    EXPECT_EQ(species_count, species_set.size());
 }
 
 TEST_F(primer_pair_unpacked_test_f, get_forward_primer)
