@@ -89,11 +89,12 @@ std::string dna_decoder(uint64_t const _code, uint64_t const mask)
     uint64_t code = _code;
     code = get_code(_code, mask);
     std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
-    uint8_t n = (63 - __builtin_clzl(code)) >> 1;
-    char seq[n];
+    uint8_t const n = (63 - __builtin_clzl(code)) >> 1;
+    char * seq_ptr = new char[n];
     for (uint8_t i = 1; i <= n; ++i, code >>= 2)
-        seq[n - i] = alphabet[3 & code];
-    return std::string(seq, n);
+        seq_ptr[n - i] = alphabet[3 & code];
+    delete[] seq_ptr;
+    return std::string(seq_ptr, n);
 }
 
 // return full length sequence, ignore variable length info in leading bits if present.
@@ -105,11 +106,12 @@ std::string dna_decoder(uint64_t const _code)
     uint64_t code = _code;
     code &= ~PREFIX_SELECTOR;
     std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
-    uint8_t n = (63 - __builtin_clzl(code)) >> 1;
-    char seq[n];
+    uint8_t const n = (63 - __builtin_clzl(code)) >> 1;
+    char * seq_ptr = new char[n];
     for (uint8_t i = 1; i <= n; ++i, code >>= 2)
-        seq[n - i] = alphabet[3 & code];
-    return std::string(seq, n);
+        seq_ptr[n - i] = alphabet[3 & code];
+    delete[] seq_ptr;
+    return std::string(seq_ptr, n);
 }
 
 extern inline uint64_t complement(uint64_t const _code)
