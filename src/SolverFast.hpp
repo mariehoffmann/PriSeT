@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include "Solver.hpp"
 #include "types/IOConfig.hpp"
 #include "types/PrimerConfig.hpp"
@@ -15,15 +13,18 @@ struct SolverFast : Solver
     SolverFast(IOConfig & _io_cfg, PrimerConfig & _primer_cfg) :
         Solver(_io_cfg, _primer_cfg) {}
 
-    void solve()
+    void run()
     {
         Solver::run();
         // wrap single pairs as groups
         if (Solver::primer_cfg.get_primer_set_size() == 1)
+        {
             Solver::as_groups();
+            Solver::sort_groups_by_coverage();
+        }
         // greedy: group primer pairs with largest coverage
         else
-            Solver::group_by_max_coverage();
+            Solver::group_by_max_coverage_exact();
 
     }
 };

@@ -11,6 +11,7 @@
 #include "../submodules/genmap/src/common.hpp"
 #include "../submodules/genmap/src/genmap_helper.hpp"
 // #include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
+#include <sdsl/bit_vectors.hpp>
 
 #include "types/all.hpp"
 #include "utilities.hpp"
@@ -159,7 +160,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
             references[seqNo_map[seqNo]][seqPos] = 1;
             // std::cout << "a10\n";
             uint64_t loc_key = location_encode(seqNo_map[seqNo], seqPos);
-            uint64_t loc_val = ONE_LSHIFT_63 >> (K - PRIMER_MIN_LEN); // later prefix of kmerID
+            uint64_t loc_val = ONE_LSHIFT_63 >> (K - KAPPA_MIN); // later prefix of kmerID
             // locations filled for K_min to K_max
             if (loc2k.find(loc_key) == loc2k.end())
                 loc2k.insert({loc_key, loc_val});
@@ -196,7 +197,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
                 throw std::invalid_argument("ERROR: prefix is 0!");
 
             // identify lowest set bit in prefix
-            TKmerLength k_max = PRIMER_MAX_LEN - ffsll(kmerID >> 54) + 1;
+            TKmerLength k_max = KAPPA_MAX - ffsll(kmerID >> 54) + 1;
 
             // lookup sequence in corpus and encode
             seqan::DnaString seq = seqan::valueById(text, seqNo_map[ONE_LSHIFT_63 | seqNo_cx]);
@@ -206,7 +207,7 @@ void transform_and_filter(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TK
             std::string cs = seqan::toCString(static_cast<seqan::CharString>(kmer_str));
 
             // erase those length bits in prefix corresponding to kmers not passing the filter
-            chemical_filter_single_pass(kmerID);
+            filter_Cs(kmerID, primer_cfg);
 
             // do not store Kmer and reset bit in reference
             if (!(PREFIX_SELECTOR & kmerID))
@@ -242,10 +243,10 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
                 std::cerr << "ERROR: k length pattern is zero\n";
 
             // minimal window start position for pairing kmer
-            uint64_t w_begin = idx_fwd + PRIMER_MIN_LEN + TRANSCRIPT_MIN_LEN;
+            uint64_t w_begin = idx_fwd + KAPPA_MIN + TRANSCRIPT_MIN_LEN;
 
             // maximal window end position (exclusive) for pairing kmer
-            uint64_t w_end = std::min(reference.size(), idx_fwd + PRIMER_MAX_LEN + TRANSCRIPT_MAX_LEN + 1);
+            uint64_t w_end = std::min(reference.size(), idx_fwd + KAPPA_MAX + TRANSCRIPT_MAX_LEN + 1);
 
             // iterate through kmers in reference sequence window [w_begin : w_end]
             // note that w_begin/end are updated due to varying kmer length of same kmerID
@@ -289,7 +290,7 @@ void combine(TReferences const & references, TKmerIDs const & kmerIDs, PrimerPai
 
 // Filter pairs by frequency and unpack PrimerPair -> PrimerPairUnpacked
 template<typename TSeqNoMap, typename TKmerIDs, typename PrimerPairList, typename PrimerPairUnpackedList>
-void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqNoMap & seqNo_map, TKmerIDs const & kmerIDs, PrimerPairList & pairs, PrimerPairUnpackedList & pairs_unpacked)
+void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig const & primer_cfg, TSeqNoMap & seqNo_map, TKmerIDs const & kmerIDs, PrimerPairList & pairs, PrimerPairUnpackedList & pairs_unpacked)
 {
     std::unordered_map<std::string, std::vector<bool>> pair2seqNo_cx_vector;
     std::unordered_map<uint64_t, std::string> primers_memoized;
@@ -346,7 +347,7 @@ void filter_and_unpack_pairs(IOConfig & io_cfg, PrimerConfig & primer_cfg, TSeqN
             {
                 if (!seen_and_index.count(key))
                 {
-                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{&io_cfg, &seqNo_map, pair2seqNo_cx_vector.at(key), kmer_fwd, code_fwd, kmer_rev, code_rev};
+                    PrimerPairUnpacked<TSeqNoMap> pair_unpacked{&io_cfg, &seqNo_map, pair2seqNo_cx_vector.at(key), code_fwd, code_rev};
                     pairs_unpacked.push_back({pair_unpacked});
                     seen_and_index[key] = pairs_unpacked.size() - 1;
                 }

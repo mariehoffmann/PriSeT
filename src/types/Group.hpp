@@ -92,7 +92,7 @@ struct Group
         for (PrimerPairUnpacked<TSeqNoMap> p : group)
         {
             s += p.get_forward_primer() + "," + p.get_reverse_primer() + ",";
-            s += std::to_string(p.get_frequency()) + "," + std::to_string(p.get_coverage()) + "\n";
+            s += std::to_string(p.get_frequency()) + "," + std::to_string(p.get_species_count()) + "\n";
         }
         return s;
     }

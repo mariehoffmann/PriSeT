@@ -37,7 +37,7 @@ struct Solver
     PrimerConfig & primer_cfg;
 
     // Constructor with member variable setting.
-    Solver(IOConfig & _io_cfg, PrimerConfig _primer_cfg) :
+    Solver(IOConfig & _io_cfg, PrimerConfig & _primer_cfg) :
         io_cfg(_io_cfg), primer_cfg(_primer_cfg) {}
 
     // Stores for each reference the encoded kmers in order of occurrence.
@@ -194,7 +194,7 @@ public:
     void run()
     {
         // 1. Optional index computation
-        if (!io_cfg.skip_FM_idx())
+        if (io_cfg.get_FM_idx_flag())
             fm_index(io_cfg);
 
         // 2. k-mer frequency computation
@@ -228,26 +228,25 @@ public:
     }
 
     // greedy grouping by clustering first primer_set_size primers sorted by coverage.
-    virtual bool group_by_max_coverage()
+    virtual bool group_by_max_coverage_greedy()
     {
         if (!pairs_unpacked.size())
             return false;
         groups.clear();
         sort(pairs_unpacked.begin(), pairs_unpacked.end(),
         [](PrimerPairUnpacked<TSeqNoMap> & p, PrimerPairUnpacked<TSeqNoMap> & q)
-            {return p.get_coverage() < q.get_coverage();});
+            {return p.get_species_count() < q.get_species_count();});
         for (auto it = std::crbegin(pairs_unpacked); it != std::crend(pairs_unpacked) - primer_cfg.get_primer_set_size() + 1; ++it)
         {
             PrimerPairUnpackedList ppu{it, it + primer_cfg.get_primer_set_size()};
             Group<TSeqNoMap> group{&io_cfg, &seqNo_map, ppu};
             groups.push_back(group);
         }
-
         return true;
     }
 
     // greedy grouping by clustering first primer_set_size primers sorted by coverage.
-    virtual bool group_by_max_frequency()
+    bool group_by_max_frequency()
     {
         if (!pairs_unpacked.size())
             return false;
@@ -260,16 +259,58 @@ public:
             PrimerPairUnpackedList ppu{it, it + primer_cfg.get_primer_set_size()};
             groups.push_back(Group<TSeqNoMap>{&io_cfg, &seqNo_map, ppu});
         }
-
         return true;
     }
 
-    // // TODO: continue here
-    // // 6. Maximize for coverage
-    // using Groups = std::vector<Group>;
-    // Groups groups;
-    // optimize_coverage<PrimerPairList, Groups>(io_cfg, primer_cfg, pairs_unpacked, groups, kmer_counts);
-    //
+    // Solve exactly for the 100 highest covering primer pairs.
+    // Rank by largest combined coverage.
+    bool group_by_max_coverage_exact()
+    {
+        // determine rank of species
+        std::unordered_map<Taxid, size_t> taxid2rank;
+        Taxid taxid;
+        size_t rank{0}; // position in common species set
+        while ((taxid = io_cfg.get_next_species()))
+            taxid2rank[taxid] = rank++;
+        std::map<size_t, uint8_t> hitcount2idx;
+        // cache best 100 primer pairs in terms of independent coverage
+        std::vector<std::vector<bool>> sp_top;
+        for (PrimerPairUnpacked<TSeqNoMap> ppu : pairs_unpacked)
+        {
+            Taxid taxid;
+            std::vector<bool> hits(taxid2rank.size(), 0);
+            size_t hits_ctr{0};
+            while ((taxid = ppu.get_next_species()))
+            {
+                hits[taxid2rank.at(taxid)] = 1;
+                ++hits_ctr;
+            }
+            if (hitcount2idx.size() < 100) // add
+            {
+                sp_top.push_back(hits);
+                hitcount2idx[hits_ctr] = sp_top.size() - 1;
+            }
+            else // possibly replace vector with lowest hit count
+            {
+                std::map<size_t, uint8_t>::iterator it = hitcount2idx.begin();
+                if (it->first < hits_ctr)
+                {
+                    uint8_t idx = it->second;
+                    sp_top[idx] = hits;
+                    hitcount2idx.erase(it);
+                    hitcount2idx[hits_ctr] = idx;
+                }
+            }
+        }
+        return (groups.size()) ? true : false;
+    }
+
+    void sort_groups_by_coverage()
+    {
+        std::sort(groups.begin(), groups.end(), [](Group<TSeqNoMap> & g, Group<TSeqNoMap> & h)
+            {return g.get_taxa_count() < h.get_taxa_count();});
+    }
+
     // // 7. Filter pairs.
     // // TODO: rewrite  filter_pairs to work with pair_freqs
     // using PrimerPairGroupsUnpack =

@@ -41,4 +41,5 @@ macro(priset_unit_test unit_test_cpp)
     unset (test_name)
 endmacro ()
 
+add_subdirectory(filter)
 add_subdirectory(types)

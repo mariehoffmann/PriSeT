@@ -30,10 +30,10 @@ namespace priset
 #define PRIMER_SET_SIZE ((uint8_t)1)
 
 // The minimal possible primer length (or a kmer).
-#define PRIMER_MIN_LEN ((uint8_t)16)
+#define KAPPA_MIN ((uint8_t)16)
 
 // The maximal possible primer length (or a kmer).
-#define PRIMER_MAX_LEN ((uint8_t)25)
+#define KAPPA_MAX ((uint8_t)25)
 
 // The default minimal transcript length.
 #define TRANSCRIPT_MIN_LEN ((uint32_t)30)
@@ -97,10 +97,10 @@ private:
     uint8_t primer_set_size{PRIMER_SET_SIZE};
 
     // The minimal primer length. Default is global minimum.
-    uint8_t primer_min_len = PRIMER_MIN_LEN;
+    uint8_t primer_min_len = KAPPA_MIN;
 
     // The maximal primer length. Default is global maximum.
-    uint8_t primer_max_len = PRIMER_MAX_LEN;
+    uint8_t primer_max_len = KAPPA_MAX;
 
     // The minimal transcript length.
     uint64_t transcript_min_len = TRANSCRIPT_MIN_LEN;
@@ -182,15 +182,15 @@ public:
         return primer_set_size;
     }
 
-    /* Set minimal primer length not subceeding PRIMER_MIN_LEN. On success it
-    * will be set to l, otherwise remains PRIMER_MIN_LEN.
+    /* Set minimal primer length not subceeding KAPPA_MIN. On success it
+    * will be set to l, otherwise remains KAPPA_MIN.
     */
     bool set_primer_min_len(uint64_t const l)
     {
-        if (l < PRIMER_MIN_LEN || l <= PRIMER_MAX_LEN)
+        if (l < KAPPA_MIN || l <= KAPPA_MAX)
         {
-            std::cerr << "ERROR: Possible primer length range is [" << PRIMER_MIN_LEN;
-            std::cerr << ":" << PRIMER_MAX_LEN << "]. Your request will be ignored!";
+            std::cerr << "ERROR: Possible primer length range is [" << KAPPA_MIN;
+            std::cerr << ":" << KAPPA_MAX << "]. Your request will be ignored!";
             std::cerr << std::endl;
             return false;
         }
@@ -209,15 +209,15 @@ public:
         return primer_min_len;
     }
 
-    /* Set maximal primer length not exceeding PRIMER_MAX_LEN. On success it
-    * will be set to l, otherwise remains PRIMER_MAX_LEN.
+    /* Set maximal primer length not exceeding KAPPA_MAX. On success it
+    * will be set to l, otherwise remains KAPPA_MAX.
     */
     bool set_primer_max_len(uint64_t const l)
     {
-        if (l > PRIMER_MAX_LEN || l < PRIMER_MIN_LEN)
+        if (l > KAPPA_MAX || l < KAPPA_MIN)
         {
-            std::cerr << "Possible primer length range is [" << PRIMER_MIN_LEN;
-            std::cerr << ":" << PRIMER_MAX_LEN << "] °C. Your request will be ignored!";
+            std::cerr << "Possible primer length range is [" << KAPPA_MIN;
+            std::cerr << ":" << KAPPA_MAX << "] °C. Your request will be ignored!";
             std::cerr << std::endl;
             return false;
         }
@@ -308,7 +308,7 @@ public:
     }
 
     // Get minimal primer melting temperature.
-    constexpr uint8_t get_primer_min_Tm() const noexcept
+    constexpr uint8_t get_Tm_min() const noexcept
     {
         return primer_min_Tm;
     }
@@ -333,7 +333,7 @@ public:
     }
 
     // Get minimal primer melting temperature.
-    constexpr uint8_t get_primer_max_Tm() const noexcept
+    constexpr uint8_t get_Tm_max() const noexcept
     {
         return primer_max_Tm;
     }

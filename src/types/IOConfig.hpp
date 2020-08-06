@@ -261,7 +261,7 @@ public:
 
     // Get next species stored in set. We use the fact that order of unordered_set
     // is fixed § 23.2.5 [unord.req] once no insertion takes place.
-    Taxid get_next_species()
+    Taxid get_next_species() noexcept
     {
         if (it_species == species_set.cend())
         {
@@ -327,10 +327,10 @@ private:
     uint64_t library_size{0};
 
     // Species extracted from tax_file.
-    std::unordered_set<Taxid> species_set;
+    std::set<Taxid> species_set;
 
     // Iterator for species set.
-    std::unordered_set<Taxid>::const_iterator it_species = species_set.cbegin();
+    std::set<Taxid>::const_iterator it_species = species_set.cbegin();
 
     // Taxid to accessions map.
     std::unordered_map<Taxid, std::vector<Accession>> taxid2accs_map;

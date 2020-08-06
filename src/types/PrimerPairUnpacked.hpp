@@ -27,8 +27,9 @@ struct PrimerPairUnpacked
                 continue;
             // recover original sequence identifier
             TSeqNo seqNo = seqNo_map->at((1ULL << 63) | seqNo_cx);
-            taxid_set.insert(io_cfg->get_taxid_by_seqNo(seqNo));
+            species_set.insert(io_cfg->get_taxid_by_seqNo(seqNo));
         }
+        it_species = species_set.cbegin();
     }
 
     // Set flag in reference vector if this pair has a match in a reference
@@ -38,12 +39,14 @@ struct PrimerPairUnpacked
         TSeqNo seqNo = seqNo_map->at((1ULL << 63) | seqNo_cx);
         Taxid taxid = io_cfg->get_taxid_by_seqNo(seqNo);
         assert(io_cfg->is_species(taxid));
-        taxid_set.insert(taxid);
+        species_set.insert(taxid);
         if (seqNo_cx_vector.size() <= seqNo_cx)
             seqNo_cx_vector.resize(seqNo_cx + 1, 0);
         if (!seqNo_cx_vector[seqNo_cx])
             ++seqNo_count;
         seqNo_cx_vector[seqNo_cx] = 1;
+        // reset taxid iterator
+        it_species = species_set.cbegin();
     }
 
     // Get flag for match of reference sequence with ID = seqNo_cx.
@@ -61,9 +64,22 @@ struct PrimerPairUnpacked
         return seqNo_count;
     }
 
-    size_t get_coverage() const noexcept
+    size_t get_species_count() const noexcept
     {
-        return taxid_set.size();
+        return species_set.size();
+    }
+
+    // Return number of distinct species.
+    Taxid get_next_species() noexcept
+    {
+        if (it_species == species_set.cend())
+        {
+            it_species = species_set.cbegin();
+            return Taxid{0};
+        }
+        Taxid taxid = *it_species;
+        it_species++;
+        return taxid;
     }
 
     // Return vector of compressed sequence identifiers.
@@ -106,7 +122,10 @@ private:
     size_t seqNo_count{0};
 
     // Set of taxonomic identifiers representing matching references.
-    std::unordered_set<Taxid> taxid_set;
+    std::unordered_set<Taxid> species_set;
+
+    // Iterator over species_set.
+    std::unordered_set<Taxid>::const_iterator it_species;
 };
 
 }

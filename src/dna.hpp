@@ -14,6 +14,7 @@
 
 //#include <seqan/basic.h>
 #include "common.hpp"
+#include "types/GenMapTypes.hpp"
 #include "types/PrimerConfig.hpp"
 #include "utilities.hpp"
 
@@ -40,7 +41,7 @@ uint64_t get_code(uint64_t const code_, uint64_t mask);
  * bits [60:64]         lower sequence length bound in case of variable length
  */
 
-uint64_t dna_encoder(seqan::String<priset::dna> const & seq)
+uint64_t dna_encoder(seqan::String<dna> const & seq)
 {
     uint64_t code(0);
      for (uint64_t i = 0; i < seqan::length(seq); ++i)
@@ -77,7 +78,7 @@ uint64_t dna_encoder_with_lbit(seqan::String<priset::dna> const & seq)
      // revert last shift
      code >>= 2;
      // add length bit and stop symbol 'C' = 1
-     code |= 1ULL << (63 - (l - PRIMER_MIN_LEN)) | (1ULL << uint64_t(l << 1));
+     code |= 1ULL << (63 - (l - KAPPA_MIN)) | (1ULL << uint64_t(l << 1));
      return code;
 }
 
@@ -167,7 +168,6 @@ extern inline uint64_t reverse_complement(uint64_t const _code)
     return prefix | code_rc;
 }
 
-//using dna = seqan::Dna;
 //!\brief DNA codes as enums.
 // TODO: use seqan Dna
 //enum dna {A, C, G, T, B, CGT, D, AGT, H, ACT, K, GT, M, AC, N, ACGT, R, AG, S, CG, V, ACG, W, AT, Y, CT};

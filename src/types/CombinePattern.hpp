@@ -20,8 +20,8 @@ private:
     // Stores which lengths of two KMerIDs are combined. At most 10 lengths are
     // encoded in a single KMerID, resulting in 10^2 possible sequence combinations.
     // A set bit at position i corresponds to the length combination
-    //              l1 = i/10 + PRIMER_MIN_LEN
-    //              l2 = (i % 10) + PRIMER_MIN_LEN
+    //              l1 = i/10 + KAPPA_MIN
+    //              l2 = (i % 10) + KAPPA_MIN
     std::bitset<100> data;
 
 public:
@@ -40,7 +40,9 @@ public:
     {
         assert(__builtin_popcountll(prefix1) == 1 && __builtin_popcountll(prefix2) == 1);
         auto idx = __builtin_clzl(prefix1) * PREFIX_SIZE + __builtin_clzl(prefix2);
+        std::cout << "set at idx = " << idx << std::endl;
         data.set(idx);
+        std::cout << "data.count() = " << data.count() << std::endl;
     }
 
     // Unset bit for a specific length combination given both TKMerID prefixes.
@@ -58,7 +60,7 @@ public:
     }
 
     // Return all enumerated length combinations translated into kmer length offsets.
-    //The true kmer length can be retrieved by adding PRIMER_MIN_LEN.
+    //The true kmer length can be retrieved by adding KAPPA_MIN.
     void get_combinations(std::vector<std::pair<TOffset, TOffset>> & combinations)
     {
         combinations.clear();

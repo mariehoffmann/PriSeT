@@ -5,7 +5,9 @@
 // GenMap is built with SeqAn2 datatypes which need to be handled by PriSeT
 namespace priset
 {
-    using dna = seqan::Dna5;
+
+    // The type of a DNA base.
+    using dna = seqan::Dna;
 
     // The Burrows-Wheeler Transfrom type in FM index compution.
     using TBWTLen = uint64_t;

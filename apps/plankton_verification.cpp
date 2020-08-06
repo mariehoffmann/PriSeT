@@ -59,9 +59,9 @@
 //     for (auto p : pairs_known)
 //     {
 //         fwd = p.first.fwd;
-//         chemical_filter_single_pass(fwd);
+//         filter_Cs(fwd);
 //         rev = p.first.rev;
-//         chemical_filter_single_pass(rev);
+//         filter_Cs(rev);
 //         std::cout << p.second << ": ";
 //         if ((PREFIX_SELECTOR & fwd) && (PREFIX_SELECTOR & rev))
 //             std::cout << " OK\n";
@@ -207,8 +207,8 @@
 //                 exit(-1);
 //             }
 //
-//             uint64_t w_begin = idx_fwd + PRIMER_MIN_LEN + TRANSCRIPT_MIN_LEN;
-//             uint64_t w_end = std::min(reference.size(), idx_fwd + PRIMER_MAX_LEN + TRANSCRIPT_MAX_LEN + 1); // + 1: rank excludes upper bound
+//             uint64_t w_begin = idx_fwd + KAPPA_MIN + TRANSCRIPT_MIN_LEN;
+//             uint64_t w_end = std::min(reference.size(), idx_fwd + KAPPA_MAX + TRANSCRIPT_MAX_LEN + 1); // + 1: rank excludes upper bound
 //
 //             for (uint64_t r_rev = r1s.rank(w_begin) + 1; r_rev <= r1s.rank(w_end); ++r_rev)
 //             {

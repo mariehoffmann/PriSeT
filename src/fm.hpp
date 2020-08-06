@@ -18,7 +18,7 @@
 #include <vector>
 
 // TODO: place proper seqan version
-#define SEQAN_APP_VERSION "1.0.0"
+#define SEQAN_APP_VERSION "3.0.0"
 
 //#include <seqan/arg_parse.h>
 #include <seqan/basic.h>
@@ -77,7 +77,7 @@ int fm_map(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & loc
     TLocations loc_per_K;
     using TKLocationsKey = typename TKLocations::key_type;
     using TKLocationsValue = typename TKLocations::mapped_type;
-    for (auto K = PRIMER_MIN_LEN; K <= PRIMER_MAX_LEN; ++K)
+    for (auto K = KAPPA_MIN; K <= KAPPA_MAX; ++K)
     {
         std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
         std::cout << "INFO: K = " << K << std::endl;

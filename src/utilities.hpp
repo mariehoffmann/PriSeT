@@ -47,21 +47,18 @@ static inline uint64_t log2_asm(uint64_t const x) {
 
 std::string kmerID2str(TKmerID kmerID);
 
-// extern inline std::pair<uint64_t, uint64_t> split(TKmerID);
-
-// helper: delete lengths bits including the one representing 2bit encode l and larger ones
-extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l)
+// Reset length bits for 2-bit encoded length l and larger
+extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l)
 {
-    // std::cout << "call delete_length_bits with l = " << int(l) << std::endl;
     auto [prefix, code] = split_kmerID(kmerID);
-    if (l <= (PRIMER_MIN_LEN << 1))
+    if (l <= (KAPPA_MIN << 1))
         kmerID = code;
     else
     {
-        uint64_t offset = PRIMER_MAX_LEN + 1 - (l >> 1);
+        uint64_t offset = KAPPA_MAX + 1 - (l >> 1);
         kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
     }
-    // std::cout << "delete_length_bits: " << kmerID2str(kmerID) << std::endl;
+    // std::cout << "reset_length_leq: " << kmerID2str(kmerID) << std::endl;
 }
 
 // Execute in terminal and collect command return value.
@@ -89,7 +86,7 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
         return;
     auto l_max = (26 - ffsll(prefix >> 54)) << 1;
     auto l_enc = WORD_SIZE - __builtin_clzll(code) - 1;
-    if (l_max > l_enc || l_enc < int(PRIMER_MIN_LEN << 1))
+    if (l_max > l_enc || l_enc < int(KAPPA_MIN << 1))
         throw std::runtime_error("ERROR: Code shorter than 16 or largest encoded length!");
     code >>= (l_enc - l_max);
     kmerID = prefix | code;
@@ -118,8 +115,8 @@ extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
     }
     uint8_t enc_l = (WORD_SIZE - 1 - __builtin_clzl(code)) >> 1; // encoded length
     if (!mask)
-        mask = ONE_LSHIFT_63 >> (enc_l - PRIMER_MIN_LEN);
-    uint8_t mask_l = __builtin_clzl(mask) + PRIMER_MIN_LEN;      // selected length
+        mask = ONE_LSHIFT_63 >> (enc_l - KAPPA_MIN);
+    uint8_t mask_l = __builtin_clzl(mask) + KAPPA_MIN;      // selected length
     return (enc_l == mask_l) ? code : code >> ((enc_l - mask_l) << 1);   // kmer length correction
 }
 
@@ -136,7 +133,7 @@ extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
 //     uint64_t code = kmerID & ~PREFIX_SELECTOR; // clear leading kmer length information
 //     TSeq decode = dna_decoder(code); // largest kmer
 //     uint64_t K = seqan::length(decode); //
-//     kmer_length_mask >>= PRIMER_MIN_LEN - K;
+//     kmer_length_mask >>= KAPPA_MIN - K;
 //     while (kmer_length_mask != 0)
 //     {
 //         if (kmer_length_mask & 1)
@@ -192,7 +189,7 @@ void print_combinations(TKmerIDs const & kmerIDs, PairList const & pairs) noexce
 
         for (auto lc : combinations)
         {
-            std::cout << "\t | \t\t\t |  \t\t\t | (kmerID_fwd[" << lc.first << ":], kmerID_rev[" << lc.second << "]) = (" << seqan::infixWithLength(kmer_fwd, 0, lc.first + PRIMER_MIN_LEN) << ", " << seqan::infixWithLength(kmer_rev, 0, lc.second + PRIMER_MIN_LEN) << ")\n";
+            std::cout << "\t | \t\t\t |  \t\t\t | (kmerID_fwd[" << lc.first << ":], kmerID_rev[" << lc.second << "]) = (" << seqan::infixWithLength(kmer_fwd, 0, lc.first + KAPPA_MIN) << ", " << seqan::infixWithLength(kmer_rev, 0, lc.second + KAPPA_MIN) << ")\n";
         }
     }
 }

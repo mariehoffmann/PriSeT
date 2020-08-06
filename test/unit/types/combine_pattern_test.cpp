@@ -1,8 +1,8 @@
 #include <bitset>
 #include <vector>
 
-#include "../../../src/dna.hpp"
-#include "../../../src/utilities.hpp"
+#include "types/CombinePattern.hpp"
+#include "utilities.hpp"
 
 #include "gtest/gtest.h"
 
@@ -36,16 +36,16 @@ TEST(combine_pattern_test, set)
     cp.set(1ULL << 54, 1ULL << 54);
     std::vector<pair_type> cmb;
     cp.get_combinations(cmb);
-    cmb.resize(2);
     ASSERT_EQ(3ULL, cmb.size());
     pair_type cmb_0{0, 0};
     pair_type cmb_1{3, 4};
     pair_type cmb_2{9, 9};
     EXPECT_EQ(cmb_0.first, cmb.at(0).first);
     EXPECT_EQ(cmb_0.second, cmb.at(0).second);
-
-    // EXPECT_EQ(cmb_1, cmb.at(1));
-    // EXPECT_EQ(cmb_2, cmb.at(2));
+    EXPECT_EQ(cmb_1.first, cmb.at(1).first);
+    EXPECT_EQ(cmb_1.second, cmb.at(1).second);
+    EXPECT_EQ(cmb_2.first, cmb.at(2).first);
+    EXPECT_EQ(cmb_2.second, cmb.at(2).second);
 }
 
 TEST(combine_pattern_test, reset)

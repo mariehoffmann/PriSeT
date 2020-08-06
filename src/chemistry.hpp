@@ -19,6 +19,7 @@
 #include <seqan/basic.h>
 
 #include "dna.hpp"
+#include "filter/Tm.hpp"
 #include "types/all.hpp"
 #include "utilities.hpp"
 
@@ -30,97 +31,14 @@ std::string dna_decoder(uint64_t code, uint64_t const mask);
 extern inline uint64_t complement(uint64_t const code);
 extern inline uint64_t reverse(uint64_t const code);
 extern inline uint64_t reverse_complement(uint64_t const code);
+extern inline void Tm_filter(uint64_t & kmer, uint8_t const Tm_min, uint8_t const Tm_max);
 extern inline void trim_to_true_length(TKmerID &);
-
-// Difference in melting temperatures (degree Celsius) according to Wallace rule.
-extern inline float dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID const kmerID2, TKmerID const mask2)
-{
-    if (!(kmerID1 & mask1) || !(kmerID2 & mask2))
-        std::cerr << "Error: target mask bit not set\n";
-
-    // remove length mask
-    TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR;
-    TKmerID code2 = kmerID2 & ~PREFIX_SELECTOR;
-
-    uint8_t enc_l1 = encoded_length(code1);  // encoded length 2bit
-    uint8_t mask_l1 = (__builtin_clzl(mask1) + PRIMER_MIN_LEN) << 1;   // selected length 2bit
-
-    uint8_t enc_l2 = encoded_length(code2); // encoded length 2bit
-    uint8_t mask_l2 = (__builtin_clzl(mask2) + PRIMER_MIN_LEN) << 1;      // selected length
-
-    if (mask_l1 > enc_l1 || mask_l2 > enc_l2)
-        std::cerr << "ERROR: largest encoded kmer length undershoots target length!\n";
-
-    // trim kmer if exceeding encoded length
-    code1 >>= enc_l1 - mask_l1;
-    code2 >>= enc_l2 - mask_l2;
-
-    int8_t AT{0};
-    int8_t CG{0};
-
-    if (!(__builtin_clzl(code1) % 2))
-        std::cerr << "ERROR: expected odd number of leading zeros\n";
-
-    if (!(__builtin_clzl(code2) % 2))
-        std::cerr << "ERROR: expected odd number of leading zeros\n";
-
-    while (code1 != 1)
-    {
-        (!(code1 & 3) || (code1 & 3) == 3) ? ++AT : ++CG;
-        code1 >>= 2;
-    }
-    while (code2 != 1)
-    {
-        (!(code2 & 3) || (code2 & 3) == 3) ? --AT : --CG;
-        code2 >>= 2;
-    }
-    return std::abs(2 * AT + 4 * CG);
-}
-
-// AT   AT = 2
-//
-// CG      CG = -2
-
-/*
- * Compute melting temperature of an encoded oligomer. The oligomer is trimmed
- * to the length indicated by bit mask, otherwise (mask = 0) to the smallest encoded
- * length.
- * \Details
- * Compute the melting temperature applying the simple Wallace rule:
- *                            Tm = 2AT + 4CG
- * The difference in temperature estimates between the Wallace and the nearest
- * neighbour method (considered as more precise) rarely exceeds 4.5 K. This
- * maximum estimatation error needs to be considered when filtering and analyzing
- * potential primer pairs.
- */
-extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
-{
-    auto [prefix, code] = split_kmerID(kmerID);
-    auto target_l = PRIMER_MIN_LEN;
-    target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
-    auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
-    code >>= (enc_l - target_l) << 1;
-    uint8_t AT = 0;
-    uint8_t CG = 0;
-    while (code != 1)
-    {
-        switch (code & 3)
-        {
-            case 0:
-            case 3: ++AT; break;
-            case 1:
-            case 2: ++CG;
-        }
-        code >>= 2;
-    }
-    return (AT << 1) + (CG << 2);
-}
 
 // CG content computation for output
 extern inline float count_CG(TKmerID const kmerID, uint64_t const mask)
 {
     auto [prefix, code] = split_kmerID(kmerID);
-    auto target_l = PRIMER_MIN_LEN;
+    auto target_l = KAPPA_MIN;
     target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
     auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
     code >>= (enc_l - target_l) << 1;
@@ -188,30 +106,27 @@ std::string kmerID2str(TKmerID kmerID);
  */
 extern inline void filter_repeats_runs(TKmerID & kmerID)
 {
-    // std::cout << "\tenter filter_repeats_runs ...\n";
     auto [prefix, code] = split_kmerID(kmerID);
     if (!code)
         throw std::invalid_argument("Expected kmerID non zero!");
     if (!prefix)
-    {
-        // std::cout << "prefix is already 0 \n";
         return;
-    }
     uint64_t const tail_selector_10 = (1 << 10) - 1;
     uint64_t const tail_selector_20 = (1 << 20) - 1;
     kmerID = code; // save trimmed kmer-code part
     uint64_t const k = (63 - __builtin_clzl(code)) >> 1;
+    uint64_t offset;
     for (uint64_t i = 0; i < k - 4; ++i) // up-to four, i.e. 8 bits consecutive characters permitted
     {
         uint64_t tail_10 = tail_selector_10 & code;
         // XOR tail with A_4, C_4, G_4, T_4
-        if ((tail_10 == 0b00000000) || (tail_10 == 0b01010101) || (tail_10 == 0b10101010) || (tail_10 == 0b11111111))
+        if (    (tail_10 == 0b00000000) || (tail_10 == 0b01010101) ||
+                (tail_10 == 0b10101010) || (tail_10 == 0b11111111))
         {
-            // note that (x >> 64) won't be executed
-            uint64_t offset = 64 - (std::max((uint64_t)PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
+            // note: (x >> 64) won't be executed
+            offset = 64 - (std::max((uint64_t)KAPPA_MIN, k - i) - KAPPA_MIN);
             // delete all k bits ≥ len_selector
             prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
-            // std::cout << "\t4-run found\n";
         }
         // at least 10 characters left to test for di-nucleotide repeats of length 5
         if (k - i > 9)
@@ -226,24 +141,17 @@ extern inline void filter_repeats_runs(TKmerID & kmerID)
                  (tail_20 == 0b10111011101110111011) || (tail_20 == 0b11101110111011101110))
             {
                 // delete all k bits ≥ len_selector
-                uint64_t offset = 64 - (std::max((uint64_t)PRIMER_MIN_LEN, k - i) - PRIMER_MIN_LEN);
+                offset = 64 - (std::max((uint64_t)KAPPA_MIN, k - i) - KAPPA_MIN);
                 // delete all k bits ≥ len_selector
                 prefix = (offset == 64) ? 0 : (prefix >> offset) << offset;
-                // std::cout << "\tdi-nucleotide run found\n";
             }
         }
         if (!prefix)
-        {
-            // std::cout << "\tprefix is 0\n";
             break;
-        }
-
         code >>= 2;
     }
     // add updated prefix
-
     kmerID |= prefix;
-    // std::cout << "\tored kmerID = " << kmerID2str(kmerID) << std::endl;
 }
 
 // Check if not more than 3 out of the 5 last bases at the 3' end are CG.
@@ -259,7 +167,7 @@ extern inline bool filter_CG_clamp(TKmerID const kmerID, char const sense, uint6
     {
         if (mask)
         {
-            uint8_t target_l = (PRIMER_MIN_LEN + __builtin_clzl(mask)) << 1; // in bits
+            uint8_t target_l = (KAPPA_MIN + __builtin_clzl(mask)) << 1; // in bits
             code >>= enc_l - target_l; // delete prefix and trim to target length
         }
     }
@@ -314,7 +222,7 @@ extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense,
     }
     if (mask)
     {
-        uint64_t target_len = (PRIMER_MIN_LEN + __builtin_clzl(mask)) << 1;
+        uint64_t target_len = (KAPPA_MIN + __builtin_clzl(mask)) << 1;
         code >>= encoded_len - target_len; // delete prefix and trim to target length
     }
     return !WWW_tails()[code & 0b111111];
@@ -322,7 +230,7 @@ extern inline bool filter_WWW_tail(TKmerID const kmerID, char const sense,
 
 extern inline void filter_annealing_disconnected(TKmerID &, TKmerID &);
 
-extern inline void delete_length_bits(TKmerID & kmerID, uint8_t l);
+extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l);
 
 // l1, l2 refer to kmer lengths including dimerizing 4-mer
 extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kmerID2, uint8_t l2)
@@ -330,27 +238,27 @@ extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
 
     // std::cout << "l1 = " << int(l1) << ", l2 = " << int(l2) << ", kmerID2 ? " << (kmerID2 ? 1 : 0)  << std::endl;
     if (!kmerID2) // first 4-mer occurrence significant
-        delete_length_bits(kmerID1, std::min(l1, l2));
+        reset_length_leq(kmerID1, std::min(l1, l2));
     else
     {
         // case: l1 <= 16 and l2 > 16 or l1 > 16 and l2 > 16
-        if (l2 > (PRIMER_MIN_LEN << 1) && l2 > l1)
+        if (l2 > (KAPPA_MIN << 1) && l2 > l1)
         {
             // std::cout << "l1 > primer_min_len\n";
-            delete_length_bits(kmerID2, l2);
+            reset_length_leq(kmerID2, l2);
         }
         // case: l1 > 16 and l2 <= 16 or l1 > 16 and l2 > 16
-        if (l1 > (PRIMER_MIN_LEN << 1) && l1 > l2)
+        if (l1 > (KAPPA_MIN << 1) && l1 > l2)
         {
             // std::cout << "l1 > primer_min_len\n";
-            delete_length_bits(kmerID1, l1);
+            reset_length_leq(kmerID1, l1);
         }
         // case: l1 <= 16 and l2 <= 16
-        if (l1 <= (PRIMER_MIN_LEN << 1) && l2 <= (PRIMER_MIN_LEN << 1))
+        if (l1 <= (KAPPA_MIN << 1) && l2 <= (KAPPA_MIN << 1))
         {
             // std::cout << "both kmers in prefixes\n";
-            delete_length_bits(kmerID1, l1);
-            delete_length_bits(kmerID2, l2);
+            reset_length_leq(kmerID1, l1);
+            reset_length_leq(kmerID2, l2);
         }
     }
     return (!(kmerID1 & PREFIX_SELECTOR) || !(kmerID2 & PREFIX_SELECTOR)) ? 1 : 0;
@@ -358,7 +266,7 @@ extern inline bool annealing_helper(TKmerID & kmerID1, uint8_t l1, TKmerID & kme
 
 /*
  * Self- and cross-dimerization test (if 2nd kmer is not zero). 4-mers ending before
- * position PRIMER_MIN_LEN result in deletion of length mask, otherwise only
+ * position KAPPA_MIN result in deletion of length mask, otherwise only
  * affected lengths are erased. In the second part non-consecutive annealing is
  * tested - more than 8 annealing positions are considered to be critical.
  */
@@ -576,14 +484,6 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
     }
 }
 
-/*
-extern inline void filter_annealing(TKmerID & kmerID) // function overload for self-annealing
-{
-    static TKmerID const kmerID2{0};
-    filter_annealing(kmerID, kmerID2);
-}
-*/
-
 // test forward and reverse cross annealing between two kmers. Two kmers cross-anneal
 // if there are at least 4 nts complementary to each other.
 extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
@@ -614,7 +514,7 @@ extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
             uint8_t l1 = std::min(four[infix], four[infix_rev]) + 8;
             uint8_t l2 = WORD_SIZE - __builtin_clzl(code2) - 1;
             // annealing in both prefix makes them incombinable
-            if (l1 <= PRIMER_MIN_LEN && l2 <= PRIMER_MIN_LEN)
+            if (l1 <= KAPPA_MIN && l2 <= KAPPA_MIN)
             {
                 kmerID1 &= ~PREFIX_SELECTOR;
                 kmerID2 &= ~PREFIX_SELECTOR;
@@ -623,10 +523,10 @@ extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
             else
             {
                 // kmerID1 remains combinable with prefix of kmerID2 or l2 prefix needs to be trimmed
-                if (l1 <= PRIMER_MIN_LEN || l2 > PRIMER_MIN_LEN)
-                    kmerID2 = (kmerID2 & ~PREFIX_SELECTOR) + (prefix2 & ~((ONE_LSHIFT_63 >> (l2 - PRIMER_MIN_LEN - 1)) - 1));
-                if (l2 <= PRIMER_MIN_LEN || l1 > PRIMER_MIN_LEN) // kmerID2 remains combinable with prefix of kmerID1
-                    kmerID1 = (kmerID1 & ~PREFIX_SELECTOR) + (prefix1 & ~((ONE_LSHIFT_63 >> (l1 - PRIMER_MIN_LEN - 1)) - 1));
+                if (l1 <= KAPPA_MIN || l2 > KAPPA_MIN)
+                    kmerID2 = (kmerID2 & ~PREFIX_SELECTOR) + (prefix2 & ~((ONE_LSHIFT_63 >> (l2 - KAPPA_MIN - 1)) - 1));
+                if (l2 <= KAPPA_MIN || l1 > KAPPA_MIN) // kmerID2 remains combinable with prefix of kmerID1
+                    kmerID1 = (kmerID1 & ~PREFIX_SELECTOR) + (prefix1 & ~((ONE_LSHIFT_63 >> (l1 - KAPPA_MIN - 1)) - 1));
             }
         }
         code2 >>= 2;
@@ -645,15 +545,20 @@ extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
  * Precondition: kmerID_ trimmed to largest prefix encoded length
  * Output: kmerID trimmed to largest length bit
  */
-void chemical_filter_single_pass(TKmerID & kmerID)
+void filter_Cs(TKmerID & kmerID, PrimerConfig const & primer_cfg)
 {
-    // TKmerID code = kmerID & ~PREFIX_SELECTOR;
+    // melting temperature test
+    Tm_filter(kmerID, primer_cfg.get_Tm_min(), primer_cfg.get_Tm_max());
+    if (!(kmerID & PREFIX_SELECTOR))
+        return;
+
+
     auto [prefix, code] = split_kmerID(kmerID);
     assert(kmerID > 0 && code > 0);
     uint8_t AT = 0; // counter 'A'|'T'
     uint8_t CG = 0; // counter 'C'|'G'
 
-    uint64_t enc_l = PRIMER_MAX_LEN - ffsll(prefix >> 54) + 1;
+    uint64_t enc_l = KAPPA_MAX - ffsll(prefix >> 54) + 1;
     // sum CG, AT content for longest kmer
     while (code != 1)
     {
@@ -664,17 +569,16 @@ void chemical_filter_single_pass(TKmerID & kmerID)
             default: ++AT;
         }
         // TATA box test
-
         if ((code > (1ULL << 9)) && (((code & 0b11111111) == 0b11001100) || ((code & 0b11111111) == 0b00110011)))
         {
-            if (enc_l <= PRIMER_MIN_LEN) // delete all length bits to discard this kmer
+            if (enc_l <= KAPPA_MIN) // delete all length bits to discard this kmer
             {
                 kmerID &= ~PREFIX_SELECTOR;
                 return;
             }
             else // delete all length bits between current encoded length and larger ones
             {
-                prefix &= ~((1ULL << (WORD_SIZE - enc_l + PRIMER_MIN_LEN)) - 1);
+                prefix &= ~((1ULL << (WORD_SIZE - enc_l + KAPPA_MIN)) - 1);
             }
         }
         if (!prefix)
@@ -684,6 +588,7 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     }
     code = kmerID & ~PREFIX_SELECTOR;
     kmerID = prefix | code;
+
     // start with largest kmer
     uint64_t tailing_zeros = ffsll(prefix >> 54) - 1;
     uint64_t mask = 1ULL << (54 + tailing_zeros);
@@ -691,18 +596,9 @@ void chemical_filter_single_pass(TKmerID & kmerID)
     {
         if (kmerID & mask)
         {
-            // reset bit if Tm out of range
-            auto Tm = (AT << 1) + (CG << 2);
-            if (Tm < PRIMER_MIN_TM || Tm > PRIMER_MAX_TM)
-            {
+            float CG_content = float(CG) / (float(__builtin_clzl(mask) + KAPPA_MIN));
+            if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
                 kmerID ^= mask;
-            }
-            else
-            {
-                float CG_content = float(CG) / (float(__builtin_clzl(mask) + PRIMER_MIN_LEN));
-                if (CG_content < CG_MIN_CONTENT || CG_content > CG_MAX_CONTENT)
-                    kmerID ^= mask;
-            }
         }
         switch(3 & code)
         {
@@ -713,27 +609,7 @@ void chemical_filter_single_pass(TKmerID & kmerID)
         code >>= 2;
         mask <<= 1;
     }
-
-    // Filter di-nucleotide repeats and
     filter_repeats_runs(kmerID);
-    // if (!(kmerID & PREFIX_SELECTOR) && passed)
-    // {
-    //     std::cout << "Did not pass filter_repeats_runs." << std::endl;
-    //     passed = 0;
-    // }
-    // // Check for self-annealing
-    // filter_annealing_connected(kmerID);
-    // if (!(kmerID & PREFIX_SELECTOR) && passed)
-    // {
-    //     passed = 0;
-    //     std::cout << "Did not pass filter_annealing_connected." << std::endl;
-    // }
-    // filter_annealing_disconnected(kmerID);
-    // if (!(kmerID & PREFIX_SELECTOR) && passed)
-    // {
-    //     std::cout << "Did not pass filter_annealing_disconnected." << std::endl;
-    // }
-
 }
 
 /*

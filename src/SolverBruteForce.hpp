@@ -9,10 +9,6 @@ private:
     bitset<4> acc = bitset<4>(0);
     size_t m_tmp = 0;
 
-
-
-
-
     void solve_brute_force_recursive()
     {
 

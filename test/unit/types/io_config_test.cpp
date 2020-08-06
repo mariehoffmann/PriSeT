@@ -22,8 +22,8 @@ private:
     std::string rp = fp.substr(0, fp.find_last_of('/'));
 
 public:
-    fs::path lib_dir = fs::path(rp) / "../library/3041";
-    fs::path work_dir = fs::path(rp) / "../work/3041";
+    fs::path lib_dir = fs::path(rp) / "../../library/3041";
+    fs::path work_dir = fs::path(rp) / "../../work/3041";
     fs::path index_dir = work_dir / "index";
     IOConfig io_cfg;
 
@@ -40,8 +40,8 @@ private:
     std::string rp = fp.substr(0, fp.find_last_of('/'));
 
 public:
-    fs::path lib_dir = fs::path(rp) / "../library/one_seq";
-    fs::path work_dir = fs::path(rp) / "../work/one_seq";
+    fs::path lib_dir = fs::path(rp) / "../../library/one_seq";
+    fs::path work_dir = fs::path(rp) / "../../work/one_seq";
     fs::path index_dir = work_dir / "index";
     IOConfig io_cfg;
 

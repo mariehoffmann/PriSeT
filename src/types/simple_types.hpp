@@ -8,9 +8,10 @@
 
 #include <vector>
 
+// #include <sdsl/bit_vectors.hpp>
+#include "sdsl/bit_vectors.hpp"
+
 #include "../../submodules/genmap/src/common.hpp"
-#include "../../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
-#include <sdsl/bit_vectors.hpp>
 
 #define ONE_LSHIFT_63 (1ULL << 63)
 
