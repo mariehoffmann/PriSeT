@@ -204,7 +204,7 @@ public:
         return true;
     }
 
-    constexpr uint64_t get_primer_min_len() const noexcept
+    constexpr uint64_t get_kappa_min() const noexcept
     {
         return primer_min_len;
     }
@@ -231,7 +231,7 @@ public:
         return true;
     }
 
-    constexpr uint64_t get_primer_max_len() const noexcept
+    constexpr uint64_t get_kappa_max() const noexcept
     {
         return primer_max_len;
     }
@@ -363,7 +363,7 @@ public:
     }
 
     // Get lower bound for relative CG content other than default.
-    constexpr float get_CG_min_content() const noexcept
+    constexpr float get_CG_min() const noexcept
     {
         return CG_min_content;
     }
@@ -381,7 +381,7 @@ public:
     }
 
     // Get lower bound for relative CG content other than default.
-    constexpr float get_CG_max_content() const noexcept
+    constexpr float get_CG_max() const noexcept
     {
         return CG_max_content;
     }

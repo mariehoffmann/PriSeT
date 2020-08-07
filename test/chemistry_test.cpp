@@ -142,16 +142,6 @@ void filter_Cs_test()
     else
         std::cout << "INFO: Success\n";
     std::cout << "kmerID as bitstr = " << bits2str(kmerID) << std::endl;
-
-    std::cout << "------------------------------------------\n";
-    // case: only CG content out of range, CG: 10 (0.625), Tm = 2*6 + 4*10 = 62
-    kmerID = ONE_LSHIFT_63 + dna_encoder("CCGACCGTAACCGGTT");
-    kmerID_ref = kmerID - ONE_LSHIFT_63;
-    filter_Cs(kmerID);
-    if (kmerID_ref != kmerID)
-        std::cout << "ERROR: expect " << kmerID2str(kmerID_ref) << " got " << kmerID2str(kmerID) << std::endl;
-    else
-        std::cout << "INFO: Success\n";
 }
 
 void chemical_debug()

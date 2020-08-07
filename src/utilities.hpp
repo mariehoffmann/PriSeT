@@ -51,14 +51,16 @@ std::string kmerID2str(TKmerID kmerID);
 extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l)
 {
     auto [prefix, code] = split_kmerID(kmerID);
+    std::cout << "l = " << int(l) << std::endl;
     if (l <= (KAPPA_MIN << 1))
         kmerID = code;
     else
     {
-        uint64_t offset = KAPPA_MAX + 1 - (l >> 1);
+
+        uint64_t offset = KAPPA_MAX - (l >> 1) + 1;
+        std::cout << "offset = " << int(offset) << std::endl;
         kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
     }
-    // std::cout << "reset_length_leq: " << kmerID2str(kmerID) << std::endl;
 }
 
 // Execute in terminal and collect command return value.

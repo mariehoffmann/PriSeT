@@ -3,6 +3,7 @@
 #include <numeric>
 #include <vector>
 
+#include "filter/CG.hpp"
 #include "types/IOConfig.hpp"
 #include "types/PrimerPair.hpp"
 #include "types/PrimerPairUnpacked.hpp"
@@ -14,6 +15,34 @@ namespace priset
 
 std::string kmerID2str(TKmerID kmerID);
 extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l);
+
+/*
+ * Compute melting temperature of a single encoded oligomer. The oligomer is trimmed
+ * to the length indicated by bit mask, otherwise (mask = 0) to the smallest encoded
+ * length.
+ * \Details
+ * Compute the melting temperature applying the simple Wallace rule:
+ *                            Tm = 2AT + 4CG
+ * The difference in temperature estimates between the Wallace and the nearest
+ * neighbour method (considered as more precise) rarely exceeds 4.5 K. This
+ * maximum estimatation error needs to be considered when filtering and analyzing
+ * potential primer pairs.
+ */
+ extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
+ {
+    auto [prefix, code] = split_kmerID(kmerID);
+    uint8_t target_l = KAPPA_MIN;
+    target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
+    uint8_t CG_content = CG(kmerID, mask);
+    return ((target_l - CG_content) << 1) + (CG_content << 2);
+
+    // code >>= (enc_l - (target_l << 1));
+    // uint64_t p = 0x5555555555555ULL;
+    // uint64_t q = 0xAAAAAAAAAAAAAULL;
+    // uint64_t x = ((code & p) << 1) ^ (code & q);
+    // uint8_t CG = __builtin_popcountll(x) - 1;
+    // return ((target_l - CG) << 1) + (CG << 2);
+}
 
 /*
  * Filter encoded kmers for satisfying melting temperature (Tm) ranges.
@@ -28,121 +57,31 @@ extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l);
  * maximum estimatation error needs to be considered when filtering and analyzing
  * potential primer pairs.
  */
-extern inline void Tm_filter(TKmerID & kmer, uint8_t const Tm_min, uint8_t const Tm_max)
+extern inline void Tm_filter(TKmerID & kmerID, uint8_t const Tm_min, uint8_t const Tm_max, uint8_t const kappa_min, uint8_t const kappa_max)
 {
-    uint64_t const l_sv = encoded_length(kmer);
-    uint64_t const head_selector = 0b11ULL << 62;
-    std::cout << "head_selector = " << std::bitset<64>(head_selector) << std::endl;
-    std::cout << "kmer = " << kmerID2str(kmer) << std::endl;
-    uint64_t l{0};
-    auto [prefix, code] = split_kmerID(kmer);
-    uint64_t code_sv{code};
-    // std::cout << "length = " << l << endl;
-    code <<= WORD_SIZE - l_sv + 2;
-    // cout << "code = " << bitset<64>(code) << endl;
-    uint8_t AT{0};
-    uint8_t CG{0};
-    while (l <= l_sv && prefix)
+    uint64_t mask = 1ULL << 63;
+    uint8_t Tm_wallace;
+    for (uint8_t k = kappa_min; k <= kappa_max; ++k)
     {
-        std::cout << "head = " << ((code & head_selector) >> 62) << std::endl;
-        switch (code & head_selector)
+        if (mask & kmerID)
         {
-            case 0:
-            case 3: AT += 2; break;
-            case 1:
-            case 2: CG += 4;
+            Tm_wallace = Tm(kmerID, mask);
+            if (Tm_wallace < Tm_min)
+                kmerID ^= mask;
+            else if (Tm_wallace > Tm_max)
+            {
+                reset_length_leq(kmerID, encoded_length_mask(mask));
+                return;
+            }
         }
-        ++++l;
-        std::cout << "l = " << int(l) << ", Tm = " << int(AT + CG) << ", AT = " << int(AT) << ", CG = " << int(CG) << std::endl;
-        code <<= 2;
-        if (l < (KAPPA_MIN << 1))
-            continue;
-
-        if (AT + CG > Tm_max) // invalidate all kmers larger or equal than length
-        {
-            std::cout << "reset all larger bits for l = " << int(l) << std::endl;
-            kmer = prefix | code_sv;
-            reset_length_leq(kmer, l);
-            return;
-        }
-        uint64_t mask_l = (prefix & (1ULL << (WORD_SIZE - 1 - (l >> 1) + KAPPA_MIN)));
-        if (mask_l > 0 && ((AT + CG) < Tm_min)) // invalidate only current kmer
-        {
-            prefix = reset_length(prefix, l);
-            std::cout << "reset bit for l = " << int(l) << std::endl;
-        }
+        mask >>= 1;
     }
-    kmer = prefix | code_sv;
-}
-
-/*
- * Compute melting temperature of a single encoded oligomer. The oligomer is trimmed
- * to the length indicated by bit mask, otherwise (mask = 0) to the smallest encoded
- * length.
- * \Details
- * Compute the melting temperature applying the simple Wallace rule:
- *                            Tm = 2AT + 4CG
- * The difference in temperature estimates between the Wallace and the nearest
- * neighbour method (considered as more precise) rarely exceeds 4.5 K. This
- * maximum estimatation error needs to be considered when filtering and analyzing
- * potential primer pairs.
- */
-extern inline uint8_t Tm(TKmerID const kmerID, uint64_t const mask)
-{
-    auto [prefix, code] = split_kmerID(kmerID);
-    auto target_l = KAPPA_MIN;
-    target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
-    auto enc_l = (WORD_SIZE - 1 - __builtin_clzll(code)) >> 1;
-    code >>= (enc_l - target_l) << 1;
-    uint8_t AT = 0;
-    uint8_t CG = 0;
-    while (code != 1)
-    {
-        switch (code & 3)
-        {
-            case 0:
-            case 3: ++AT; break;
-            case 1:
-            case 2: ++CG;
-        }
-        code >>= 2;
-    }
-    return (AT << 1) + (CG << 2);
 }
 
 // Difference in melting temperatures (degree Celsius) according to Wallace rule.
 extern inline uint8_t dTm(TKmerID const kmerID1, TKmerID const mask1, TKmerID const kmerID2, TKmerID const mask2)
 {
-    // remove length mask
-    TKmerID code1 = kmerID1 & ~PREFIX_SELECTOR;
-    TKmerID code2 = kmerID2 & ~PREFIX_SELECTOR;
-
-    uint8_t enc_l1 = encoded_length(code1); // encoded length
-    uint8_t mask_l1 = (__builtin_clzl(mask1) + KAPPA_MIN) << 1; // selected length
-
-    uint8_t enc_l2 = encoded_length(code2); // encoded length
-    uint8_t mask_l2 = (__builtin_clzl(mask2) + KAPPA_MIN) << 1; // selected length
-
-    // if (mask_l1 > enc_l1 || mask_l2 > enc_l2)
-    //     std::cerr << "ERROR: largest encoded kmer length undershoots target length!\n";
-
-    // trim kmer if exceeding encoded length
-    code1 >>= enc_l1 - mask_l1;
-    code2 >>= enc_l2 - mask_l2;
-
-    int8_t AT{0};
-    int8_t CG{0};
-    while (code1 != 1)
-    {
-        (!(code1 & 3) || (code1 & 3) == 3) ? ++AT : ++CG;
-        code1 >>= 2;
-    }
-    while (code2 != 1)
-    {
-        (!(code2 & 3) || (code2 & 3) == 3) ? --AT : --CG;
-        code2 >>= 2;
-    }
-    return std::abs(2 * AT + 4 * CG);
+    return std::abs(Tm(kmerID1, mask1) - Tm(kmerID2, mask2));
 }
 
 }

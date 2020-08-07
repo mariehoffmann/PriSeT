@@ -31,7 +31,7 @@ std::string dna_decoder(uint64_t code, uint64_t const mask);
 extern inline uint64_t complement(uint64_t const code);
 extern inline uint64_t reverse(uint64_t const code);
 extern inline uint64_t reverse_complement(uint64_t const code);
-extern inline void Tm_filter(uint64_t & kmer, uint8_t const Tm_min, uint8_t const Tm_max);
+extern inline void Tm_filter(TKmerID & kmerID, uint8_t const Tm_min, uint8_t const Tm_max, uint8_t const kappa_min, uint8_t const kappa_max);
 extern inline void trim_to_true_length(TKmerID &);
 
 // CG content computation for output
@@ -548,9 +548,10 @@ extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
 void filter_Cs(TKmerID & kmerID, PrimerConfig const & primer_cfg)
 {
     // melting temperature test
-    Tm_filter(kmerID, primer_cfg.get_Tm_min(), primer_cfg.get_Tm_max());
+    Tm_filter(kmerID, primer_cfg.get_Tm_min(), primer_cfg.get_Tm_max(), primer_cfg.get_kappa_min(), primer_cfg.get_kappa_max());
     if (!(kmerID & PREFIX_SELECTOR))
         return;
+
 
 
     auto [prefix, code] = split_kmerID(kmerID);
