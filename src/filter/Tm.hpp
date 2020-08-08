@@ -12,7 +12,8 @@
 
 namespace priset
 {
-
+// forward declarations
+extern inline float CG(TKmerID const, uint64_t const);
 std::string kmerID2str(TKmerID kmerID);
 extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l);
 

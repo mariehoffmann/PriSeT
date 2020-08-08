@@ -13,6 +13,9 @@
 // #include "../submodules/sdsl-lite/include/sdsl/bit_vectors.hpp"
 #include <sdsl/bit_vectors.hpp>
 
+#include "filter/annealing.hpp"
+#include "filter/Tm.hpp"
+#include "filter/WWW_tail.hpp"
 #include "types/all.hpp"
 #include "utilities.hpp"
 

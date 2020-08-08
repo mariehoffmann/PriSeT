@@ -128,12 +128,12 @@
 //         sstream << std::hex << std::hash<std::string>()(fwd + rev) << ",";
 //         sstream << pf.first << "," << fwd << "," << rev << ",";
 //         sstream << "\"[" << float(Tm(code_fwd, mask_fwd)) << "," << float(Tm(code_rev, mask_rev)) << "]\",";
-//         sstream << "\"[" << count_CG(code_fwd, mask_fwd) << "," << count_CG(code_rev, mask_rev) << "]\"" << std::endl;
+//         sstream << "\"[" << CG(code_fwd, mask_fwd) << "," << CG(code_rev, mask_rev) << "]\"" << std::endl;
 //
 //     }
 //     // std::cout << sstream.str().substr(0,8) << "," << pf.first << "," << fwd << ",";
 //     // std::cout << rev << ",\"[" << float(Tm(code_fwd, mask_fwd)) << ",";
-//     // std::cout << float(Tm(code_rev, mask_rev)) << "]\",\"[" << count_CG(code_fwd, mask_fwd) << "," << count_CG(code_rev, mask_rev) << "]\"" << std::endl;
+//     // std::cout << float(Tm(code_rev, mask_rev)) << "]\",\"[" << CG(code_fwd, mask_fwd) << "," << count_CG(code_rev, mask_rev) << "]\"" << std::endl;
 //
 //     std::cout << sstream.rdbuf();
 //
