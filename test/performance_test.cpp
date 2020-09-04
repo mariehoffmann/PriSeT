@@ -14,7 +14,7 @@
 
 #include "../src/argument_parser.hpp"
 #include "../src/errors.hpp"
-#include "../src/filter.hpp"
+#include "../src/algorithm.hpp"
 #include "../src/fm.hpp"
 #include "../src/gui.hpp"
 #include "../src/IOConfig.hpp"

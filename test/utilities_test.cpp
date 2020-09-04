@@ -15,7 +15,7 @@
 #include <seqan/sequence.h>
 #include <seqan/stream.h>
 
-#include "../src/filter.hpp"
+#include "../src/algorithm.hpp"
 #include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"

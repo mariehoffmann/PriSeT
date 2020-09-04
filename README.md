@@ -8,7 +8,17 @@ Tool for assisting the search of primer sequences for metabarcoding experiments.
 | <img src="./.github/Linux.svg" width="100" height="100" /> | `Linux 64 bit` | - |
 | <img src="./.github/MacOS.svg" width="100" height="100" /> | `Mac OS 64 bit` | High Sierra 10.12.6 |
 
-### R
+### SDSL-Lite
+
+Get it from here: [xxsds/sdsl-lite](https://github.com/xxsds/sdsl-lite)
+
+
+### Cmake 3.7 or higher
+
+### GNU C++ Compiler xx or higher
+
+<!---
+### R for GUI
 If not installed on your system yet, install `R` via your standard package manager. However, for MacOS I recommend not to install via `port`, but download the binaries from [CRAN](https://cran.r-project.org/bin/macosx), because I ran into installation errors when when trying to install `igraph` and others in an interactive `R` session. If you install the package from `cran.r-project.org`, open the `R.app`, go to the package installer (under `Packages & Data`), search for the below listed packages and click the install button.
 If you use R in terminal, start an inter session, install the required `R` packages `shiny` and `DT` for table output, and `treemap` and `d3treeR` for an interactive tree map plot.
 ```shell
@@ -33,6 +43,8 @@ cd libiconv-1.15
 make
 make install
 ```
+-->
+
 
 ### Taxonomic Tree and Library
 In order to explore the potential primer sequences hierarchically w.r.t. an existing taxonomy, the taxonomic node identifier (taxid) needs to be related to reference sequences.
@@ -72,11 +84,20 @@ git clone --recurse-submodules https://github.com/mariehoffmann/PriSeT.git
 
 ### Unit Tests
 
+Create an out-of-source build directory and change into it:
+
 ```shell
-cd ../build
-cmake -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=/usr/local/bin/g++ ../PriSeT/tests/
-make
+mdkir -p ~/devel/priset_build_test/debug
+cd ~/devel/priset_build_test/debug
 ```
+
+Compile unit tests by calling CMakeLists.txt located in cloned PriSeT directory under /PriSeT/test.
+```shell
+cmake ~/git/PriSeT/test -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=g++ -B .
+make -j
+```
+
+cmake ../../seqan3/test/unit -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++-7
 
 ## References
    [1] Pockrandt, C., Alzamel, M., Iliopoulos, C. S., Reinert, K.. GenMap: Fast and Exact Computation of Genome Mappability. bioRxiv, presented on RECOMB-Seq, 2019.

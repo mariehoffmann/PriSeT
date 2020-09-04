@@ -18,7 +18,7 @@
 #define PRISET_TEST
 
 #include "../src/argument_parser.hpp"
-#include "../src/filter.hpp"
+#include "../src/algorithm.hpp"
 #include "../src/gui.hpp"
 #include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"

@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "filter.hpp"
+#include "algorithm.hpp"
 #include "fm.hpp"
 #include "types/all.hpp"
 #include "utilities.hpp"
