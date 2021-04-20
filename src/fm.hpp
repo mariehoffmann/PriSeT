@@ -55,7 +55,8 @@ namespace priset
 int fm_index(io_cfg_type const & io_cfg)
 {
     std::cout << "MESSAGE: start index recomputation" << std::endl;
-    std::string cmd = io_cfg.get_genmap_binary().string() + " index -F " + io_cfg.get_fasta_file().string() + " -I " + io_cfg.get_index_dir().string();
+    std::string cmd = io_cfg.get_genmap_binary().string() + " index -F " + \
+        io_cfg.get_fasta_file().string() + " -I " + io_cfg.get_index_dir().string();
     std::system(cmd.c_str());
     return 0;
 }
@@ -81,7 +82,8 @@ int fm_map(io_cfg_type const & io_cfg, primer_cfg_type const & primer_cfg, TKLoc
         std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
         std::cout << "INFO: K = " << K << std::endl;
         // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
-        char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", std::to_string(K).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csvRAM", "-fl"};
+        char const * argv[11] = {"map", "-I", s1.c_str(), "-O", s2.c_str(), "-K", \
+            std::to_string(K).c_str(), "-E", std::to_string(primer_cfg.get_error()).c_str(), "--csvRAM", "-fl"};
         unsigned const freq_kmer_min = io_cfg.get_freq_kmer_min();
         mappabilityMain<TLocations>(11, argv, loc_per_K, freq_kmer_min);
         TKLocations::iterator it_hint = locations.begin();

@@ -140,9 +140,9 @@ public:
         }
         result_file = result_path / "results.csv";
         primer_info_file = result_path / "primer_info.csv";
-        script_file = get_work_dir() / "app" / "app.R";
-        std::cout << "STATUS\tSet R script file: " << script_file << std::endl;
-        script_runner = get_work_dir() / "app" / "app_run.R";
+        // script_file = get_work_dir() / "app" / "app.R";
+        // std::cout << "STATUS\tSet R script file: " << script_file << std::endl;
+        // script_runner = get_work_dir() / "app" / "app_run.R";
 
         if (!fs::exists(script_runner))
         {
