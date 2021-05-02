@@ -4,7 +4,7 @@ Tool for assisting the search of primer sequences for metabarcoding experiments.
 
 | **Platform**                       | **Details**            | **Binaries** |
 |:---------------------------------: | :--------------------: | :-----------: |
-| <img src="./.github/MacOS.svg" width="100" height="100" /> | `Mac OS 64 bit` | [Link to Build](https://github.com/mariehoffmann/PriSeT) |
+| <img src="./.github/MacOS.svg" width="100" height="100" /> | `Mac OS 64 bit` | [Link to Build](https://github.com/mariehoffmann/PriSeT/blob/master/binaries/priset_v10_darwin) |
 
 [comment]: <> (| <img src="./.github/Linux.svg" width="100" height="100" /> | `Linux 64 bit` | Link to Build |)
 
@@ -75,29 +75,12 @@ cmake ../PriSeT/apps -DCMAKE_BUILD_TYPE=Debug -B .
 ./solver_fast -s -l <lib_dir> -w <work_dir>
   ```
 
-#### Unit Tests
+### Unit Tests
 
 Add new unit tests under test/unit and run cmake 
 ```shell
 cmake ../PriSeT/test/unit/ -DGENMAP_NATIVE_BUILD=ON -DCMAKE_BUILD_TYPE=Debug -B .
 ```
-
-### Unit Tests
-
-Create an out-of-source build directory and change into it:
-
-```shell
-mdkir -p ~/devel/priset_build_test/debug
-cd ~/devel/priset_build_test/debug
-```
-
-Compile unit tests by calling CMakeLists.txt located in cloned PriSeT directory under /PriSeT/test.
-```shell
-cmake ~/git/PriSeT/test -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=g++ -B .
-make -j
-```
-
-cmake ../../seqan3/test/unit -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++-7
 
 ## References
    [1] Pockrandt, C., Alzamel, M., Iliopoulos, C. S., Reinert, K.. GenMap: Fast and Exact Computation of Genome Mappability. bioRxiv, presented on RECOMB-Seq, 2019.
