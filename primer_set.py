@@ -2,8 +2,8 @@ import sys
 
 f = "./primer_set.txt"
 
-PRIMER_MIN_LEN = 16
-PRIMER_MAX_LEN = 17
+KAPPA_MIN = 10
+KAPPA_MAX = 11
 
 PRIMER_MIN_TM = 50.0
 PRIMER_MAX_TM = 64.0
@@ -66,12 +66,14 @@ def compute_primers(offset = 0):
     with open(f, 'a') as f_hdlr:
         while len(heap) > 0:
             code = heap.pop()
-            if code > (1 << (2 * PRIMER_MIN_LEN)): # add code if large enough
+            if code > (1 << (2 * KAPPA_MIN)): # add code if large enough
                 if offset < ctr and filter_CG_clamps(code):
                     f.write(dna_decoder(code) + "\n")
                 ctr += 1
+                if ctr > 10000:
+                    print(ctr)
             code <<= 2
-            if code < (1 << (2 * PRIMER_MAX_LEN + 1)):
+            if code < (1 << (2 * KAPPA_MAX + 1)):
                 if filter(code):
                     heap.append(code)
                 if filter(code + 1):
@@ -80,6 +82,7 @@ def compute_primers(offset = 0):
                     heap.append(code + 2)
                 if filter(code + 3):
                     heap.append(code + 3)
+    print(ctr, " primers found")
 
 
 if __name__ == "__main__":

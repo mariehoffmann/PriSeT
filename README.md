@@ -1,82 +1,103 @@
 # PriSeT
 Tool for assisting the search of primer sequences for metabarcoding experiments. Given a taxonomic identifier, a reference database, and a genetic target region, PriSeT identifies conserved sections suitable for PCR primers such that taxonomic coverage and separation are optimal.
 
-## Requirements
 
-| **Platform**                       | **Details**            | **Tested** |
+| **Platform**                       | **Details**            | **Binaries** |
 |:---------------------------------: | :--------------------: | :-----------: |
-| <img src="./.github/Linux.svg" width="100" height="100" /> | `Linux 64 bit` | - |
-| <img src="./.github/MacOS.svg" width="100" height="100" /> | `Mac OS 64 bit` | High Sierra 10.12.6 |
+| <img src="./.github/MacOS.svg" width="100" height="100" /> | `Mac OS 64 bit` | [Link to Build](https://github.com/mariehoffmann/PriSeT) |
 
-### R
-If not installed on your system yet, install `R` via your standard package manager. However, for MacOS I recommend not to install via `port`, but download the binaries from [CRAN](https://cran.r-project.org/bin/macosx), because I ran into installation errors when when trying to install `igraph` and others in an interactive `R` session. If you install the package from `cran.r-project.org`, open the `R.app`, go to the package installer (under `Packages & Data`), search for the below listed packages and click the install button.
-If you use R in terminal, start an inter session, install the required `R` packages `shiny` and `DT` for table output, and `treemap` and `d3treeR` for an interactive tree map plot.
-```shell
-$ R
-> install.packages("shiny")
-> install.packages("DT")
-> install.packages("igraph")
-> install.packages("treemap")
+[comment]: <> (| <img src="./.github/Linux.svg" width="100" height="100" /> | `Linux 64 bit` | Link to Build |)
+
+
+## Usage 
+
+### Usecase: Precompiled Binary
+
+Download one of the above linked binaries (Ubuntu build will be provided soon) and call it from command line with a directory containing a FASTA file of the reference sequences. The binary is based on `apps/solver_fast.cpp`. In case you want to edit the app and change the primer properties via setter functions provied by `types/PrimerConfig.hpp`, follow the compilation instructions in the next section.
+The FASTA file should not be larger than 500 MB. Index building and primer search are decoupled to allow for tweaking the constraints that affect the primer pair result set.
+
+#### Build FM-Index
+First an FM-index is built on the FASTA file and stored under the user-given directory. Note, that the FM-index consumes about four times more space than the input file. The index for a specific library has to be built only once. Create `work_dir` in advance.
 ```
-To make the treemap interactive you need `d3treeR` hosted on github. To download it in an interactive session, follow these steps:
-```R
-> install.packages("devtools")
-> library(devtools)
-> install_github("d3treeR/d3treeR")
+./priset -i -l <path_to_fasta> -w <work_dir|idx_dir>
 ```
 
-```shell
-wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.15.tar.gz
-tar -zxvf libiconv-1.15.tar.gz
-cd libiconv-1.15
-./configure --prefix=/usr/local
-make
-make install
+#### Discover Primer Pairs
+Primer search is triggered via the `-s` flag. The results are output in csv format; the first 20 pairs are displayed in terminal.
+
+[comment]: <> (Optionally, a couple of primer sequence parameters can also be set in an experimental configuration file. If omitted the default parameters defined in `PrimerConfig.hpp` are chosen.)
+
+```
+./priset -s -l <path_to_fasta> -w <work_dir>
 ```
 
-### Taxonomic Tree and Library
-In order to explore the potential primer sequences hierarchically w.r.t. an existing taxonomy, the taxonomic node identifier (taxid) needs to be related to reference sequences.
-You can use the tool [tactac](https://github.com/mariehoffmann/tactac) to create
-a subset of your reference library. Calling `python tactac.py --subtree <taxid>` (plus password)
-will create three files:
-  * Taxonomic subtree as tuples in csv format: `/subset/<taxid>/root_<taxid>.tax`
-  * Taxonomic map of taxids assigned directly to accessions: `/subset/<taxid>/root_<taxid>.acc`
-  * Library of all sequences under `<taxid>`: `/subset/<taxid>/root_<taxid>.fasta`
+## Usecase: Userwritten Apps
 
-## Setup
+In case you want to modify the way how primer pairs are searched and processed, you can write and compile your own applications. 
+
+### Requirements
+
+  - SDSL-Lite, get it from here: [xxsds/sdsl-lite](https://github.com/xxsds/sdsl-lite)
+  - Cmake 3.7 or higher
+  - GNU C++ Compiler xx or higher
+
+#### Setup
 Clone PriSeT and its submodules
 ```shell
 git clone --recurse-submodules https://github.com/mariehoffmann/PriSeT.git
 ```
 
+#### Compilation
 
-### Compilation
+User-defined apps should go into the `apps` folder, and the therein contained `CMakeLists.txt` file modified. In the following we assume your application is called `solver_fast.cpp`. Add the following entry to the `apps/CMakeLists.txt`:
+```
+priset_app_macro(solver_fast.cpp)
+```
+The macro will create a target and link it against the required libraries.
+
+
   1. Create a build directory and compile with `cmake`
   ```shell
-  cmake -DCMAKE_BUILD_TYPE=Debug ../PriSeT
+cmake ../PriSeT/apps -DCMAKE_BUILD_TYPE=Debug -B .
   ```
   2. Build
   ```shell
   make -j
   ```
 
-  3. Call binary with the library directory containing:
-    * Taxonomy `root_<taxid>.tax`
-    * Taxid to accessions map `root_<taxid>.acc`
-    * Library with reference sequences `root_<taxid>.fasta`
+  3. Run to build FM-index once 
+  ```shell
+./solver_fast -i -l <lib_dir> -w <work_dir>
+  ```
 
- Assume `lib_dir` and `work_dir` as your library and working directories. The latter one will store the FM index, mappings, the shiny app as R script and the input table for the shiny app.
+  4. Discover primers 
+  ```shell
+./solver_fast -s -l <lib_dir> -w <work_dir>
+  ```
+
+#### Unit Tests
+
+Add new unit tests under test/unit and run cmake 
 ```shell
- ./priset <lib_dir> <work_dir> [--skip-idx]
- ```
+cmake ../PriSeT/test/unit/ -DGENMAP_NATIVE_BUILD=ON -DCMAKE_BUILD_TYPE=Debug -B .
+```
 
 ### Unit Tests
 
+Create an out-of-source build directory and change into it:
+
 ```shell
-cd ../build
-cmake -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=/usr/local/bin/g++ ../PriSeT/tests/
-make
+mdkir -p ~/devel/priset_build_test/debug
+cd ~/devel/priset_build_test/debug
 ```
+
+Compile unit tests by calling CMakeLists.txt located in cloned PriSeT directory under /PriSeT/test.
+```shell
+cmake ~/git/PriSeT/test -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=g++ -B .
+make -j
+```
+
+cmake ../../seqan3/test/unit -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++-7
 
 ## References
    [1] Pockrandt, C., Alzamel, M., Iliopoulos, C. S., Reinert, K.. GenMap: Fast and Exact Computation of Genome Mappability. bioRxiv, presented on RECOMB-Seq, 2019.
