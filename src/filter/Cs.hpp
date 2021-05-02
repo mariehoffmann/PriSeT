@@ -1,5 +1,13 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
+#include <iostream>
+#include <fstream>
 #include <numeric>
 #include <vector>
 
@@ -9,6 +17,7 @@
 #include "Tm.hpp"
 #include "repeats.hpp"
 #include "types/all.hpp"
+#include "AT_tail.hpp"
 
 namespace priset
 {
@@ -31,11 +40,10 @@ void filter_Cs(TKmerID & kmerID, PrimerConfig const & primer_cfg)
     Tm_filter(kmerID, primer_cfg.get_Tm_min(), primer_cfg.get_Tm_max(), primer_cfg.get_kappa_min(), primer_cfg.get_kappa_max());
     if (!(kmerID & PREFIX_SELECTOR))
         return;
-
     CG_filter(kmerID, primer_cfg.get_CG_min(), primer_cfg.get_CG_max(), primer_cfg.get_kappa_min(), primer_cfg.get_kappa_max());
     if (!(kmerID & PREFIX_SELECTOR))
         return;
-
+    
     auto [prefix, code] = split_kmerID(kmerID);
     assert(kmerID > 0 && code > 0);
     uint8_t AT = 0; // counter 'A'|'T'
@@ -65,10 +73,11 @@ void filter_Cs(TKmerID & kmerID, PrimerConfig const & primer_cfg)
     code = kmerID & ~PREFIX_SELECTOR;
     kmerID = prefix | code;
 
-    repeats_filter(kmerID);
+    filter_repeats_runs(kmerID);
     if (!(kmerID & PREFIX_SELECTOR))
         return;
-    self_annealing_filter(kmerID);
+    
+    self_annealing_filter(kmerID);   
 }
 
 }

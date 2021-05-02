@@ -1,3 +1,9 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <numeric>

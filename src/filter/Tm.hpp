@@ -1,3 +1,9 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <numeric>
@@ -36,13 +42,6 @@ extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l);
     target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
     uint8_t CG_content = CG(kmerID, mask);
     return ((target_l - CG_content) << 1) + (CG_content << 2);
-
-    // code >>= (enc_l - (target_l << 1));
-    // uint64_t p = 0x5555555555555ULL;
-    // uint64_t q = 0xAAAAAAAAAAAAAULL;
-    // uint64_t x = ((code & p) << 1) ^ (code & q);
-    // uint8_t CG = __builtin_popcountll(x) - 1;
-    // return ((target_l - CG) << 1) + (CG << 2);
 }
 
 /*

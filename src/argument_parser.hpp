@@ -3,6 +3,7 @@
 // ============================================================================
 //          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
 //          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <experimental/filesystem>
@@ -23,7 +24,7 @@ namespace priset
 struct options
 {
 private:
-    std::string usage_string = "Usage: %s -l <dir_library> -w <dir_work> [-K <word_length>] [-i|s] [-E <errors>]\n";
+    std::string usage_string = "Usage: %s [-i|s] -l <dir_library> -w <dir_work> [-K <word_length>] [-E <errors>]\n";
 
     using size_type = PrimerConfig::size_type;
 
@@ -54,6 +55,7 @@ private:
         for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
         std::cout << std::endl;
 
+        // TODO: continue here, use only i,s,e as flags
         // l (lib_dir), w (work_dir), i (index only), s (skip_idx), E (error), K (kmer length), colon indicates argument
         while ((opt = getopt(argc, argv, "l:w:isE:")) != -1)
         {
@@ -68,7 +70,7 @@ private:
                     work_dir.assign(std::string(optarg));
                     break;
                 case 'i':
-                    idx_only = 1;
+                    skip_idx = 0;
                     break;
                 case 's':
                     skip_idx = 1;
@@ -86,8 +88,8 @@ private:
         {
             fprintf(stderr, &usage_string[0], argv[0]), exit(EXIT_FAILURE);
         }
-        // init io configurator
-        io_cfg.assign(lib_dir, work_dir, idx_only, skip_idx);
+        // init IO configurator
+        io_cfg.assign(lib_dir, work_dir, skip_idx);
         flag_E ? primer_cfg.set_error(E) : (void) (NULL);
     }
 

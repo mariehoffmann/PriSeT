@@ -1,20 +1,22 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <numeric>
 #include <vector>
 
-#include "types/IOConfig.hpp"
-#include "types/PrimerPair.hpp"
-#include "types/PrimerPairUnpacked.hpp"
-#include "types/PrimerConfig.hpp"
 #include "utilities.hpp"
+
 
 namespace priset
 {
 
 std::string kmerID2str(TKmerID kmerID);
 extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l);
-
 
 /*
  * Compute melting temperature of a single encoded oligomer. The oligomer is trimmed
@@ -31,7 +33,7 @@ extern inline float CG(TKmerID const kmerID, uint64_t const mask)
     target_l += (prefix & !mask) ? __builtin_clzll(prefix) : __builtin_clzll(mask);
     code >>= (enc_l - (target_l << 1));
     uint64_t p = 0x5555555555555ULL; // = (01)_52
-    uint64_t q = 0xAAAAAAAAAAAAAULL; // = (10)_52  101010101010101010101010101010101010101010101010101
+    uint64_t q = 0xAAAAAAAAAAAAAULL; // = (10)_52 
     uint64_t x = ((code & p) << 1) ^ (code & q);
     return __builtin_popcountll(x) - 1;
 }
@@ -59,13 +61,14 @@ extern inline float CG_percent(TKmerID const kmerID, uint64_t const mask)
  */
 extern inline void CG_filter(TKmerID & kmerID, float const CG_min, float const CG_max, uint8_t const kappa_min, uint8_t const kappa_max)
 {
-    uint64_t mask = 1ULL << 63;
+    uint64_t mask = (1ULL << 63) >> (kappa_min - KAPPA_MIN);
     float CG_content;
     for (uint8_t k = kappa_min; k <= kappa_max; ++k)
     {
         if (mask & kmerID)
         {
-            CG_content = CG(kmerID, mask);
+            CG_content = CG_percent(kmerID, mask);
+            
             if (CG_content < CG_min || CG_content > CG_max)
                 kmerID ^= mask;
         }

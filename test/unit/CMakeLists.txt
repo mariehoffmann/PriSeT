@@ -7,7 +7,6 @@ project(priset_test_unit CXX)
 # ----------------------------------------------------------------------------
 # searches for priset-config.cmake
 find_package (priset-test REQUIRED HINTS ${CMAKE_CURRENT_LIST_DIR}/../../build_system)
-# include (${CMAKE_CURRENT_LIST_DIR}/../../build_system/priset-test-config.cmake)
 
 include (CheckCXXSourceCompiles)
 include (FindPackageHandleStandardArgs)
@@ -15,7 +14,6 @@ include (FindPackageMessage)
 
 # priset_require_ccache ()
 priset_require_test()
-
 
 # macro for adding and linking unit tests
 macro(priset_unit_test unit_test_cpp)

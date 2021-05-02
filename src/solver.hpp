@@ -83,16 +83,17 @@ private:
 
     std::vector<size_t> & primerIDs();
 
-    size_t C_max{0};              // maximal score
+    // maximal score
+    size_t C_max{0};              
 
     // Map of sorted result group indices. key = size, value = index in groups list.
-    std::map<size_t, size_t> group_idcs_srtd;
+    std::map<size_t, std::vector<size_t>> group_idcs_srtd;
 
     // State variable for looping over results, either groups or sorted groups.
-    using State = std::pair<size_t, decltype(std::crbegin(group_idcs_srtd))>;
+    using State = std::tuple<size_t, decltype(std::crbegin(group_idcs_srtd)), size_t>;
 
-    // State variable for iterating over results.
-    State state{0, std::crbegin(group_idcs_srtd)};
+    // State variable for iterating over results, either groups or sorted groups.
+    State state{0, std::crbegin(group_idcs_srtd), 0};
 
     // Flag indicating if indices in group_idcs_srtd represent sorting by coverage.
     bool is_srtd_by_coverage{false};
@@ -129,17 +130,32 @@ public:
     {
         group_idcs_srtd.clear();
         for (size_t i = 0; i < groups.size(); ++i)
-            group_idcs_srtd[groups[i].get_taxa_count()] = i;
+        {
+            auto key = groups[i].get_taxa_count();
+            if (group_idcs_srtd.count(key))
+                group_idcs_srtd.at(key).push_back(i);
+            else
+                group_idcs_srtd[key] = std::vector<size_t>{i};
+        }
+            // group_idcs_srtd[groups[i].get_taxa_count()] = i;
         is_srtd_by_coverage = true;
         is_srtd_by_frequency = false;
     }
 
     // Sort result groups by their frequency w.r.t. distinct sequences they match.
+    // TODO: group_icds_srtd key not unique!
     void sort_results_by_frequency()
     {
         group_idcs_srtd.clear();
         for (size_t i = 0; i < groups.size(); ++i)
-            group_idcs_srtd[groups[i].get_sequence_count()] = i;
+        {
+            auto key = groups[i].get_sequence_count();
+            if (group_idcs_srtd.count(key))
+                group_idcs_srtd.at(key).push_back(i);
+            else
+                group_idcs_srtd[key] = std::vector<size_t>{i};
+        }
+            // group_idcs_srtd[groups[i].get_sequence_count()] = i;
         is_srtd_by_coverage = false;
         is_srtd_by_frequency = true;
     }
@@ -150,21 +166,34 @@ public:
         return "#name, forward (5'-3'), Tm_fwd, CG_fwd, reverse (5'-3'), Tm_rev, \
         CG_rev, coverage, frequency, [taxa]\n";
     }
-
+    
+    /*
+    * Iterate over groups (iterator stored in state.first) or sorted groups 
+    * (iterator stored in state.second).
+    */
     std::pair<bool, Group<TSeqNoMap>> get_next_result()
     {
-        if (group_idcs_srtd.size())
-        {
-            if (state.second == group_idcs_srtd.rend())
-                return std::pair<bool, Group<TSeqNoMap>>{false, Group<TSeqNoMap>()};
-            std::pair<bool, Group<TSeqNoMap>> p{true, groups.at((state.second++)->second)};
-            // ++state.second;
-            return p;
-        }
-        if (state.first == groups.size())
+        auto [ idx1, idx2, pos ] = state;
+        // TODO: write unit test, iterator seems not be forwarded
+        // if (is_srtd_by_coverage || is_srtd_by_frequency)
+        // {
+        //     if (idx2 == group_idcs_srtd.rend())
+        //         return std::pair<bool, Group<TSeqNoMap>>{false, Group<TSeqNoMap>()};
+        //     size_t group_idx = (idx2->second).at(pos);
+        //     std::pair<bool, Group<TSeqNoMap>> p{true, groups.at(group_idx)};
+        //     if (pos == (idx2->second).size() - 1)
+        //         state = std::make_tuple(idx1, ++idx2, 0);
+        //     else
+        //         state = std::make_tuple(idx1, idx2, ++pos);
+        //     return p;
+        // } // else
+        if (idx1 == groups.size())
             return std::pair<bool, Group<TSeqNoMap>>{false, Group<TSeqNoMap>()};
-        return std::pair<bool, Group<TSeqNoMap>>{true, groups.at(state.first++)};
+        std::pair<bool, Group<TSeqNoMap>> p{true, groups.at(idx1)};
+        state = std::make_tuple(++idx1, idx2, 0);
+        return p;
     }
+
 
     std::string generate_statistics()
     {
@@ -174,28 +203,52 @@ public:
         return info;
     }
 
-    bool generate_table()
+    // as_string: return also std::string if true else omit
+    std::string generate_table(bool as_string=false)
     {
-        state = State{0, std::crbegin(group_idcs_srtd)};
+        std::string s{""};
+        state = State{0, std::crbegin(group_idcs_srtd), 0};
         auto [success, group] = get_next_result();
         std::ofstream ofs;
         ofs.open(io_cfg.get_result_file());
-        while (success)
+        // TODO: use get_next_result to iterate over optionally sorted groups
+        // while (success)
+        // {
+        //     s += group.to_string();
+        //     ofs << group.to_string();
+        //     auto [success, group] = get_next_result();
+        // }
+        int head = 20;
+        if (!groups.size())
         {
-            ofs << group.to_string();
-            auto [success, group] = get_next_result();
+            std::cout << "INFO: no primer pairs found with the current settings" << std::endl;
+            return s;
+        }
+        ofs << groups.at(0).get_header();
+        std::string aux;
+        for (auto group : groups)
+        {
+            aux = group.to_string();
+            if (head > 0)
+            {
+                s += aux;
+                --head;
+            }
+            ofs << aux;
         }
         ofs.close();
         std::cout << "INFO: output written to " << io_cfg.get_result_file() << std::endl;
-        return true;
+        return s;
     }
 
-    // copy app code here
     void run()
     {
-        // 1. Optional index computation
-        if (io_cfg.get_FM_idx_flag())
+        // 1. Index computation
+        if (!io_cfg.get_skip_idx())
+        {
             fm_index(io_cfg);
+            return;
+        }
 
         // 2. k-mer frequency computation
         fm_map<TKLocations>(io_cfg, primer_cfg, locations);
@@ -205,25 +258,44 @@ public:
         TKmerIDs kmerIDs;
 
         transform_and_filter<TKLocations, TSeqNoMap, TKmerIDs>(io_cfg, primer_cfg, locations, references, seqNo_map, kmerIDs, taxa_by_seqNo_cx, kmer_counts);
+        uint64_t tkmer_ctr{0};
+        for (auto kmerID_list : kmerIDs)
+            tkmer_ctr += kmerID_list.size();
 
+        std::cout << "STATUS\tfound " << tkmer_ctr << " TKmerID\n";
+        
         // 4. Combine frequent k-mers to form pairs reference-wise.
         // Container type for storing Pairs.
         using PrimerPairList = std::vector<PrimerPair>;
         PrimerPairList pairs;
         combine<PrimerPairList, TKmerIDs>(references, kmerIDs, pairs, kmer_counts);
-
+        std::cout << "STATUS\tfound " << pairs.size() << " TKmerID pairs\n";
         // 5. Filter and unpack
-        filter_and_unpack_pairs<TSeqNoMap, TKmerIDs, PrimerPairList, PrimerPairUnpackedList>(io_cfg, primer_cfg, seqNo_map, kmerIDs, pairs, pairs_unpacked);
+        filter_and_unpack_pairs<TSeqNoMap, TKmerIDs, PrimerPairList, PrimerPairUnpackedList>(
+            io_cfg, 
+            primer_cfg, 
+            seqNo_map, 
+            kmerIDs, 
+            pairs, 
+            pairs_unpacked
+        );
+        std::cout << "STATUS\t " << pairs_unpacked.size() << " unpacked and filtered pairs remain" << std::endl; 
 
+        // 6. Write primer pairs to memory
+        std::cout << generate_table(true);
     }
 
     bool as_groups()
     {
         if (!pairs_unpacked.size())
             return false;
-        std::transform(pairs_unpacked.begin(), pairs_unpacked.end(), groups.begin(),
-            [&](PrimerPairUnpacked<TSeqNoMap> & p)
-            {return Group<TSeqNoMap>(&io_cfg, &seqNo_map, p);});
+
+        groups.clear();
+        for (auto p : pairs_unpacked)
+        {
+            Group<TSeqNoMap> g(&io_cfg, &seqNo_map, p);
+            groups.push_back(g);
+        }
         return true;
     }
 
@@ -307,6 +379,7 @@ public:
 
     void sort_groups_by_coverage()
     {
+        assert(false); // TODO: enable upon provisioning of taxid file
         std::sort(groups.begin(), groups.end(), [](Group<TSeqNoMap> & g, Group<TSeqNoMap> & h)
             {return g.get_taxa_count() < h.get_taxa_count();});
     }

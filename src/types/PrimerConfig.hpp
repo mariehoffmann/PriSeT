@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 
@@ -64,7 +65,7 @@ namespace priset
 * below will be dropped. Default is 10 %. The absolute value will be computed
 * based on the library size.
 */
-#define DIGAMMA_PERCENT ((uint8_t)10)
+#define DIGAMMA_PERCENT ((uint8_t)5)
 
 // Lower kmer pair frequency cutoff, i.e. all pair occurences below will be dropped.
 #define FREQ_PAIR_MIN ((uint32_t)2)
@@ -187,10 +188,10 @@ public:
     */
     bool set_primer_min_len(uint64_t const l)
     {
-        if (l < KAPPA_MIN || l <= KAPPA_MAX)
+        if (l <= KAPPA_MIN || l >= KAPPA_MAX)
         {
-            std::cerr << "ERROR: Possible primer length range is [" << KAPPA_MIN;
-            std::cerr << ":" << KAPPA_MAX << "]. Your request will be ignored!";
+            std::cerr << "ERROR: Possible primer length range is [" << int(KAPPA_MIN);
+            std::cerr << ":" << int(KAPPA_MAX) << "]. Your setting will be ignored!";
             std::cerr << std::endl;
             return false;
         }
@@ -432,7 +433,7 @@ public:
     {
         if (!digamma)
             digamma = size_type(float(digamma_percent)/float(100) * float(species_count));
-        return digamma;
+        return std::max(1ULL, digamma);
     }
 
     // Set absolut frequency cutoff for k-mer pairs.

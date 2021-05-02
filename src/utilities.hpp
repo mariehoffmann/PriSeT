@@ -1,3 +1,9 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <algorithm>
@@ -31,7 +37,6 @@ namespace priset
 {
 
 std::string dna_decoder(uint64_t code, uint64_t const mask);
-// std::string dna_decoder(uint64_t code);
 
 // Identify highest set bit without loop
 // TODO: cmp number of CPU cycles with fct for leading zeros (+1)
@@ -51,14 +56,12 @@ std::string kmerID2str(TKmerID kmerID);
 extern inline void reset_length_leq(TKmerID & kmerID, uint8_t l)
 {
     auto [prefix, code] = split_kmerID(kmerID);
-    std::cout << "l = " << int(l) << std::endl;
     if (l <= (KAPPA_MIN << 1))
         kmerID = code;
     else
     {
 
         uint64_t offset = KAPPA_MAX - (l >> 1) + 1;
-        std::cout << "offset = " << int(offset) << std::endl;
         kmerID = (prefix & (PREFIX_SELECTOR << offset)) | code;
     }
 }
@@ -81,8 +84,6 @@ std::string exec(char const * cmd)
 // Trim to true length
 extern inline void trim_to_true_length(TKmerID & kmerID)
 {
-    // std::cout << "trim2tl input: ";
-    // std::cout << kmerID2str(kmerID) << std::endl;
     auto [prefix, code] = split_kmerID(kmerID);
     if (!prefix)
         return;
@@ -93,12 +94,6 @@ extern inline void trim_to_true_length(TKmerID & kmerID)
     code >>= (l_enc - l_max);
     kmerID = prefix | code;
 }
-
-// extern inline std::pair<uint64_t, uint64_t> split(TKmerID kmerID)
-// {
-//     //std::cout << "split: " << bits2str(kmerID) << std::endl;
-//     return std::pair<uint64_t, uint64_t>{kmerID & PREFIX_SELECTOR, kmerID & ~PREFIX_SELECTOR};
-// }
 
 // forward declaration
 struct PrimerConfig;
@@ -121,29 +116,6 @@ extern inline uint64_t get_code(uint64_t const kmerID, uint64_t mask = 0)
     uint8_t mask_l = __builtin_clzl(mask) + KAPPA_MIN;      // selected length
     return (enc_l == mask_l) ? code : code >> ((enc_l - mask_l) << 1);   // kmer length correction
 }
-
-// extern inline void dna_decoder(uint64_t kmerID, std::vector<TSeq> & decodes)
-// {
-//     // note that assert converted to nop due to seqan's #define NDEBUG
-//     if (kmerID == 0ULL)
-//         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
-//     decodes.clear();
-//     uint64_t kmer_length_mask = (kmerID & ~((1ULL << 52ULL) - 1ULL)) >> 52ULL;
-//     if (kmerID == 0ULL)
-//         throw std::invalid_argument("ERROR: invalid argument for decoder, code > 0.");
-//     decodes.clear();
-//     uint64_t code = kmerID & ~PREFIX_SELECTOR; // clear leading kmer length information
-//     TSeq decode = dna_decoder(code); // largest kmer
-//     uint64_t K = seqan::length(decode); //
-//     kmer_length_mask >>= KAPPA_MIN - K;
-//     while (kmer_length_mask != 0)
-//     {
-//         if (kmer_length_mask & 1)
-//             decodes.push_back(seqan::prefix(decode, K)); //.substr(0, K));
-//         kmer_length_mask >>= 1;
-//         --K;
-//     }
-// }
 
 // Assume that sequence IDs and position indices do not exceed 32 bits.
 extern inline uint64_t location_encode(TSeqNo seqNo, TSeqPos seqPos)
@@ -199,64 +171,21 @@ void print_combinations(TKmerIDs const & kmerIDs, PairList const & pairs) noexce
 void print_locations(TLocations & locations)
 {
     using key_type = typename TLocations::key_type;
-    using TSeqNo = typename seqan::Value<key_type, 1>::Type;
+    using TSeqNo_seqan = typename seqan::Value<key_type, 1>::Type;
     using TSeqPos = typename seqan::Value<key_type, 2>::Type;
     //using value1_type = typename seqan::Value<typename TLocations::value_type, 1>::Type;
     std::cout << "Locations (SeqNo, SeqPos): [(SeqNo, SeqPos)], [(SeqNo, SeqPos)]:\n";
     for (typename TLocations::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(it->first) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(it->first) << "): [";
-        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).first)
-            std::cout << "(" << seqan::getValueI1<TSeqNo, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo, TSeqPos>(pair) << ") ";
+        std::cout << "(" << seqan::getValueI1<TSeqNo_seqan, TSeqPos>(it->first) << ", " << seqan::getValueI2<TSeqNo_seqan, TSeqPos>(it->first) << "): [";
+        for (seqan::Pair<TSeqNo_seqan, TSeqPos> pair : (it->second).first)
+            std::cout << "(" << seqan::getValueI1<TSeqNo_seqan, TSeqPos>(pair) << ", " << seqan::getValueI2<TSeqNo_seqan, TSeqPos>(pair) << ") ";
         std::cout << "], [";
-        for (seqan::Pair<TSeqNo, TSeqPos> pair : (it->second).second)
+        for (seqan::Pair<TSeqNo_seqan, TSeqPos> pair : (it->second).second)
             std::cout << "(" << seqan::getValueI1(pair) << ", " << seqan::getValueI2(pair) << ") ";
         std::cout << "]\n";
     }
 }
-
-/*
-void print_kmer_locations(KmerLocations const & kmer_locations)
-{
-    for (KmerLocations::size_type i = 0; i < kmer_locations.size(); ++i)
-    {
-        auto kmer_ID = kmer_locations[i].get_kmer_ID();
-        std::cout << dna_decoder(kmer_ID) << ": [";
-        for (KmerLocation::size_type j = 0; j < kmer_locations[i].container_size(); ++j)
-            std::cout << "(" << kmer_locations[i].accession_ID_at(j) << ", " << kmer_locations[i].kmer_pos_at(j) << ") ";
-        std::cout << "]" << std::endl;
-    }
-}*/
-
-/*
-// Retrieve DNA sequences from txt.concat given a set of locations. Kmer IDs are retrieved from
-void lookup_sequences(KmerLocations & kmer_locations, IOConfig const & io_cfg, PrimerConfig const & primer_cfg)
-{
-    // load corpus
-    seqan::StringSet<seqan::DnaString, seqan::Owner<seqan::ConcatDirect<>>> text;
-    fs::path text_path = io_cfg.get_index_txt_path();
-    std::cout << "text_path: " << text_path << std::endl;
-    seqan::open(text, text_path.string().c_str(), seqan::OPEN_RDONLY);
-
-    TSeqNo kmer_ID;
-    TSeqPos kmer_pos;
-    TKmerLength K;
-    // TODO: remove this later, uniqueness should be already ensured by location construction
-    std::unordered_set<TKmerID> seen;
-    for (KmerLocations::iterator kmer_it = kmer_locations.begin(); kmer_it != kmer_locations.end(); ++kmer_it)
-    {
-        acc_ID = kmer_it->accession_ID_at(0);
-        kmer_pos = kmer_it->kmer_pos_at(0);
-        K = kmer_it->get_K();
-        seqan::DnaString seq = seqan::valueById(text, acc_ID);
-        auto const & kmer_str = seqan::infixWithLength(seq, kmer_pos, K);
-        uint64_t kmer_code = dna_encoder(kmer_str);
-        assert(!seen.contains(kmer_code));
-        seen.insert(kmer_code)
-        // replace kmer_ID
-        kmer_it->set_kmer_ID(kmer_code);
-    }
-}*/
 
 // set directory information as needed by genmap's fasta file parsing
 void set_directoryInformation(std::string & index_path_base_ids, TDirectoryInformation & directoryInformation)
@@ -289,7 +218,6 @@ void split(std::string const & line, std::vector<std::string> & tokens, std::str
 template<typename IOConfig>
 void create_accID2acc_map(std::unordered_map<AccessionID, std::string> & accID2acc, std::unordered_map<Accession, AccessionID> & acc2accID, IOConfig const & io_cfg)
 {
-    //std::cout << "create_accID2acc_map\n";
     std::ifstream id_file(io_cfg.get_id_file());
     std::vector<std::string> tokens;
     std::string line;
@@ -306,7 +234,6 @@ void create_accID2acc_map(std::unordered_map<AccessionID, std::string> & accID2a
         {
             accID2acc[accID] = tokens[i];
             acc2accID[tokens[i]] = accID;
-            //std::cout << "filled both dictionaries with " << accID << " <-> " << tokens[i] << std::endl;
         }
     }
     std::cout << "... done\n";
@@ -330,15 +257,12 @@ void create_accID2taxID_map(std::unordered_map<AccessionID, Taxid> & accID2taxID
 
         split(line, tokens);
         Taxid taxid = std::stoi(tokens[0]);
-        //std::cout << "taxid = " << taxid << std::endl;
         taxid_set.insert(taxid);
         for (uint16_t token_idx = 1; token_idx < tokens.size(); ++token_idx)
         {
             Accession acc = tokens[token_idx];
-            //std::cout << "acc = " << acc << std::endl;
-            // TODO: observation - there are accessions (without version suffix) that do not have fasta entries in DB
             if (acc2accID.find(acc) == acc2accID.end())
-                continue; //std::cout << "ERROR: accession " << acc << " not in acc2accID dictionary!" << std::endl, exit(0);
+                continue;
             accID2taxID[acc2accID.at(acc)] = taxid;
         }
     }
@@ -459,13 +383,15 @@ void create_tax_map(std::unordered_map<Taxid, Taxid> & tax_map, IOConfig const &
 template<typename TKmerIDs>
 void unique_kmers(TKmerIDs const & kmerIDs, std::set<uint64_t> & set)
 {
-    //std::vector<std::deque<TKmerID>> TKmerIDs;
     for (auto it_ref = kmerIDs.begin(); it_ref < kmerIDs.end(); ++it_ref)
     {
         for (auto it_kmerID = it_ref->begin(); it_kmerID <= it_ref->end(); ++it_kmerID)
         {
             auto [prefix, code] = split_kmerID(*it_kmerID);
-            bool start_shift = false; // since kmer IDs represent only the longest kmer they encode and not necessarily the longest possible primer length, we start truncating the ID after we have seen the first length bit
+            // since kmer IDs represent only the longest kmer they encode and not 
+            // necessarily the longest possible primer length, we start truncating the 
+            // ID after we have seen the first length bit
+            bool start_shift = false; 
             while (prefix)
             {
                 if (prefix & 1)
@@ -502,6 +428,16 @@ uint64_t get_num_pairs(PairList const & pairs)
     for (auto pair : pairs)
         ctr += pair.cp.size();
     return ctr;
+}
+
+// Log messages
+// TODO: activate for specific verbose levels
+void log_msg(std::string s)
+{
+    std::ofstream myfile;
+    myfile.open ("log.txt", std::ios::app);
+    myfile << s + "\n";
+    myfile.close();
 }
 
 // i,j are codes with no prefixes

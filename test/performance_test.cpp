@@ -16,7 +16,6 @@
 #include "../src/errors.hpp"
 #include "../src/algorithm.hpp"
 #include "../src/fm.hpp"
-#include "../src/gui.hpp"
 #include "../src/IOConfig.hpp"
 #include "../src/output.hpp"
 #include "../src/PrimerConfig.hpp"
@@ -34,9 +33,8 @@ using namespace priset;
 
 struct setup
 {
-    std::string lib_dir = fs::canonical("../PriSeT/tests/library/3041").string();
-    //std::cout << "lib_dir = " << lib_dir << std::endl;
-    std::string work_dir = fs::canonical("../PriSeT/tests/work/3041").string();
+    std::string lib_dir = fs::canonical("../PriSeT/test/library/3041").string();
+    std::string work_dir = fs::canonical("../PriSeT/test/work/3041").string();
 
     fs::path idx_dir = work_dir + "/index";
     fs::path idx_zip = work_dir + "/index.zip";
@@ -82,7 +80,6 @@ int main(/*int argc, char ** argv*/)
     for (unsigned i = 0; i < argc; ++i) std::cout << argv[i] << " ";
     std::cout << std::endl;
 
-    ///////////////////////////////////////////
     // Store start and finish times for optional runtime measurements
     std::chrono::time_point<std::chrono::system_clock> start, finish;
 
@@ -132,34 +129,25 @@ int main(/*int argc, char ** argv*/)
     // compute k-mer mappings
     fm_map(io_cfg, primer_cfg, locations);
     finish = std::chrono::high_resolution_clock::now();
-    // duration obj
-    //auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
     runtimes[TIMEIT::MAP] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
 
     // Do not modify or delete STATS lines, since they are captured for statistical analysis
     std::cout << "\nINFO: kmers init = " << locations.size() << std::endl;
 
     // filter k-mers by frequency and chemical properties
-    // TODO: result structure for references and k-mer pairs: candidates/matches
-    // vector storing k-mer IDs and their locations, i.e. {TSeq: [(TSeqAccession, TSeqPos)]}
     start = std::chrono::high_resolution_clock::now();
     TReferences references;
     TKmerIDs kmerIDs;
-    // TSeqNoMap seqNoMap;
     transform_and_filter(io_cfg, locations, references, kmerIDs, &kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
     runtimes[TIMEIT::FILTER1_TRANSFORM] += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
 
     std::cout << "\nINFO: kmers after filter1 & transform = " << get_num_kmers(kmerIDs) << std::endl;
 
-    // TODO: delete locations
     using TPairList = TPairList<TPair<CombinePattern>>;
     TPairList pairs;
 
     start = std::chrono::high_resolution_clock::now();
-
-    // template<typename TPairList>
-    // void combine(TReferences const & references, TKmerIDs const & kmerIDs, TPairList & pairs, TKmerCounts & stats)
 
     combine<TPairList>(references, kmerIDs, pairs, &kmerCounts);
     finish = std::chrono::high_resolution_clock::now();
@@ -170,8 +158,6 @@ int main(/*int argc, char ** argv*/)
     // Decomment the following line for analysing unique kmer combinations.
     start = std::chrono::high_resolution_clock::now();
 
-// template<typename TPairList, typename TPairFreq>
-// void filter_pairs(TReferences & references, TKmerIDs const & kmerIDs, TPairList & pairs, std::vector<TPairFreq> & pair_freqs, TKmerCounts * kmerCounts = nullptr)
     // List of unique pair frequencies
     TPairFreqList pair_freqs;
 
@@ -182,8 +168,6 @@ int main(/*int argc, char ** argv*/)
 
     std::cout << "INFO: pairs after frequency cutoff = " << get_num_pairs<TPairList>(pairs) << std::endl;
 
-
-    //////////////////////////////////////////
     std::cout << "MESSAGE: ... done." << std::endl;
 
     std::cout << "K\tMAP\t\tFILTER1_TRANSFORM\tCOMBINE_FILTER2\tPAIR_FREQ\t|\tSUM [μs]\n" << std::string(100, '_') << "\n";
@@ -191,7 +175,6 @@ int main(/*int argc, char ** argv*/)
             '\t' << runtimes[priset::TIMEIT::FILTER1_TRANSFORM] <<
             '\t' << runtimes[priset::TIMEIT::COMBINE_FILTER2] << '\t' << runtimes[priset::TIMEIT::PAIR_FREQ] <<
             "\t|\t" << std::accumulate(std::cbegin(runtimes), std::cend(runtimes), 0) << '\n';
-
 
     return 0;
 }

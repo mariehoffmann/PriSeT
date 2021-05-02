@@ -1,3 +1,9 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <bitset>
@@ -40,9 +46,7 @@ public:
     {
         assert(__builtin_popcountll(prefix1) == 1 && __builtin_popcountll(prefix2) == 1);
         auto idx = __builtin_clzl(prefix1) * PREFIX_SIZE + __builtin_clzl(prefix2);
-        std::cout << "set at idx = " << idx << std::endl;
         data.set(idx);
-        std::cout << "data.count() = " << data.count() << std::endl;
     }
 
     // Unset bit for a specific length combination given both TKMerID prefixes.

@@ -22,18 +22,14 @@
 namespace fs = std::experimental::filesystem;
 using namespace priset;
 
-
+// TODO: rewrite as unit test for gtest
 void filter_repeats_runs_test()
 {
-    // |ACGTAAAAACGTACGT| = 16   0000000000000000000000000000000100011011000000000001101100011011
-
     TKmerID kmerID = ONE_LSHIFT_63 + dna_encoder("ACGTAAAAACGTACGT");
     TKmerID kmerID_ref = kmerID - ONE_LSHIFT_63;
     std::cout << "ACGTAAAAACGTACGT to bits with head bit:\t" << bits2str(kmerID) << std::endl;
-    // head should be 0 after return
     filter_repeats_runs(kmerID);
     std::cout << "ACGTAAAAACGTACGT to bits after head rem:\t" << bits2str(kmerID) << std::endl;
-
     if (kmerID_ref != kmerID)
     {
         std::cout << "ERROR: expect 0 header, got " << bits2str((PREFIX_SELECTOR & kmerID) >> 54) << std::endl;
@@ -65,7 +61,6 @@ void filter_repeats_runs_test()
     // case: multiple lengths, only largest filtered out |ACGTACGTACGTATATATAT| = 20, |ACGTACGTACGTATATATATA| = 21
     kmerID = (ONE_LSHIFT_63 >> 4) + (ONE_LSHIFT_63 >> 5) + dna_encoder("ACGTACGTACGTATATATATA");
     kmerID_ref = kmerID - (ONE_LSHIFT_63 >> 5);
-    //std::cout << "kmerID in: " << std::bitset<64>(kmerID) << " as string " << kmerID2str(kmerID) << std::endl;
     filter_repeats_runs(kmerID);
 
     if (kmerID_ref != kmerID)
@@ -186,7 +181,7 @@ void test_filter_WWW()
 {
     TKmerID kmerID = 4036873631493718478;
     std::cout << kmerID2str(kmerID) << std::endl;
-    std::cout << "passes WWW filter: " << filter_WWW_tail(kmerID, '+', ONE_LSHIFT_63 >> 2) << std::endl;
+    std::cout << "passes WWW filter: " << filter_AT_tail(kmerID, '+', ONE_LSHIFT_63 >> 2) << std::endl;
 }
 
 int main()

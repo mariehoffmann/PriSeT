@@ -20,7 +20,8 @@ struct SolverFast : Solver
         if (Solver::primer_cfg.get_primer_set_size() == 1)
         {
             Solver::as_groups();
-            Solver::sort_groups_by_coverage();
+            // Solver::sort_groups_by_coverage();
+            Solver::sort_results_by_frequency();
         }
         // greedy: group primer pairs with largest coverage
         else

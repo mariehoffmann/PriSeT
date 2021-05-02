@@ -1,12 +1,18 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <numeric>
 #include <vector>
 
-#include "types/IOConfig.hpp"
-#include "types/PrimerPair.hpp"
-#include "types/PrimerPairUnpacked.hpp"
-#include "types/PrimerConfig.hpp"
+#include "../types/IOConfig.hpp"
+#include "../types/PrimerPair.hpp"
+#include "../types/PrimerPairUnpacked.hpp"
+#include "../types/PrimerConfig.hpp"
 #include "utilities.hpp"
 
 namespace priset
@@ -68,7 +74,7 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
     // test overlap positions [0, 0:l1-2] @code1 against [l2-8:max(0,l2-l1+2), l2] @code2
     for (overlap = 8; (overlap_mask = (1ULL << overlap) - 1) <= (1ULL << (l1 - 2)) - 1; ++++overlap)
     {
-        std::cout << "current overlap = " << int(overlap) << std::endl;
+        // std::cout << "current overlap = " << int(overlap) << std::endl;
         if (ctr < 0)
             exit(0);
         --ctr;
@@ -84,13 +90,11 @@ extern inline void filter_annealing_connected(TKmerID & kmerID1, TKmerID & kmerI
         {
             if ((x & fourmer_mask) == fourmer_mask)
             {
-                std::cout << "found pattern in x\n";
                 if (annealing_helper(kmerID1, overlap - i, kmerID2, l2 - i))
                     return;
             }
             if ((y & fourmer_mask) == fourmer_mask)
             {
-                std::cout << "found pattern in y\n";
                 if (annealing_helper(kmerID1, overlap - i, kmerID2, i + 8))
                     return;
             }
@@ -181,13 +185,13 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
         // count ones every two bits and store in 2 bits, 011011 -> 010110
         x = x - ((x >> 1) & 0x1555555555555);
         // filter every second set bit
-        x &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{50}
+        x &= 0xAAAAAAAAAAAA & overlap_mask; // =0b10_{50}
         auto annealings_x = __builtin_popcountll(x);
         if (annealings_x >= 8)
             annealing_helper(kmerID1, overlap, kmerID2, l2);
         y = y - ((y >> 1) & 0x1555555555555);
         // filter every second set bit
-        y &= 0xAAAAAAAAAAAA; // 0b10_{42}
+        y &= 0xAAAAAAAAAAAA; // =0b10_{42}
         auto annealings_y = __builtin_popcountll(y);
         if (annealings_y >= 8)
             annealing_helper(kmerID1, overlap, kmerID2, l2);
@@ -203,7 +207,7 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
             {
                 x = (code1 ^ code2) & overlap_mask;
                 x = x - ((x >> 1) & 0x1555555555555);
-                x &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{50}
+                x &= 0xAAAAAAAAAAAA & overlap_mask; // =0b10_{50}
                 auto annealings_x = __builtin_popcountll(x);
                 if (annealings_x >= 8)
                 {
@@ -214,7 +218,7 @@ extern inline void filter_annealing_disconnected(TKmerID & kmerID1, TKmerID & km
             }
             y = (code1 ^ code2_rev) & overlap_mask;
             y = y - ((y >> 1) & 0x1555555555555);
-            y &= 0xAAAAAAAAAAAA & overlap_mask; // 0b10_{42}
+            y &= 0xAAAAAAAAAAAA & overlap_mask; // =0b10_{42}
             auto annealings_y = __builtin_popcountll(y);
             if (annealings_y >= 8)
             {
@@ -277,6 +281,9 @@ extern inline void filter_cross_annealing(TKmerID & kmerID1, TKmerID & kmerID2)
     }
 }
 
+/*
+* Helper to check for self-annealing patterns (connected and disconnected).
+*/
 void extern inline self_annealing_filter(TKmerID & kmerID)
 {
     filter_annealing_connected(kmerID);

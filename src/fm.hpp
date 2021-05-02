@@ -20,7 +20,6 @@
 // TODO: place proper seqan version
 #define SEQAN_APP_VERSION "3.0.0"
 
-//#include <seqan/arg_parse.h>
 #include <seqan/basic.h>
 #include <seqan/seq_io.h>
 #include <seqan/index.h>
@@ -51,12 +50,16 @@ namespace priset
  */
 int fm_index(IOConfig const & io_cfg)
 {
-    assert(io_cfg.FM_idx_flag);
+    assert(!io_cfg.get_skip_idx());
     int const argc = 5;
     std::string const fasta_file = io_cfg.get_fasta_file().string();
-    char const * argv[argc] = {"index",
+    std::string const index_dir = io_cfg.get_index_dir().string();
+    
+    char const * argv[argc] = {
+        "index",
         "-F", fasta_file.c_str(),
-        "-I", io_cfg.get_index_dir().c_str()};
+        "-I", index_dir.c_str()
+    };
     indexMain(argc, argv);
     return 0;
 }
@@ -77,10 +80,11 @@ int fm_map(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & loc
     TLocations loc_per_K;
     using TKLocationsKey = typename TKLocations::key_type;
     using TKLocationsValue = typename TKLocations::mapped_type;
-    for (auto K = KAPPA_MIN; K <= KAPPA_MAX; ++K)
+    
+    for (auto K = primer_cfg.get_kappa_min(); K <= primer_cfg.get_kappa_max(); ++K)
     {
-        std::cout << "STATUS: run genmap::mappability with E = " << primer_cfg.get_error() << std::endl;
-        std::cout << "INFO: K = " << K << std::endl;
+        std::cout << "STATUS: run genmap::mappability with E = " << int(primer_cfg.get_error());
+        std::cout << " and K = " << int(K) << std::endl;
         // Remark: csv flag triggers `csvComputation` and therefore the population of the (TLocations) locations vector!
         char const * argv[11] = {"map",
             "-I", s1.c_str(), "-O", s2.c_str(),
@@ -89,6 +93,7 @@ int fm_map(IOConfig const & io_cfg, PrimerConfig & primer_cfg, TKLocations & loc
             "--csvRAM", "-fl"};
 
         mappabilityMain<TLocations>(11, argv, loc_per_K, primer_cfg.get_digamma());
+        // std::cerr << "DEBUG\tlocations found: " << loc_per_K.size() << std::endl;
         typename TKLocations::iterator it_hint = locations.begin();
         // inserting map pair using hint
         for (auto it = loc_per_K.begin(); it != loc_per_K.end(); ++it)

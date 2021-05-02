@@ -13,7 +13,6 @@
 #include <unordered_set>
 #include <stdexcept>
 
-// #include "chemistry.hpp"
 #include "Errors.hpp"
 #include "simple_types.hpp"
 
@@ -45,9 +44,9 @@ public:
     IOConfig & operator=(IOConfig && rhs) = default;
 
     // Set library and working directory paths.
-    // FM_idx_flag = 1  compute FM index
-    // FM_idx_flag = 0  else skip FM index computation and use index in given  directory
-    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const _FM_idx_flag = 1)
+    // skip_idx = 0  compute FM-index
+    // skip_idx = 1  else skip FM-index computation and use index in given directory
+    void assign(fs::path const & lib_dir_, fs::path const & work_dir_, bool const _skip_idx = 1)
     {
         lib_dir = fs::canonical(lib_dir_);
         work_dir = fs::canonical(work_dir_);
@@ -59,7 +58,7 @@ public:
             fs::create_directory(work_dir_);
         }
 
-        FM_idx_flag = _FM_idx_flag;
+        skip_idx = _skip_idx;
         index_dir = work_dir;
         mapping_dir = work_dir;
 
@@ -85,18 +84,10 @@ public:
             else if (p.path().extension().compare(ext_tax) == 0)
                 tax_file = p;
         }
-        if (!acc_file.has_filename())
-            std::cout << "ERROR: Unable to locate accession file in: " << lib_dir << std::endl, exit(-1);
 
-
-        std::cout << "STATUS\tSet accessions file: \t" << acc_file << std::endl;
         if (!fasta_file.has_filename())
             std::cout << "ERROR: Unable to locate fasta file in: " << lib_dir << std::endl, exit(-1);
-
         std::cout << "STATUS\tSet fasta file: \t" << fasta_file << std::endl;
-        if (!tax_file.has_filename())
-            std::cout << "ERROR: Unable to locate taxonomy file in: " << lib_dir << std::endl, exit(-1);
-        std::cout << "STATUS\tSet taxonomy file: \t" << tax_file << std::endl;
 
         // create working directory if not existing after clearing
         if (!fs::exists(work_dir))
@@ -109,13 +100,15 @@ public:
 
         // set output directory for FM index, will be created by genmap
         index_dir /= fs::path("index");
-        if (!FM_idx_flag && !fs::exists(index_dir))
+        std::cout << "STATUS\tSet index directory: \t" << index_dir << std::endl;
+
+        if (skip_idx && !fs::exists(index_dir))
         {
-            std::cerr << "ERROR: Index computation flag is set to 0, but index_dir (" << index_dir << ") does not exists!" << std::endl;
+            std::cerr << "ERROR: You configured PriSeT to skip index computation, but index_dir (" << index_dir << ") does not exists!" << std::endl;
             exit(-1);
         }
 
-        if (FM_idx_flag && fs::exists(index_dir))
+        if (!skip_idx && fs::exists(index_dir))
         {
             char cmd[50];
             sprintf(cmd, "rm -r %s", index_dir.c_str());
@@ -138,17 +131,6 @@ public:
         }
         result_file = result_path / "result.csv";
         primer_info_file = result_path / "primer_info.csv";
-        script_file = get_work_dir() / "app" / "app.R";
-        std::cout << "STATUS\tSet R script file: " << script_file << std::endl;
-        script_runner = get_work_dir() / "app" / "app_run.R";
-
-        if (!fs::exists(script_runner))
-        {
-            std::ofstream ofs;
-            ofs.open(script_runner);
-            ofs << "library(shiny)\nrunApp(" << script_file << ")\n";
-            ofs.close();
-        }
 
         /* Parse accession, id, and taxonomy files to build species set,
         * sequence to accession, and taxid to accessions map. Call first
@@ -163,22 +145,16 @@ public:
     // Destructor.
     ~IOConfig() = default;
 
-    // Return FM_idx_flag.
-    bool get_FM_idx_flag() const noexcept
+    // Return skip_idx.
+    bool get_skip_idx() const noexcept
     {
-        return FM_idx_flag;
+        return skip_idx;
     }
 
     // Return accession file with absolute path as filesystem::path object.
     fs::path get_acc_file() const noexcept
     {
         return acc_file;
-    }
-
-    // Return template file for shiny app.
-    fs::path get_app_template() const noexcept
-    {
-        return app_template;
     }
 
     // Return library file with absolute path as filesystem::path object.
@@ -215,18 +191,6 @@ public:
     fs::path get_result_file() const noexcept
     {
         return result_file;
-    }
-
-    // Return path to R script file to be run in terminal.
-    fs::path get_script_file() const noexcept
-    {
-        return script_file;
-    }
-
-    // Return path to R script starter file.
-    fs::path get_script_runner() const noexcept
-    {
-        return script_runner;
     }
 
     // Return taxonomy file with absolute path as filesystem::path object.
@@ -276,7 +240,9 @@ public:
     // Given a sequence number return its accession ID based on FASTA file.
     Accession get_acc_by_seqNo(TSeqNo const seqNo) const
     {
-        return seqNo2acc_map.at(seqNo);
+        if (seqNo2acc_map.count(seqNo))
+            return seqNo2acc_map.at(seqNo);
+        return "";
     }
 
     // Given an accession return the taxonomic ID.
@@ -300,7 +266,7 @@ private:
     fs::path work_dir;
 
     // Flag for indicating if index computation shall be skipped (because it already exists).
-    bool FM_idx_flag{1};
+    bool skip_idx{1};
 
     // Taxid to accession map in csv format (set by PriSeT).
     fs::path acc_file{};
@@ -340,15 +306,6 @@ private:
 
     // Association between sequence and accession identifiers.
     std::unordered_map<TSeqNo, Accession> seqNo2acc_map;
-
-    // Path to R shiny app template
-    fs::path app_template = "../PriSeT/src/app_template.R";
-
-    // R script for launching shiny app.
-    fs::path script_runner{};
-
-    // Path to generated copy of R script to be run in terminal.
-    fs::path script_file{};
 
     // Path to store result tables to load in Shiny.
     fs::path result_file{};

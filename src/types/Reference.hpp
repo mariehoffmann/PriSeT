@@ -1,6 +1,8 @@
 // ============================================================================
 //                    PriSeT - The Primer Search Tool
 // ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
 
 /*!\file
 * \brief Reference type for a taxid and its reference sequences.

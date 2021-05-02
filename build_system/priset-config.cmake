@@ -5,12 +5,11 @@
 #   priset::priset          -- interface target where
 #                                  target_link_libraries(target priset::priset)
 #                              automatically sets
-#                                  target_include_directories(target $SEQAN3_INCLUDE_DIRS),
-#                                  target_link_libraries(target $SEQAN3_LIBRARIES), and
-#                                  target_compile_options(target $SEQAN3_CXX_FLAGS)
+#                                  target_include_directories(target $SEQAN_INCLUDE_DIRS),
+#                                  target_link_libraries(target $SEQAN_LIBRARIES), and
+#                                  target_compile_options(target $SEQAN_CXX_FLAGS)
 #                              for a target.
-
-
+#
 # ----------------------------------------------------------------------------
 # Set paths for PriSeT.
 # ----------------------------------------------------------------------------
@@ -48,29 +47,19 @@ endmacro ()
 
 
 # Definitions needed by PriSeT tests and apps independently.
-# set (PRISET_INCLUDE_DIRS "-I ~/include -L ~/lib")
 message (STATUS "PRISET_INCLUDE_DIRS = ${PRISET_INCLUDE_DIRS}")
-set (PRISET_LIBRARIES "-lstdc++fs -lpthread")
-# set (CMAKE_STATIC_LINKER_FLAGS "-ldivsufsort -ldivsufsort64")
-# set (CMAKE_CXX_STANDARD_LIBRARIES "-lsdsl -ldivsufsort -ldivsufsort64")
-# set (CMAKE_EXE_LINKER_FLAGS "-ldivsufsort -ldivsufsort64")
 
 # -Wno-unknown-pragmas to suppress unknown pragma warning in genmap
 # -Wno-ignored-qualifiers to suppresses warnings in sdsl,
 #   e.g. in int_vector.hpp:1402:8: type qualifiers ignored on function return type
-set (PRISET_CXX_FLAGS "-std=c++17 -Wno-unknown-pragmas -Wno-ignored-qualifiers")
-
+set (PRISET_CXX_FLAGS "-std=c++17 -O3 -lstdc++fs -Wno-unknown-pragmas -Wno-ignored-qualifiers -Wno-deprecated -Wno-error=deprecated-copy -Wno-unused-parameter -lsdsl -ldivsufsort -ldivsufsort64")
 
 # ----------------------------------------------------------------------------
 # Find PriSeT include path
 # ----------------------------------------------------------------------------
 
-# Note that seqan3-config.cmake can be standalone and thus SEQAN3_CLONE_DIR might be empty.
-# * `SEQAN3_CLONE_DIR` was already found in seqan3-config-version.cmake
-# * `SEQAN3_INCLUDE_DIR` was already found in seqan3-config-version.cmake
 priset_status_message("PRISET_CLONE_DIR = ${PRISET_CLONE_DIR}")
 priset_status_message("PRISET_INCLUDE_DIR = ${PRISET_INCLUDE_DIR}")
-
 find_path (PRISET_SUBMODULES_DIR NAMES submodules/genmap HINTS "${PRISET_CLONE_DIR}" "${PRISET_INCLUDE_DIR}/PriSeT")
 
 if (PRISET_INCLUDE_DIR)
@@ -85,7 +74,7 @@ endif ()
 
 include (CheckIncludeFileCXX)
 include (CheckCXXSourceCompiles)
-# include (FindPackageHandleStandardArgs)
+include (FindPackageHandleStandardArgs)
 
 
 # # ----------------------------------------------------------------------------
@@ -116,6 +105,7 @@ endif()
 # ----------------------------------------------------------------------------
 
 add_library (genmap INTERFACE)
+
 target_include_directories(genmap INTERFACE ${PRISET_CLONE_DIR}/submodules/genmap/src)
 
 
@@ -130,22 +120,16 @@ target_include_directories(seqan2 INTERFACE ${PRISET_CLONE_DIR}/submodules/genma
 # ----------------------------------------------------------------------------
 # Require sdsl-lite and declare interface library.
 # ----------------------------------------------------------------------------
+set(CMAKE_REQUIRED_LIBRARIES "sdsl") 
+check_include_file_cxx (sdsl PRISET_HAS_SDSL)
 
-check_include_file_cxx (sdsl _SEQAN3_HAVE_SDSL)
-
-if (_SEQAN3_HAVE_SDSL)
+if (PRISET_HAS_SDSL)
     priset_status_message ("Required dependency:        SDSL found.")
 else ()
     priset_status_message ("The SDSL library is required, but wasn't found. Get it from https://github.com/xxsds/sdsl-lite")
 endif ()
 
-# add_library (sdsl INTERFACE) # declare library interface since genmap is header-only
-# target_include_directories(sdsl INTERFACE ${PRISET_CLONE_DIR}/submodules/sdsl-lite/include)
-set (PRISET_CXX_FLAGS "${PRISET_CXX_FLAGS} -ffast-math -funroll-loops -D__extern_always_inline=\"extern __always_inline\" -I$ENV{HOME}/include -L$ENV{HOME}/lib")
 
-# -ffast-math -funroll-loops -D__extern_always_inline="extern __always_inline" -I/Users/troja/include -L/Users/troja/lib
-
-# g++ -std=c++14  -O3 -DNDEBUG -msse4.2 -Wall -Wextra -pedantic -ffast-math -funroll-loops -D__extern_always_inline="extern __always_inline" -I/Users/troja/include -L/Users/troja/lib example.cpp -ldivsufsort -ldivsufsort64
 # ----------------------------------------------------------------------------
 # Add submodules of dependencies.
 # ----------------------------------------------------------------------------
@@ -180,7 +164,6 @@ target_link_libraries (priset_priset INTERFACE seqan2)
 # target_link_libraries (priset_priset INTERFACE divsufsort)
 # target_link_libraries (priset_priset INTERFACE ldivsufsort64)
 
-# target_link_libraries (priset_priset INTERFACE sdsl)
 target_include_directories (priset_priset INTERFACE "${PRISET_INCLUDE_DIR}")
 target_include_directories (priset_priset SYSTEM INTERFACE "${PRISET_DEPENDENCY_INCLUDE_DIRS}")
 add_library (priset::priset ALIAS priset_priset)

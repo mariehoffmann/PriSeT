@@ -19,7 +19,6 @@
 
 #include "../src/argument_parser.hpp"
 #include "../src/algorithm.hpp"
-#include "../src/gui.hpp"
 #include "../src/PrimerConfig.hpp"
 #include "../src/types.hpp"
 #include "../src/utilities.hpp"
@@ -27,12 +26,8 @@
 namespace fs = std::experimental::filesystem;
 using namespace priset;
 
-
-// g++ ../PriSeT/tests/transform_and_filter_test.cpp -Wno-write-strings -std=c++17 -Wall -Wextra -lstdc++fs -DNDEBUG -O3 -I/Users/troja/include -L/Users/troja/lib -lsdsl -ldivsufsort -o transform_and_filter_test
-
 struct setup
 {
-    // TODO: make this runnable with arbitrarily located build folders
     std::string lib_dir = (fs::canonical("../PriSeT/tests/library/one_seq")).string();
     std::string work_dir = (fs::canonical("../PriSeT/tests/work/one_seq")).string();
     IOConfig io_cfg{};
@@ -124,11 +119,8 @@ void test_combine()
 {
     setup su{};
     transform_and_filter(su.io_cfg, su.primer_cfg, su.locations, su.references, su.kmerIDs, su.seqNoMap, su.kmerCounts);
-    //using TPair = TPair;
     using TPairList = TPairList<TPair<CombinePattern>>;
     TPairList pairs;
-    //std::vector<_Ch_type, std::allocator<_CharT> > >(priset::PrimerConfig&, priset::TKmerIDs&, priset::TPairList<priset::TPair<priset::CombinePattern>> &)'
-//     print_combinations<>(su.primer_cfg, su.kmerIDs, pairs);
     combine(su.references, su.kmerIDs, pairs, su.kmerCounts);
     print_combinations<TPairList>(su.kmerIDs, pairs);
 }

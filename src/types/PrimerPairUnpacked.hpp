@@ -1,3 +1,9 @@
+// ============================================================================
+//                    PriSeT - The Primer Search Tool
+// ============================================================================
+//          Author: Marie Hoffmann <ozymandiaz147 AT gmail.com>
+//          Manual: https://github.com/mariehoffmann/PriSeT
+
 #pragma once
 
 #include <numeric>
@@ -18,7 +24,12 @@ struct PrimerPairUnpacked
     PrimerPairUnpacked() = default;
     // Constructor with arguments. Length corrected codes must not be zero.
     PrimerPairUnpacked(IOConfig * _io_cfg, TSeqNoMap const * _seqNo_map,
-        std::vector<bool> & _seqNo_cx_vector, uint64_t _code_fwd, uint64_t _code_rev) : io_cfg(_io_cfg), seqNo_map(_seqNo_map), seqNo_cx_vector(_seqNo_cx_vector), code_fwd(_code_fwd), code_rev(_code_rev)
+        std::vector<bool> & _seqNo_cx_vector, uint64_t _code_fwd, uint64_t _code_rev) : 
+            io_cfg(_io_cfg), 
+            seqNo_map(_seqNo_map), 
+            seqNo_cx_vector(_seqNo_cx_vector), 
+            code_fwd(_code_fwd), 
+            code_rev(_code_rev)
     {
         assert(code_fwd && code_rev);
         for (TSeqNo seqNo_cx = 0; seqNo_cx < seqNo_cx_vector.size(); ++seqNo_cx)
@@ -26,8 +37,9 @@ struct PrimerPairUnpacked
             if (!seqNo_cx_vector.at(seqNo_cx))
                 continue;
             // recover original sequence identifier
-            TSeqNo seqNo = seqNo_map->at((1ULL << 63) | seqNo_cx);
-            species_set.insert(io_cfg->get_taxid_by_seqNo(seqNo));
+            // TODO: optionally taxid file can be provided and primer pair information be augmented
+            // TSeqNo seqNo = seqNo_map->at((1ULL << 63) | seqNo_cx);
+            // species_set.insert(io_cfg->get_taxid_by_seqNo(seqNo));
         }
         it_species = species_set.cbegin();
     }
@@ -36,10 +48,15 @@ struct PrimerPairUnpacked
     // with ID = seqNo_cx.
     void set_sequence_match(uint64_t const seqNo_cx)
     {
+        // TODO: enable upon provisioning of taxid file
         TSeqNo seqNo = seqNo_map->at((1ULL << 63) | seqNo_cx);
-        Taxid taxid = io_cfg->get_taxid_by_seqNo(seqNo);
-        assert(io_cfg->is_species(taxid));
-        species_set.insert(taxid);
+        // TODO: this only upon provisioning of taxid file
+        if (false)
+        {
+            Taxid taxid = io_cfg->get_taxid_by_seqNo(seqNo);
+            assert(io_cfg->is_species(taxid));
+            species_set.insert(taxid);
+        }
         if (seqNo_cx_vector.size() <= seqNo_cx)
             seqNo_cx_vector.resize(seqNo_cx + 1, 0);
         if (!seqNo_cx_vector[seqNo_cx])
